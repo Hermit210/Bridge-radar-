@@ -15,8 +15,8 @@
 
 use anchor_lang::prelude::*;
 
-declare_id!("3H4czq5qrroFAH8tB7bUvSbwkYDvNkB4gDVr4Wp3QpUN");
-
+declare_id!("6148M4aXYbDsscWn14zCazPy9V4fQFGozdDQp4LFmqHM");
+                                                             
 #[program]
 pub mod radar_oracle {
     use super::*;
