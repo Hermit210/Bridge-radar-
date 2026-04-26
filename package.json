@@ -1,0 +1,23 @@
+{
+  "name": "bridge-radar",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Real-time bridge-health intelligence layer for Solana",
+  "license": "MIT",
+  "packageManager": "pnpm@10.15.1",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev:api": "pnpm --filter @radar/api dev",
+    "dev:dash": "pnpm --filter @radar/dashboard dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "format": "pnpm -r format",
+    "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

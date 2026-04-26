@@ -1,0 +1,44 @@
+# Bridge Radar — production-shaped local stack.
+# Not required for the v0 dev loop (which uses SQLite). Use this when you need
+# a Postgres + Timescale + Redis environment matching production.
+#
+#   docker compose up -d
+#   DATABASE_URL=postgres://radar:radar@localhost:5432/radar cargo run -p radar-indexer-solana
+
+services:
+  timescale:
+    image: timescale/timescaledb:2.16.1-pg16
+    container_name: radar-timescale
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: radar
+      POSTGRES_PASSWORD: radar
+      POSTGRES_DB: radar
+    ports:
+      - "5432:5432"
+    volumes:
+      - radar-pgdata:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U radar -d radar"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: radar-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - radar-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  radar-pgdata:
+  radar-redis:

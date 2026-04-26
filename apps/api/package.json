@@ -1,0 +1,29 @@
+{
+  "name": "@radar/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bridge Radar — REST + WebSocket gateway. Hono on Node.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'lint TBD'",
+    "test": "echo 'no tests'"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.0",
+    "@hono/node-ws": "^1.0.5",
+    "@radar/shared": "workspace:*",
+    "better-sqlite3": "^11.5.0",
+    "hono": "^4.6.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^22.7.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

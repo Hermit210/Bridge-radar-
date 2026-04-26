@@ -1,0 +1,30 @@
+[package]
+name = "radar-indexer-solana"
+description = "Bridge Radar — Solana event indexer (logsSubscribe + polling fallback)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+radar-core = { path = "../radar-core" }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+dotenvy = { workspace = true }
+reqwest = { workspace = true }
+url = { workspace = true }
+uuid = { workspace = true }
+futures-util = { workspace = true }
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots", "url"] }
+
+[[bin]]
+name = "radar-indexer-solana"
+path = "src/main.rs"
