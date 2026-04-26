@@ -22,7 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/events" className="hover:text-text">Events</Link>
               <Link href="/about" className="hover:text-text">About</Link>
               <a
-                href="https://github.com/Pratikkale26/bridge-radar/blob/main/WHITEPAPER.md"
+                href="https://github.com/Hermit210/Bridge-radar-/blob/master/WHITEPAPER.md"
                 className="hover:text-text"
                 target="_blank"
                 rel="noreferrer"
@@ -30,7 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 Whitepaper
               </a>
               <a
-                href="https://github.com/Pratikkale26/bridge-radar"
+                href="https://github.com/Hermit210/Bridge-radar-"
                 className="hover:text-text"
                 target="_blank"
                 rel="noreferrer"
