@@ -52,3 +52,7 @@ Over $2.8B drained from bridges since 2022. Most exploits emitted detectable sig
 ## License
 
 MIT (code), CC-BY 4.0 (docs). No token, no equity, no premine.
+Built by: Khan Saloni ([@Hermit210](https://github.com/Hermit210))
+## Devnet Deployment
+- Program ID: `6148M4aXYbDsscWn14zCazPy9V4fQFGozdDQp4LFmqHM`
+
