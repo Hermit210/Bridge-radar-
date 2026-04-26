@@ -5,21 +5,20 @@ anchor_version = "1.0.0"
 resolution = true
 skip-lint = false
 
-[programs.localnet]
-radar_oracle = "944WKQwFt6tuDXZTEwN35mC62V3h2r1ekUtceeAyDiNC"
-
 [programs.devnet]
 radar_oracle = "944WKQwFt6tuDXZTEwN35mC62V3h2r1ekUtceeAyDiNC"
 
-[registry]
-url = "https://api.apr.dev"
+[programs.localnet]
+radar_oracle = "3H4czq5qrroFAH8tB7bUvSbwkYDvNkB4gDVr4Wp3QpUN"
 
 [provider]
-cluster = "Localnet"
+cluster = "localnet"
 wallet = "~/.config/solana/id.json"
+
+[workspace]
+members = ["programs/*"]
 
 [scripts]
 test = "echo 'anchor test runner: TBD'"
 
-[workspace]
-members = ["programs/*"]
+[hooks]
