@@ -1,0 +1,24 @@
+[package]
+name = "radar-scorer"
+description = "Bridge Radar — Health Score writer (v0-naive: outflow rate only)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+radar-core = { path = "../radar-core" }
+tokio = { workspace = true }
+chrono = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+dotenvy = { workspace = true }
+
+[dev-dependencies]
+uuid = { workspace = true }
+
+[[bin]]
+name = "radar-scorer"
+path = "src/main.rs"

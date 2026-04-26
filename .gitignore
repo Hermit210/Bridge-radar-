@@ -1,0 +1,44 @@
+# Rust
+target/
+Cargo.lock.bak
+**/*.rs.bk
+
+# Node
+node_modules/
+.pnpm-store/
+*.tsbuildinfo
+.next/
+dist/
+build/
+out/
+
+# Anchor / Solana
+.anchor/
+test-ledger/
+**/*-keypair.json
+**/keypair*.json
+
+# Local DB / runtime artifacts
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+data/
+.cache/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+logs/

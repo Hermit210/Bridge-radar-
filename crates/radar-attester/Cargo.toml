@@ -1,0 +1,32 @@
+[package]
+name = "radar-attester"
+description = "Bridge Radar — pushes Health Scores onto the on-chain radar-oracle program."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+radar-core = { path = "../radar-core" }
+tokio = { workspace = true }
+chrono = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+dotenvy = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+reqwest = { workspace = true }
+base64 = { workspace = true }
+bs58 = "0.5"
+borsh = "1.5"
+solana-program = "2.0"
+solana-sdk = "2.0"
+solana-client = "2.0"
+
+[[bin]]
+name = "radar-attester"
+path = "src/main.rs"

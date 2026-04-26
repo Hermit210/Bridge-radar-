@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body {
+  background: #07090c;
+  color: #e7ecf2;
+  font-feature-settings: "ss01", "cv11";
+}
+
+.health-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #fb7185 0%, #facc15 50%, #2dd4bf 100%);
+}
