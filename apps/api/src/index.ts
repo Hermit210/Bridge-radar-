@@ -5,6 +5,7 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import type { BridgeEventKind, BridgeWithHealth, WsMessage } from "@radar/shared";
 import { RadarDb } from "./db.js";
+import { getImplementedBridges } from "./bridges.js";
 
 const port = Number(process.env.API_PORT ?? 3001);
 const host = process.env.API_HOST ?? "0.0.0.0";
@@ -30,6 +31,7 @@ app.get("/", (c) =>
       "GET /v1/bridges/:id/history",
       "GET /v1/events",
       "GET /v1/ws",
+      "GET /v1/registry",
     ],
   }),
 );
@@ -47,6 +49,22 @@ const SCORING_META = {
     "outflow_severity = z-score over a rolling 30-day distribution of 5-min bucket counts (z=4 → severity 1.0); falls back to clamp(events_per_5min / 10, 0, 1) for the first ~4 hours of observations. parity_severity = 1 - min(origin, solana) / max(origin, solana) over a 5-min window (count proxy; USD-weighted parity per Appendix B follows once per-bridge ABI decoders populate amount_usd). signer / frontend / oracle stream live once their detectors are deployed.",
   weights: { parity: 40, outflow: 25, signer: 15, frontend: 10, oracle: 10 },
 };
+
+// Bridge registry endpoint
+app.get("/v1/registry", (c) => {
+  const implemented = getImplementedBridges();
+  return c.json({
+    total: implemented.length,
+    bridges: implemented.map((b) => ({
+      id: b.id,
+      name: b.name,
+      homepage: b.homepage,
+      supportedChains: b.supportedChains,
+      hasSolana: b.hasSolana,
+      status: b.status,
+    })),
+  });
+});
 
 app.get("/v1/bridges", (c) => {
   const bridges = db.listBridges();
