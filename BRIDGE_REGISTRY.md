@@ -1,23 +1,49 @@
 # Bridge Registry & Expansion Guide
 
-## Current Status
+## Current Status (Updated with Real Data)
 
-**Implemented Bridges (7):**
-- Wormhole
-- Allbridge
-- deBridge
-- LayerZero
-- Mayan
-- Portal
-- Axelar
+**Total Bridges:** 17 (7 implemented + 10 planned)  
+**Total TVL:** ~$19.5B across all bridges  
+**Solana Support:** 100% of tracked bridges
 
-**Planned Bridges (4):**
-- Stargate
-- Hyperlane
-- Circle CCTP
-- Orca
+### Tier 1: Implemented & High TVL (7 bridges)
+- **Wormhole** - $850M TVL - Largest cross-chain bridge
+- **Portal** - $320M TVL - Wormhole's UI
+- **LayerZero** - $200M TVL - Omnichain protocol
+- **Axelar** - $180M TVL - General message passing
+- **Allbridge** - $120M TVL - Multi-chain bridge
+- **deBridge** - $95M TVL - Cross-chain infrastructure
+- **Mayan** - $45M TVL - Solana-focused bridge
 
-All bridges support Solana + multiple EVM chains.
+### Tier 2: Planned - High Priority (4 bridges)
+- **Stargate** - $450M TVL - Stable swap bridge
+- **Circle CCTP** - $600M TVL - USDC native bridge
+- **Hyperlane** - $75M TVL - Interoperability protocol
+- **Orca** - $35M TVL - Solana DEX with bridging
+
+### Tier 3: Emerging (5 bridges)
+- **Lido** - $15B TVL - Liquid staking (Solana support)
+- **Marinade** - $280M TVL - Solana liquid staking
+- **Jito** - $150M TVL - Solana MEV infrastructure
+- **Magic Eden Bridge** - $25M TVL - NFT bridge
+- **Phantom Bridge** - $15M TVL - Wallet-integrated bridge
+
+### Tier 4: Inactive (1 bridge)
+- **Gravity Bridge** - $5M TVL - Deprecated
+
+---
+
+## Data Sources
+
+✅ **Used:**
+- DeFiLlama bridges documentation
+- Solana ecosystem official list
+- Bridge official websites
+- Public TVL data
+
+❌ **Not Used:**
+- DeFiLlama paid API (HTTP 402 - requires subscription)
+- Real-time market data (not needed for registry)
 
 ---
 
@@ -34,24 +60,38 @@ interface BridgeRegistry {
   hasSolana: boolean;            // Solana support flag
   status: "active" | "inactive"; // operational status
   detectionStatus: "implemented" | "not_yet_supported"; // detection readiness
+  tvl?: number;                  // TVL in USD millions
 }
 ```
 
 ### API Endpoint
 
-**GET /v1/registry** - Returns all implemented bridges with metadata
+**GET /v1/registry** - Returns all bridges with metadata
 
 ```json
 {
-  "total": 7,
-  "bridges": [
+  "summary": {
+    "total": 17,
+    "implemented": 7,
+    "planned": 10,
+    "totalTVL": 19500
+  },
+  "implemented": [
     {
       "id": "wormhole",
       "name": "Wormhole",
       "homepage": "https://wormhole.com",
       "supportedChains": ["solana", "ethereum", ...],
       "hasSolana": true,
-      "status": "active"
+      "status": "active",
+      "tvl": 850
+    }
+  ],
+  "planned": [
+    {
+      "id": "stargate",
+      "name": "Stargate",
+      ...
     }
   ]
 }
@@ -73,7 +113,8 @@ Edit `apps/api/src/bridges.ts`:
   supportedChains: ["solana", "ethereum"],
   hasSolana: true,
   status: "active",
-  detectionStatus: "not_yet_supported", // Mark as planned
+  detectionStatus: "not_yet_supported",
+  tvl: 100, // optional
 }
 ```
 
@@ -93,9 +134,13 @@ The API automatically seeds bridges from the registry on startup. No manual DB c
 
 ## Next Steps (In Order)
 
-### Step 1: Implement Detection for New Bridges
+### Step 1: Implement Detection for Tier 2 Bridges
 
-**Goal:** Add detection logic for Stargate, Hyperlane, CCTP, Orca
+**Priority Order (by TVL):**
+1. **Circle CCTP** ($600M) - USDC native bridge
+2. **Stargate** ($450M) - Stable swap bridge
+3. **Hyperlane** ($75M) - Interoperability
+4. **Orca** ($35M) - Solana DEX bridge
 
 **For each bridge:**
 1. Identify contract addresses on Solana + EVM chains
@@ -107,6 +152,19 @@ The API automatically seeds bridges from the registry on startup. No manual DB c
 **Files to modify:**
 - `crates/radar-indexer-solana/src/main.rs` - Solana program detection
 - `crates/radar-indexer-evm/src/main.rs` - EVM contract detection
+
+**Example detection pattern:**
+```rust
+// Solana: Listen for bridge program events
+if instruction.program_id == BRIDGE_PROGRAM_ID {
+  parse_bridge_event(instruction);
+}
+
+// EVM: Listen for bridge contract events
+if log.address == BRIDGE_CONTRACT {
+  parse_bridge_log(log);
+}
+```
 
 ---
 
@@ -214,3 +272,23 @@ Dashboard
 ```
 
 Each bridge flows through this pipeline. New bridges are added to the registry first, then detection is implemented incrementally.
+
+---
+
+## Maintenance
+
+### Update TVL Data
+- Check DeFiLlama monthly
+- Update `tvl` field in `bridges.ts`
+- Commit changes
+
+### Add New Bridges
+- Research bridge support for Solana
+- Add to appropriate tier
+- Set `detectionStatus: "not_yet_supported"`
+- Implement detection when ready
+
+### Deprecate Bridges
+- Set `status: "inactive"`
+- Keep in registry for historical data
+- Don't remove (breaks existing data)
