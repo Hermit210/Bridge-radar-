@@ -1,14 +1,45 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { HealthCard } from "@/components/health-card";
 import { LiveFeed } from "@/components/live-feed";
 import { apiUrls, listBridges, listEvents } from "@/lib/api";
+import type { BridgeWithHealth, BridgeEvent } from "@radar/shared";
 
-export const dynamic = "force-dynamic";
+export default function Home() {
+  const [bridges, setBridges] = useState<BridgeWithHealth[]>([]);
+  const [events, setEvents] = useState<BridgeEvent[]>([]);
 
-export default async function Home() {
-  const [{ bridges }, { events }] = await Promise.all([
-    listBridges().catch(() => ({ bridges: [] })),
-    listEvents({ limit: 50 }).catch(() => ({ events: [] })),
-  ]);
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchData = async () => {
+      try {
+        const [bridgesResult, eventsResult] = await Promise.all([
+          listBridges().catch(() => ({ bridges: [] })),
+          listEvents({ limit: 50 }).catch(() => ({ events: [] })),
+        ]);
+        
+        if (!cancelled) {
+          setBridges(bridgesResult.bridges);
+          setEvents(eventsResult.events);
+        }
+      } catch (error) {
+        // Handle error silently, keep existing data
+      }
+    };
+
+    // Initial fetch
+    fetchData();
+
+    // Set up polling
+    const interval = setInterval(fetchData, 5000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
 
   const totals = {
     green: bridges.filter((b) => (b.health?.score ?? 0) >= 80).length,
@@ -60,7 +91,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <LiveFeed initial={events} wsUrl={apiUrls.ws} />
+      <LiveFeed initial={events} />
     </div>
   );
 }

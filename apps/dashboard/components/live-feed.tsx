@@ -1,54 +1,49 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { BridgeEvent, WsMessage } from "@radar/shared";
+import type { BridgeEvent } from "@radar/shared";
 import { EventRow } from "./event-row";
+import { listEvents } from "@/lib/api";
 
 interface Props {
   initial: BridgeEvent[];
-  wsUrl: string;
 }
 
-export function LiveFeed({ initial, wsUrl }: Props) {
+export function LiveFeed({ initial }: Props) {
   const [events, setEvents] = useState<BridgeEvent[]>(initial);
-  const [connected, setConnected] = useState(false);
+  const [connected, setConnected] = useState(true);
 
   useEffect(() => {
-    let ws: WebSocket | null = null;
     let cancelled = false;
 
-    function connect() {
-      ws = new WebSocket(wsUrl);
-      ws.onopen = () => setConnected(true);
-      ws.onclose = () => {
-        setConnected(false);
-        if (!cancelled) setTimeout(connect, 2000);
-      };
-      ws.onerror = () => ws?.close();
-      ws.onmessage = (evt) => {
-        try {
-          const msg = JSON.parse(evt.data) as WsMessage;
-          if (msg.kind === "event") {
-            setEvents((cur) => [msg.data, ...cur].slice(0, 50));
-          }
-        } catch {
-          /* ignore */
+    const fetchEvents = async () => {
+      try {
+        const { events: newEvents } = await listEvents({ limit: 50 });
+        if (!cancelled) {
+          setEvents(newEvents);
+          setConnected(true);
         }
-      };
-    }
-    connect();
+      } catch (error) {
+        if (!cancelled) {
+          setConnected(false);
+        }
+      }
+    };
+
+    const interval = setInterval(fetchEvents, 5000);
+
     return () => {
       cancelled = true;
-      ws?.close();
+      clearInterval(interval);
     };
-  }, [wsUrl]);
+  }, []);
 
   return (
     <section className="rounded-xl border border-border bg-surface">
       <header className="flex items-center justify-between border-b border-border px-5 py-3">
         <h2 className="text-sm font-semibold">Live event feed</h2>
         <span className={`text-xs ${connected ? "text-green" : "text-muted"}`}>
-          {connected ? "● live" : "○ disconnected"}
+          {connected ? "● live" : "○ reconnecting..."}
         </span>
       </header>
       <div className="max-h-96 overflow-auto">
