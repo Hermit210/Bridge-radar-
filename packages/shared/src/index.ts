@@ -79,7 +79,16 @@ export interface BridgeRow {
   enabled: boolean;
 }
 
+export interface DeFiLlamaData {
+  tvl: number;
+  tvlFormatted: string;
+  volume24h: number;
+  volumeFormatted: string;
+  chains: string[];
+}
+
 export interface BridgeWithHealth extends BridgeRow {
+  defilama?: DeFiLlamaData;
   health?: HealthScore;
 }
 

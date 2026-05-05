@@ -16,6 +16,8 @@ const bandLabel = {
 export function HealthCard({ bridge }: { bridge: BridgeWithHealth }) {
   const score = bridge.health?.score;
   const band = score !== undefined ? bandOf(score) : "yellow";
+  const defilama = bridge.defilama;
+
   return (
     <Link
       href={`/bridges/${bridge.id}`}
@@ -30,7 +32,11 @@ export function HealthCard({ bridge }: { bridge: BridgeWithHealth }) {
           {score ?? "—"}
         </div>
       </div>
+
+      {/* Health bar */}
       <div className="mt-4 health-bar opacity-30" />
+
+      {/* Status and time */}
       <div className="mt-3 flex justify-between text-xs">
         <span className={`${bandColor[band]}`}>{bandLabel[band]}</span>
         <span className="text-muted">
@@ -39,7 +45,26 @@ export function HealthCard({ bridge }: { bridge: BridgeWithHealth }) {
             : "no score yet"}
         </span>
       </div>
-      <p className="mt-2 text-[10px] uppercase tracking-wider text-muted">
+
+      {/* DeFiLlama context - TVL and volume */}
+      {defilama && (
+        <div className="mt-3 space-y-1 border-t border-border/50 pt-3">
+          <div className="flex justify-between text-xs">
+            <span className="text-muted">TVL</span>
+            <span className="font-mono text-text">{defilama.tvlFormatted}</span>
+          </div>
+          <div className="flex justify-between text-xs">
+            <span className="text-muted">24h Vol</span>
+            <span className="font-mono text-text">{defilama.volumeFormatted}</span>
+          </div>
+          <div className="flex justify-between text-xs">
+            <span className="text-muted">Chains</span>
+            <span className="font-mono text-text">{defilama.chains.length}</span>
+          </div>
+        </div>
+      )}
+
+      <p className="mt-3 text-[10px] uppercase tracking-wider text-muted">
         algorithm: v0-naive · parity + outflow only
       </p>
     </Link>
