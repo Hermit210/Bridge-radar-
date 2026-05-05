@@ -5,7 +5,7 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import type { BridgeEventKind, BridgeWithHealth, WsMessage } from "@radar/shared";
 import { RadarDb } from "./db.js";
-import { getImplementedBridges } from "./bridges.js";
+import { getImplementedBridges, getPlannedBridges, getTotalTVL, BRIDGE_REGISTRY } from "./bridges.js";
 
 const port = Number(process.env.API_PORT ?? 3001);
 const host = process.env.API_HOST ?? "0.0.0.0";
@@ -30,8 +30,8 @@ app.get("/", (c) =>
       "GET /v1/bridges/:id/health",
       "GET /v1/bridges/:id/history",
       "GET /v1/events",
-      "GET /v1/ws",
       "GET /v1/registry",
+      "GET /v1/ws",
     ],
   }),
 );
@@ -50,18 +50,34 @@ const SCORING_META = {
   weights: { parity: 40, outflow: 25, signer: 15, frontend: 10, oracle: 10 },
 };
 
-// Bridge registry endpoint
+// Bridge registry endpoint - returns all bridges with metadata
 app.get("/v1/registry", (c) => {
   const implemented = getImplementedBridges();
+  const planned = getPlannedBridges();
   return c.json({
-    total: implemented.length,
-    bridges: implemented.map((b) => ({
+    summary: {
+      total: BRIDGE_REGISTRY.length,
+      implemented: implemented.length,
+      planned: planned.length,
+      totalTVL: getTotalTVL(),
+    },
+    implemented: implemented.map((b) => ({
       id: b.id,
       name: b.name,
       homepage: b.homepage,
       supportedChains: b.supportedChains,
       hasSolana: b.hasSolana,
       status: b.status,
+      tvl: b.tvl,
+    })),
+    planned: planned.map((b) => ({
+      id: b.id,
+      name: b.name,
+      homepage: b.homepage,
+      supportedChains: b.supportedChains,
+      hasSolana: b.hasSolana,
+      status: b.status,
+      tvl: b.tvl,
     })),
   });
 });
