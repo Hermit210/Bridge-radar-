@@ -6,6 +6,7 @@ import { logger } from "hono/logger";
 import type { BridgeEventKind, BridgeWithHealth, WsMessage } from "@radar/shared";
 import { RadarDb } from "./db.js";
 import { getImplementedBridges, getPlannedBridges, getTotalTVL, BRIDGE_REGISTRY } from "./bridges.js";
+import { fetchDeFiLlamaBridges, filterSolanaBridges, getBridgeData, formatTVL, formatVolume } from "./defilama.js";
 
 const port = Number(process.env.API_PORT ?? 3001);
 const host = process.env.API_HOST ?? "0.0.0.0";
@@ -31,6 +32,7 @@ app.get("/", (c) =>
       "GET /v1/bridges/:id/history",
       "GET /v1/events",
       "GET /v1/registry",
+      "GET /v1/defilama",
       "GET /v1/ws",
     ],
   }),
@@ -49,6 +51,32 @@ const SCORING_META = {
     "outflow_severity = z-score over a rolling 30-day distribution of 5-min bucket counts (z=4 → severity 1.0); falls back to clamp(events_per_5min / 10, 0, 1) for the first ~4 hours of observations. parity_severity = 1 - min(origin, solana) / max(origin, solana) over a 5-min window (count proxy; USD-weighted parity per Appendix B follows once per-bridge ABI decoders populate amount_usd). signer / frontend / oracle stream live once their detectors are deployed.",
   weights: { parity: 40, outflow: 25, signer: 15, frontend: 10, oracle: 10 },
 };
+
+// DeFiLlama data endpoint - returns Solana-compatible bridges with TVL/volume
+app.get("/v1/defilama", async (c) => {
+  try {
+    const allBridges = await fetchDeFiLlamaBridges();
+    const solanaBridges = filterSolanaBridges(allBridges);
+    
+    return c.json({
+      source: "DeFiLlama",
+      timestamp: new Date().toISOString(),
+      count: solanaBridges.length,
+      bridges: solanaBridges.map((b) => ({
+        id: b.id,
+        name: b.name,
+        chains: b.chains,
+        tvl: b.tvl,
+        tvlFormatted: formatTVL(b.tvl),
+        volume24h: b.volume24h,
+        volumeFormatted: formatVolume(b.volume24h),
+      })),
+    });
+  } catch (error) {
+    console.error("DeFiLlama endpoint error:", error);
+    return c.json({ error: "Failed to fetch DeFiLlama data" }, 500);
+  }
+});
 
 // Bridge registry endpoint - returns all bridges with metadata
 app.get("/v1/registry", (c) => {
@@ -82,22 +110,62 @@ app.get("/v1/registry", (c) => {
   });
 });
 
-app.get("/v1/bridges", (c) => {
+app.get("/v1/bridges", async (c) => {
   const bridges = db.listBridges();
   const scores = new Map(db.latestScores().map((s) => [s.bridge_id, s]));
+  
+  // Fetch DeFiLlama data for context
+  let defilamaData: Map<string, any> = new Map();
+  try {
+    const allBridges = await fetchDeFiLlamaBridges();
+    const solanaBridges = filterSolanaBridges(allBridges);
+    solanaBridges.forEach((b) => {
+      defilamaData.set(b.id, {
+        tvl: b.tvl,
+        tvlFormatted: formatTVL(b.tvl),
+        volume24h: b.volume24h,
+        volumeFormatted: formatVolume(b.volume24h),
+        chains: b.chains,
+      });
+    });
+  } catch (error) {
+    console.warn("Could not fetch DeFiLlama data:", error);
+  }
+
   const out: BridgeWithHealth[] = bridges.map((b) => ({
     ...b,
     health: scores.get(b.id),
+    defilama: defilamaData.get(b.id),
   }));
   return c.json({ scoring: SCORING_META, bridges: out });
 });
 
-app.get("/v1/bridges/:id", (c) => {
+app.get("/v1/bridges/:id", async (c) => {
   const id = c.req.param("id");
   const bridge = db.listBridges().find((b) => b.id === id);
   if (!bridge) return c.json({ error: "bridge not found" }, 404);
+  
   const score = db.latestScores().find((s) => s.bridge_id === id);
-  return c.json({ bridge, health: score });
+  
+  // Fetch DeFiLlama data for this bridge
+  let defilamaData = null;
+  try {
+    const allBridges = await fetchDeFiLlamaBridges();
+    const bridgeData = getBridgeData(id, allBridges);
+    if (bridgeData) {
+      defilamaData = {
+        tvl: bridgeData.tvl,
+        tvlFormatted: formatTVL(bridgeData.tvl),
+        volume24h: bridgeData.volume24h,
+        volumeFormatted: formatVolume(bridgeData.volume24h),
+        chains: bridgeData.chains,
+      };
+    }
+  } catch (error) {
+    console.warn("Could not fetch DeFiLlama data for bridge:", error);
+  }
+
+  return c.json({ bridge, health: score, defilama: defilamaData });
 });
 
 app.get("/v1/bridges/:id/health", (c) => {
