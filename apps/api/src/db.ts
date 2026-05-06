@@ -102,18 +102,8 @@ export class RadarDb {
         ('stargate','Stargate','https://stargate.finance'),
         ('cctp','Circle CCTP','https://www.circle.com/en/usdc/bridge'),
         ('hyperlane','Hyperlane','https://hyperlane.xyz'),
-        ('orca','Orca','https://orca.so'),
-        ('marinade','Marinade','https://marinade.finance'),
         ('lido','Lido','https://lido.fi'),
-        ('jito','Jito','https://jito.co'),
-        ('magic-eden','Magic Eden Bridge','https://magiceden.io'),
-        ('phantom','Phantom Bridge','https://phantom.app'),
-        ('raydium','Raydium','https://raydium.io'),
-        ('orca-whirlpool','Orca Whirlpool','https://orca.so'),
-        ('serum','Serum','https://www.projectserum.com'),
-        ('saber','Saber','https://saber.so'),
-        ('step','Step Finance','https://step.finance'),
-        ('cope','Cope','https://cope.trade');
+        ('magic-eden','Magic Eden Bridge','https://magiceden.io');
     `);
   }
 

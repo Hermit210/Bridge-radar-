@@ -20,8 +20,7 @@ export interface BridgeConfig {
 /**
  * All Solana-compatible bridges
  * Tier 1: Fully implemented (7 bridges)
- * Tier 2: Planned - high priority (4 bridges)
- * Tier 3: Emerging (5 bridges)
+ * Tier 2: Planned - high priority (5 bridges)
  */
 export const BRIDGE_CONFIG: BridgeConfig[] = [
   // ─── TIER 1: Fully Implemented ────────────────────────────────────────────
@@ -108,24 +107,6 @@ export const BRIDGE_CONFIG: BridgeConfig[] = [
     detectionStatus: "not_yet_supported",
   },
   {
-    id: "orca",
-    name: "Orca",
-    homepage: "https://orca.so",
-    chains: ["solana"],
-    status: "partial",
-    detectionStatus: "not_yet_supported",
-  },
-
-  // ─── TIER 3: Emerging ─────────────────────────────────────────────────────
-  {
-    id: "marinade",
-    name: "Marinade",
-    homepage: "https://marinade.finance",
-    chains: ["solana"],
-    status: "partial",
-    detectionStatus: "not_yet_supported",
-  },
-  {
     id: "lido",
     name: "Lido",
     homepage: "https://lido.fi",
@@ -134,26 +115,10 @@ export const BRIDGE_CONFIG: BridgeConfig[] = [
     detectionStatus: "not_yet_supported",
   },
   {
-    id: "jito",
-    name: "Jito",
-    homepage: "https://jito.co",
-    chains: ["solana"],
-    status: "partial",
-    detectionStatus: "not_yet_supported",
-  },
-  {
     id: "magic-eden",
     name: "Magic Eden Bridge",
     homepage: "https://magiceden.io",
     chains: ["solana", "ethereum"],
-    status: "partial",
-    detectionStatus: "not_yet_supported",
-  },
-  {
-    id: "phantom",
-    name: "Phantom Bridge",
-    homepage: "https://phantom.app",
-    chains: ["solana", "ethereum", "polygon"],
     status: "partial",
     detectionStatus: "not_yet_supported",
   },
