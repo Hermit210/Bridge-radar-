@@ -1,13 +1,16 @@
 //! Per-bridge adapter modules. v0 ships a working Wormhole adapter plus
-//! placeholder modules for the other six bridges so contributors have a
+//! placeholder modules for the other bridges so contributors have a
 //! clear "fill this in" surface.
 
 pub mod allbridge;
 pub mod axelar;
+pub mod cctp;
 pub mod debridge;
+pub mod hyperlane;
 pub mod layerzero;
 pub mod mayan;
 pub mod portal;
+pub mod stargate;
 pub mod wormhole;
 
 use crate::adapter::BridgeAdapter;
@@ -23,5 +26,8 @@ pub fn registry() -> Vec<Arc<dyn BridgeAdapter>> {
         Arc::new(mayan::MayanAdapter),
         Arc::new(portal::PortalAdapter),
         Arc::new(axelar::AxelarAdapter),
+        Arc::new(cctp::CctpAdapter),
+        Arc::new(hyperlane::HyperlaneAdapter),
+        Arc::new(stargate::StargateAdapter),
     ]
 }
