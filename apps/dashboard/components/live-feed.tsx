@@ -42,13 +42,13 @@ export function LiveFeed({ initial }: Props) {
   return (
     <section className="glass-card-elevated overflow-hidden">
       <header className="flex items-center justify-between border-b border-border-subtle px-6 py-4">
-        <h2 className="text-sm font-semibold text-text">Live event feed</h2>
+        <h2 className="text-sm font-semibold gradient-text-vivid">Live event feed</h2>
         <span className="inline-flex items-center gap-2 text-xs">
           {connected ? (
-            <>
-              <span className="status-dot status-dot-green"></span>
+            <span className="badge" style={{ background: "rgba(45,212,191,0.1)", borderColor: "rgba(45,212,191,0.2)" }}>
+              <span className="status-dot status-dot-green" style={{ width: 8, height: 8, animation: "pulse-dot 2s ease-in-out infinite" }}></span>
               <span className="text-green font-medium">Live</span>
-            </>
+            </span>
           ) : (
             <>
               <span className="status-dot status-dot-muted"></span>
@@ -57,7 +57,7 @@ export function LiveFeed({ initial }: Props) {
           )}
         </span>
       </header>
-      <div className="max-h-[28rem] overflow-auto">
+      <div className="max-h-[32rem] overflow-auto">
         <table className="w-full text-left premium-table">
           <thead className="text-xs uppercase tracking-widest text-muted-dark font-medium">
             <tr>
@@ -73,8 +73,23 @@ export function LiveFeed({ initial }: Props) {
           <tbody>
             {events.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-muted text-sm">
-                  Waiting for events. Make sure the indexer is running.
+                <td colSpan={7} className="px-6 py-16 text-center">
+                  <div className="flex flex-col items-center gap-4">
+                    {/* Radar sweep CSS illustration */}
+                    <div className="relative w-16 h-16">
+                      <div className="absolute inset-0 rounded-full border border-accent/20" />
+                      <div className="absolute inset-2 rounded-full border border-accent/15" />
+                      <div className="absolute inset-4 rounded-full border border-accent/10" />
+                      <div className="absolute inset-0 rounded-full" style={{
+                        background: "conic-gradient(from 0deg, transparent 0deg, rgba(110,168,255,0.15) 60deg, transparent 120deg)",
+                        animation: "spin 3s linear infinite",
+                      }} />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-2 h-2 rounded-full bg-accent/40" />
+                      </div>
+                    </div>
+                    <p className="text-muted text-sm">Waiting for events. Make sure the indexer is running.</p>
+                  </div>
                 </td>
               </tr>
             ) : (
