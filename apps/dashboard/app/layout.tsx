@@ -43,7 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main className="mx-auto max-w-7xl px-6 py-10">{children}</main>
         <footer className="border-t border-border/30 mt-20">
           <div className="mx-auto max-w-7xl px-6 py-6 text-xs text-muted-dark">
-            Public-goods infrastructure. Built by Saloni Khan · MIT (code) · CC-BY 4.0 (docs) · No token.
+            Public-goods infrastructure. Built by Khan Saloni · MIT (code) · CC-BY 4.0 (docs) · No token.
           </div>
         </footer>
       </body>
