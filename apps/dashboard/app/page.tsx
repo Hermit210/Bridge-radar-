@@ -5,6 +5,7 @@ export default function LandingPage() {
     <div className="mx-auto max-w-5xl px-6 py-16 space-y-24 animate-fade-in">
       {/* Hero */}
       <section className="relative text-center space-y-8 py-12 overflow-hidden">
+        {/* Decorative background */}
         <div className="absolute inset-0 hero-grid animate-grid-fade pointer-events-none" />
         <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-accent/10 blur-[100px] pointer-events-none animate-float" />
         <div className="absolute -bottom-32 -left-32 w-80 h-80 rounded-full bg-green/10 blur-[100px] pointer-events-none animate-float" style={{ animationDelay: "3s" }} />
@@ -28,10 +29,18 @@ export default function LandingPage() {
           </p>
 
           <div className="flex items-center justify-center gap-4 pt-2">
-            <Link href="/bridges" className="rounded-xl bg-accent px-8 py-3.5 text-sm font-semibold text-black shadow-glow-sm hover:shadow-glow-md hover:bg-accent-dim transition-all duration-300">
+            <Link
+              href="/bridges"
+              className="rounded-xl bg-accent px-8 py-3.5 text-sm font-semibold text-black shadow-glow-sm hover:shadow-glow-md hover:bg-accent-dim transition-all duration-300"
+            >
               View Live Dashboard
             </Link>
-            <a href="https://github.com/Hermit210/Bridge-radar-" target="_blank" rel="noreferrer" className="glass-card px-8 py-3.5 text-sm text-text-secondary hover:text-text transition-all duration-300">
+            <a
+              href="https://github.com/Hermit210/Bridge-radar-"
+              target="_blank"
+              rel="noreferrer"
+              className="glass-card px-8 py-3.5 text-sm text-text-secondary hover:text-text transition-all duration-300"
+            >
               GitHub
             </a>
           </div>
@@ -45,7 +54,10 @@ export default function LandingPage() {
           { value: "$2.8B+", label: "Lost to Bridge Exploits" },
           { value: "100%", label: "Open Source" },
         ].map((s) => (
-          <div key={s.label} className="glass-card p-8 space-y-3 transition-all duration-300 hover:shadow-glow-sm hover:-translate-y-1">
+          <div
+            key={s.label}
+            className="glass-card p-8 space-y-3 transition-all duration-300 hover:shadow-glow-sm hover:-translate-y-1"
+          >
             <div className="text-4xl font-bold font-mono text-gradient">{s.value}</div>
             <div className="text-sm text-text-secondary tracking-wide">{s.label}</div>
           </div>
@@ -67,7 +79,10 @@ export default function LandingPage() {
             { title: "Oracle Staleness", desc: "Checks price feed freshness that bridges depend on." },
             { title: "On-chain Health Oracle", desc: "dApps can gate withdrawals based on live bridge health scores." },
           ].map((f) => (
-            <div key={f.title} className="glass-card p-6 space-y-3 group transition-all duration-300 hover:border-accent/20 hover:shadow-glow-sm">
+            <div
+              key={f.title}
+              className="glass-card p-6 space-y-3 group transition-all duration-300 hover:border-accent/20 hover:shadow-glow-sm"
+            >
               <div className="flex items-center gap-2 text-sm font-semibold text-text group-hover:text-accent transition-colors">
                 <span className="inline-block w-1.5 h-1.5 rounded-sm bg-accent" />
                 {f.title}
@@ -83,7 +98,10 @@ export default function LandingPage() {
         <section className="glass-card-elevated p-12 text-center space-y-6">
           <h2 className="text-3xl font-bold">Ready to check bridge health?</h2>
           <p className="text-text-secondary text-sm">Live data. No token. No signup. Fully open source.</p>
-          <Link href="/bridges" className="inline-block rounded-xl bg-accent px-8 py-3.5 text-sm font-semibold text-black shadow-glow-sm hover:shadow-glow-md hover:bg-accent-dim transition-all duration-300">
+          <Link
+            href="/bridges"
+            className="inline-block rounded-xl bg-accent px-8 py-3.5 text-sm font-semibold text-black shadow-glow-sm hover:shadow-glow-md hover:bg-accent-dim transition-all duration-300"
+          >
             Open Dashboard
           </Link>
         </section>
