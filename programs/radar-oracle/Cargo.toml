@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Bridge Radar — on-chain Health Score oracle"
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/Pratikkale26/bridge-radar"
+repository = "https://github.com/Hermit210/Bridge-radar-"
 
 # Anchor builds this crate standalone (not as a member of the parent
 # workspace at the repo root). The empty [workspace] table tells cargo to
