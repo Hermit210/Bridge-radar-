@@ -3,7 +3,7 @@
 **A real-time bridge-health intelligence layer for Solana.**
 
 Version 0.1 — April 2026
-Author: Pratik Kale
+Author: Saloni Khan
 
 ---
 
@@ -292,7 +292,7 @@ Self-funded buffer for RPC overage and domain registration.
 
 ## 12. Team
 
-**Pratik Kale** — 3 years full-stack blockchain. Turbin3 graduate. CTO at an IIT Madras–incubated startup. 1× hackathon winner, 3× grant recipient. Background in DePIN and infrastructure tooling. Sole maintainer at v1; will recruit one co-maintainer post-launch.
+**Saloni Khan** — 3 years full-stack blockchain. Turbin3 graduate. CTO at an IIT Madras–incubated startup. 1× hackathon winner, 3× grant recipient. Background in DePIN and infrastructure tooling. Sole maintainer at v1; will recruit one co-maintainer post-launch.
 
 ---
 

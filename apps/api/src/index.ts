@@ -24,7 +24,7 @@ app.get("/", (c) =>
   c.json({
     name: "bridge-radar",
     version: "0.1.0",
-    docs: "https://github.com/Pratikkale26/bridge-radar/blob/main/ARCHITECTURE.md",
+    docs: "https://github.com/Hermit210/Bridge-radar-/blob/main/ARCHITECTURE.md",
     endpoints: [
       "GET /v1/bridges",
       "GET /v1/bridges/:id",
