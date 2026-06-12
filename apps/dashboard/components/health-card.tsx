@@ -25,6 +25,12 @@ const bandDot = {
   red: "status-dot-red",
 } as const;
 
+const bandBorderColor = {
+  green: "border-l-green/30",
+  yellow: "border-l-yellow/30",
+  red: "border-l-red/30",
+} as const;
+
 export function HealthCard({ bridge }: { bridge: BridgeWithHealth }) {
   const score = bridge.health?.score;
   const band = score !== undefined ? bandOf(score) : "yellow";
@@ -33,26 +39,32 @@ export function HealthCard({ bridge }: { bridge: BridgeWithHealth }) {
   return (
     <Link
       href={`/bridges/${bridge.id}`}
-      className="group block glass-card p-5 transition-all duration-300 hover:shadow-card-hover hover:-translate-y-1 hover:border-accent/30"
+      className={`group block glass-card-interactive p-6 border-l-2 ${bandBorderColor[band]}`}
     >
       <div className="flex items-baseline justify-between">
         <div>
-          <h3 className="text-lg font-semibold group-hover:text-accent transition-colors duration-200">
+          <h3 className="text-xl font-bold group-hover:text-accent transition-colors duration-200">
             {bridge.display_name}
           </h3>
-          <p className="text-xs text-muted-dark font-mono">{bridge.id}</p>
+          <p className="text-[11px] text-muted-dark font-mono">{bridge.id}</p>
         </div>
-        <div className={`text-3xl font-bold font-mono tabular-nums ${bandColor[band]}`}>
-          {score ?? "—"}
+        <div className="relative">
+          <div className={`absolute inset-0 rounded-full ${band === "green" ? "bg-green/5" : band === "yellow" ? "bg-yellow/5" : "bg-red/5"} blur-sm scale-150`} />
+          <div className={`relative text-4xl font-bold font-mono tabular-nums ${bandColor[band]}`}>
+            {score ?? "—"}
+          </div>
         </div>
       </div>
 
       {/* Health bar */}
-      <div className="mt-4 health-bar">
-        <div
-          className={`health-bar-fill ${bandBarClass[band]}`}
-          style={{ width: `${score ?? 0}%` }}
-        />
+      <div className="mt-4 flex items-center gap-3">
+        <div className="flex-1 health-bar">
+          <div
+            className={`health-bar-fill ${bandBarClass[band]}`}
+            style={{ width: `${score ?? 0}%` }}
+          />
+        </div>
+        <span className="text-[11px] font-mono text-muted-dark tabular-nums">{score ?? 0}%</span>
       </div>
 
       {/* Status and time */}
@@ -70,7 +82,7 @@ export function HealthCard({ bridge }: { bridge: BridgeWithHealth }) {
 
       {/* DeFiLlama context */}
       {defilama && (
-        <div className="mt-3 space-y-1 border-t border-border-subtle pt-3">
+        <div className="mt-3 space-y-1 pt-3" style={{ borderTop: "1px solid", borderImage: "linear-gradient(90deg, rgba(110,168,255,0.15), rgba(167,139,250,0.1), transparent) 1" }}>
           <div className="flex justify-between text-xs">
             <span className="text-muted">TVL</span>
             <span className="font-mono text-text-secondary tabular-nums">{defilama.tvlFormatted}</span>
@@ -86,9 +98,12 @@ export function HealthCard({ bridge }: { bridge: BridgeWithHealth }) {
         </div>
       )}
 
-      <p className="mt-3 text-[10px] uppercase tracking-widest text-muted-dark opacity-60 group-hover:opacity-100 transition-opacity">
-        algorithm: v0-naive · parity + outflow only
-      </p>
+      <div className="mt-3 flex items-center justify-between">
+        <span className="badge text-[10px]">v0-naive</span>
+        <span className="text-[10px] text-muted-dark opacity-60 group-hover:opacity-100 transition-opacity">
+          parity + outflow only
+        </span>
+      </div>
     </Link>
   );
 }
