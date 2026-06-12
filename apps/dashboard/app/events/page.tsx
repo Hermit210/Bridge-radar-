@@ -7,16 +7,13 @@ export default async function EventsPage() {
   const { events } = await listEvents({ limit: 50 }).catch(() => ({ events: [] }));
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="relative gradient-bg py-2">
-        <div className="relative z-10">
-          <h1 className="text-4xl font-bold tracking-tight">All events</h1>
-          <p className="mt-2 text-sm text-text-secondary leading-relaxed">
-            Live stream across every bridge. Pulled from the public{" "}
-            <span className="badge font-mono text-accent">/v1/ws</span> endpoint.
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">All events</h1>
+        <p className="mt-1.5 text-sm text-text-secondary leading-relaxed">
+          Live stream across every bridge. Pulled from the public{" "}
+          <code className="font-mono bg-surface-2 px-1.5 py-0.5 rounded text-accent text-xs">/v1/ws</code> endpoint.
+        </p>
       </div>
-      <div className="section-divider" />
       <LiveFeed initial={events} wsUrl={apiUrls.ws} />
     </div>
   );
