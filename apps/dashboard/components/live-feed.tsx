@@ -7,6 +7,7 @@ import { listEvents } from "@/lib/api";
 
 interface Props {
   initial: BridgeEvent[];
+  wsUrl?: string;
 }
 
 export function LiveFeed({ initial }: Props) {
@@ -39,30 +40,40 @@ export function LiveFeed({ initial }: Props) {
   }, []);
 
   return (
-    <section className="rounded-xl border border-border bg-surface">
-      <header className="flex items-center justify-between border-b border-border px-5 py-3">
-        <h2 className="text-sm font-semibold">Live event feed</h2>
-        <span className={`text-xs ${connected ? "text-green" : "text-muted"}`}>
-          {connected ? "● live" : "○ reconnecting..."}
+    <section className="glass-card-elevated overflow-hidden">
+      <header className="flex items-center justify-between border-b border-border-subtle px-6 py-4">
+        <h2 className="text-sm font-semibold text-text">Live event feed</h2>
+        <span className="inline-flex items-center gap-2 text-xs">
+          {connected ? (
+            <>
+              <span className="status-dot status-dot-green"></span>
+              <span className="text-green font-medium">Live</span>
+            </>
+          ) : (
+            <>
+              <span className="status-dot status-dot-muted"></span>
+              <span className="text-muted">Reconnecting...</span>
+            </>
+          )}
         </span>
       </header>
-      <div className="max-h-96 overflow-auto">
-        <table className="w-full text-left">
-          <thead className="text-xs uppercase tracking-wide text-muted">
+      <div className="max-h-[28rem] overflow-auto">
+        <table className="w-full text-left premium-table">
+          <thead className="text-xs uppercase tracking-widest text-muted-dark font-medium">
             <tr>
-              <th className="px-5 py-2">Time</th>
-              <th className="py-2">Bridge</th>
-              <th className="py-2">Type</th>
-              <th className="py-2">Chain</th>
-              <th className="py-2">Asset</th>
-              <th className="py-2">USD</th>
-              <th className="py-2">Tx</th>
+              <th className="px-5 py-3">Time</th>
+              <th className="px-2 py-3">Bridge</th>
+              <th className="px-2 py-3">Type</th>
+              <th className="px-2 py-3">Chain</th>
+              <th className="px-2 py-3">Asset</th>
+              <th className="px-2 py-3">USD</th>
+              <th className="px-2 py-3">Tx</th>
             </tr>
           </thead>
           <tbody>
             {events.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-5 py-6 text-center text-muted text-sm">
+                <td colSpan={7} className="px-6 py-12 text-center text-muted text-sm">
                   Waiting for events. Make sure the indexer is running.
                 </td>
               </tr>

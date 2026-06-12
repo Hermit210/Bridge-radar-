@@ -9,6 +9,7 @@ import type { BridgeWithHealth, BridgeEvent } from "@radar/shared";
 export default function Home() {
   const [bridges, setBridges] = useState<BridgeWithHealth[]>([]);
   const [events, setEvents] = useState<BridgeEvent[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -19,20 +20,18 @@ export default function Home() {
           listBridges().catch(() => ({ bridges: [] })),
           listEvents({ limit: 50 }).catch(() => ({ events: [] })),
         ]);
-        
+
         if (!cancelled) {
           setBridges(bridgesResult.bridges);
           setEvents(eventsResult.events);
+          setLoading(false);
         }
       } catch (error) {
-        // Handle error silently, keep existing data
+        if (!cancelled) setLoading(false);
       }
     };
 
-    // Initial fetch
     fetchData();
-
-    // Set up polling
     const interval = setInterval(fetchData, 5000);
 
     return () => {
@@ -51,12 +50,12 @@ export default function Home() {
   };
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-10 animate-fade-in">
       <section>
         <div className="mb-6 flex items-end justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Bridges</h1>
-            <p className="mt-1 text-sm text-muted">
+            <h1 className="text-3xl font-bold tracking-tight">Bridges</h1>
+            <p className="mt-2 text-sm text-text-secondary max-w-2xl leading-relaxed">
               Real-time bridge-health intelligence layer for Solana. Health
               Score composes parity, outflow z-score, signer-set drift,
               frontend hash, and oracle staleness; greater is healthier.
@@ -66,29 +65,51 @@ export default function Home() {
             href={`${apiUrls.base}/v1/bridges`}
             target="_blank"
             rel="noreferrer"
-            className="text-xs text-muted hover:text-text"
+            className="glass-card inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted hover:text-accent transition-colors"
           >
             JSON ↗
           </a>
         </div>
         <div className="mb-6 flex flex-wrap gap-3 text-xs">
-          <Pill className="text-green" label="Healthy" count={totals.green} />
-          <Pill className="text-yellow" label="Watch" count={totals.yellow} />
-          <Pill className="text-red" label="Alert" count={totals.red} />
+          <Pill dotClass="status-dot-green" label="Healthy" count={totals.green} />
+          <Pill dotClass="status-dot-yellow" label="Watch" count={totals.yellow} />
+          <Pill dotClass="status-dot-red" label="Alert" count={totals.red} />
           {totals.unknown > 0 ? (
-            <Pill className="text-muted" label="No score yet" count={totals.unknown} />
+            <Pill dotClass="status-dot-muted" label="No score yet" count={totals.unknown} />
           ) : null}
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {bridges.length === 0 ? (
-            <div className="col-span-full rounded-xl border border-border bg-surface p-6 text-sm text-muted">
+
+        {loading && bridges.length === 0 ? (
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="glass-card p-5 space-y-4">
+                <div className="flex justify-between">
+                  <div className="space-y-2">
+                    <div className="skeleton h-5 w-32"></div>
+                    <div className="skeleton h-3 w-20"></div>
+                  </div>
+                  <div className="skeleton h-10 w-14 rounded-lg"></div>
+                </div>
+                <div className="skeleton h-1.5 w-full rounded-full"></div>
+                <div className="flex justify-between">
+                  <div className="skeleton h-3 w-16"></div>
+                  <div className="skeleton h-3 w-24"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : bridges.length === 0 ? (
+          <div className="glass-card-elevated col-span-full p-10 text-center space-y-3">
+            <p className="text-sm text-muted">
               API unreachable. Start it with{" "}
-              <code className="text-text">make dev-api</code>.
-            </div>
-          ) : (
-            bridges.map((b) => <HealthCard key={b.id} bridge={b} />)
-          )}
-        </div>
+              <code className="font-mono bg-surface-2 px-2 py-0.5 rounded text-accent text-sm">make dev-api</code>.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 stagger-children">
+            {bridges.map((b) => <HealthCard key={b.id} bridge={b} />)}
+          </div>
+        )}
       </section>
 
       <LiveFeed initial={events} />
@@ -97,19 +118,19 @@ export default function Home() {
 }
 
 function Pill({
-  className,
+  dotClass,
   label,
   count,
 }: {
-  className: string;
+  dotClass: string;
   label: string;
   count: number;
 }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1">
-      <span className={`text-base ${className}`}>●</span>
+    <span className="glass-card inline-flex items-center gap-2.5 px-4 py-1.5 transition-all duration-200 hover:border-accent/20">
+      <span className={`status-dot ${dotClass}`}></span>
       <span className="text-muted">{label}</span>
-      <span className="tabular-nums">{count}</span>
+      <span className="font-mono font-semibold tabular-nums">{count}</span>
     </span>
   );
 }

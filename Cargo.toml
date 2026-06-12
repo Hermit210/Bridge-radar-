@@ -8,9 +8,9 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.85"
 license = "MIT"
-authors = ["Pratik Kale <pratikkale7661@gmail.com>"]
-repository = "https://github.com/Pratikkale26/bridge-radar"
-homepage = "https://github.com/Pratikkale26/bridge-radar"
+authors = ["Saloni Khan"]
+repository = "https://github.com/Hermit210/Bridge-radar-"
+homepage = "https://github.com/Hermit210/Bridge-radar-"
 readme = "README.md"
 
 [workspace.dependencies]
