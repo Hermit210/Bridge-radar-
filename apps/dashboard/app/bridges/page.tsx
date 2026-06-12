@@ -52,10 +52,10 @@ export default function Home() {
   return (
     <div className="space-y-10 animate-fade-in">
       <section>
-        <div className="mb-6 flex items-end justify-between">
+        <div className="mb-5 flex items-end justify-between">
           <div>
-            <h1 className="text-4xl font-bold tracking-tight">Bridges</h1>
-            <p className="mt-2 text-sm text-text-secondary max-w-2xl leading-relaxed">
+            <h1 className="text-2xl font-bold tracking-tight">Bridges</h1>
+            <p className="mt-1.5 text-sm text-text-secondary max-w-2xl leading-relaxed">
               Real-time bridge-health intelligence layer for Solana. Health
               Score composes parity, outflow z-score, signer-set drift,
               frontend hash, and oracle staleness; greater is healthier.
@@ -65,13 +65,12 @@ export default function Home() {
             href={`${apiUrls.base}/v1/bridges`}
             target="_blank"
             rel="noreferrer"
-            className="badge hover:text-accent transition-colors"
+            className="badge hover:text-text transition-colors text-xs"
           >
             JSON ↗
           </a>
         </div>
-        <div className="section-divider mb-6" />
-        <div className="mb-6 flex flex-wrap gap-3 text-xs">
+        <div className="mb-5 flex flex-wrap gap-2 text-xs">
           <Pill dotClass="status-dot-green" label="Healthy" count={totals.green} />
           <Pill dotClass="status-dot-yellow" label="Watch" count={totals.yellow} />
           <Pill dotClass="status-dot-red" label="Alert" count={totals.red} />
@@ -81,33 +80,33 @@ export default function Home() {
         </div>
 
         {loading && bridges.length === 0 ? (
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="glass-card p-6 space-y-4 rounded-2xl">
+              <div key={i} className="glass-card p-5 space-y-4">
                 <div className="flex justify-between">
                   <div className="space-y-2">
-                    <div className="skeleton h-5 w-32 rounded-lg"></div>
-                    <div className="skeleton h-3 w-20 rounded-lg"></div>
+                    <div className="skeleton h-5 w-32"></div>
+                    <div className="skeleton h-3 w-20"></div>
                   </div>
-                  <div className="skeleton h-10 w-14 rounded-xl"></div>
+                  <div className="skeleton h-8 w-12"></div>
                 </div>
-                <div className="skeleton h-2 w-full rounded-full"></div>
+                <div className="skeleton h-1.5 w-full rounded-full"></div>
                 <div className="flex justify-between">
-                  <div className="skeleton h-3 w-16 rounded-lg"></div>
-                  <div className="skeleton h-3 w-24 rounded-lg"></div>
+                  <div className="skeleton h-3 w-16"></div>
+                  <div className="skeleton h-3 w-24"></div>
                 </div>
               </div>
             ))}
           </div>
         ) : bridges.length === 0 ? (
-          <div className="glass-card-elevated col-span-full p-10 text-center space-y-3">
+          <div className="glass-card-elevated p-10 text-center">
             <p className="text-sm text-muted">
               API unreachable. Start it with{" "}
-              <span className="badge font-mono text-accent">make dev-api</span>.
+              <code className="font-mono bg-surface-2 px-1.5 py-0.5 rounded text-accent text-xs">make dev-api</code>.
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 stagger-children">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 stagger-children">
             {bridges.map((b) => <HealthCard key={b.id} bridge={b} />)}
           </div>
         )}
@@ -128,8 +127,8 @@ function Pill({
   count: number;
 }) {
   return (
-    <span className="badge transition-all duration-200 hover:border-accent/30">
-      <span className={`status-dot ${dotClass}`} style={{ width: 8, height: 8 }}></span>
+    <span className="badge">
+      <span className={`status-dot ${dotClass}`}></span>
       <span className="text-muted">{label}</span>
       <span className="font-mono font-semibold tabular-nums text-text">{count}</span>
     </span>
