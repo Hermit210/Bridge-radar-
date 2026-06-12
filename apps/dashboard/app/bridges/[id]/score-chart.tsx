@@ -14,9 +14,8 @@ import type { HealthScore } from "@radar/shared";
 export function ScoreChart({ history }: { history: HealthScore[] }) {
   if (history.length === 0) {
     return (
-      <div className="glass-card-elevated p-10 text-center space-y-2">
-        <p className="text-sm text-muted">No score history yet</p>
-        <p className="text-xs text-muted-dark">The scorer hasn&apos;t run. Start it to see health score trends over time.</p>
+      <div className="glass-card p-8 text-center text-sm text-muted">
+        No score history yet — the scorer hasn&apos;t run.
       </div>
     );
   }
@@ -25,22 +24,18 @@ export function ScoreChart({ history }: { history: HealthScore[] }) {
     score: h.score,
   }));
   return (
-    <div className="h-64 w-full">
+    <div className="h-56 w-full">
       <ResponsiveContainer>
         <AreaChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#6ea8ff" stopOpacity={0.3} />
-              <stop offset="40%" stopColor="#a78bfa" stopOpacity={0.15} />
-              <stop offset="100%" stopColor="#a78bfa" stopOpacity={0} />
+              <stop offset="0%" stopColor="#6387d2" stopOpacity={0.2} />
+              <stop offset="100%" stopColor="#6387d2" stopOpacity={0} />
             </linearGradient>
-            <filter id="lineShadow">
-              <feDropShadow dx="0" dy="0" stdDeviation="2" floodColor="#6ea8ff" floodOpacity="0.4" />
-            </filter>
           </defs>
           <CartesianGrid
             strokeDasharray="3 3"
-            stroke="rgba(31,36,44,0.5)"
+            stroke="rgba(30,39,64,0.4)"
             vertical={false}
           />
           <XAxis
@@ -48,36 +43,35 @@ export function ScoreChart({ history }: { history: HealthScore[] }) {
             type="number"
             domain={["dataMin", "dataMax"]}
             tickFormatter={(t) => new Date(t).toLocaleTimeString()}
-            stroke="#2a3040"
-            tick={{ fontSize: 10, fill: "#5a6478" }}
+            stroke="#1e2740"
+            tick={{ fontSize: 10, fill: "#475470" }}
           />
           <YAxis
             domain={[0, 100]}
-            stroke="#2a3040"
-            tick={{ fontSize: 10, fill: "#5a6478" }}
+            stroke="#1e2740"
+            tick={{ fontSize: 10, fill: "#475470" }}
             width={28}
           />
           <Tooltip
             contentStyle={{
-              background: "rgba(15,18,22,0.95)",
-              border: "1px solid rgba(31,36,44,0.6)",
-              borderRadius: "1rem",
-              padding: "12px 16px",
-              fontSize: 13,
-              boxShadow: "0 4px 30px rgba(0,0,0,0.3)",
+              background: "rgba(20,26,38,0.95)",
+              border: "1px solid rgba(30,39,64,0.6)",
+              borderRadius: "0.5rem",
+              padding: "8px 12px",
+              fontSize: 12,
+              boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
             }}
             labelFormatter={(t) => new Date(t as number).toLocaleString()}
           />
           <Area
             type="monotone"
             dataKey="score"
-            stroke="#6ea8ff"
-            strokeWidth={2.5}
+            stroke="#6387d2"
+            strokeWidth={2}
             fill="url(#scoreGradient)"
             fillOpacity={1}
             dot={false}
-            activeDot={{ r: 5, stroke: "#6ea8ff", strokeWidth: 2, fill: "#0f1216" }}
-            style={{ filter: "url(#lineShadow)" }}
+            activeDot={{ r: 4, stroke: "#6387d2", strokeWidth: 2, fill: "#141a26" }}
           />
         </AreaChart>
       </ResponsiveContainer>
