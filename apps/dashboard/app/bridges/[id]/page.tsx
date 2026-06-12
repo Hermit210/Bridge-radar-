@@ -25,6 +25,12 @@ const bandGlow = {
   red: "shadow-glow-red",
 } as const;
 
+const bandDot = {
+  green: "status-dot-green",
+  yellow: "status-dot-yellow",
+  red: "status-dot-red",
+} as const;
+
 export default function BridgePage({
   params,
 }: {
@@ -146,7 +152,9 @@ export default function BridgePage({
             <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
               <circle cx="60" cy="60" r="52" className="score-ring-track" strokeWidth="6" />
               <circle
-                cx="60" cy="60" r="52"
+                cx="60"
+                cy="60"
+                r="52"
                 className="score-ring-fill"
                 strokeWidth="6"
                 stroke={bandStroke[band]}
@@ -178,7 +186,7 @@ export default function BridgePage({
         </div>
       </section>
 
-      {/* Bridge Context */}
+      {/* Bridge Context - DeFiLlama Data */}
       {defilama && (
         <section className="glass-card p-6">
           <h2 className="mb-1 text-sm font-semibold">Bridge Context</h2>
@@ -204,8 +212,11 @@ export default function BridgePage({
 
       {/* Status */}
       <section className={`glass-card p-6 ${
-        score !== undefined && score >= 80 ? "border-green/10" :
-        score !== undefined && score >= 50 ? "border-yellow/10" : "border-red/10"
+        score !== undefined && score >= 80
+          ? "border-green/10"
+          : score !== undefined && score >= 50
+          ? "border-yellow/10"
+          : "border-red/10"
       }`}>
         <h2 className="mb-3 text-sm font-semibold">Status</h2>
         <div className="flex items-center gap-2.5">
@@ -228,7 +239,7 @@ export default function BridgePage({
         </div>
       </section>
 
-      {/* Score History */}
+      {/* Score History Chart */}
       <section className="glass-card p-6">
         <h2 className="mb-4 text-sm font-semibold">Score history (last 24h)</h2>
         <ScoreChart history={history} />

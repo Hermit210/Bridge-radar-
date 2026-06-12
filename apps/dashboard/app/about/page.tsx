@@ -16,11 +16,11 @@ export default function AboutPage() {
         <div className="mt-2 h-0.5 w-8 rounded-full bg-accent/50" />
       </div>
       <ul className="list-none space-y-2 text-sm text-text-secondary">
-        <li className="flex gap-2"><span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-accent flex-shrink-0"></span><span><span className="text-text font-medium">Parity</span> — origin-side lock/unlock vs. Solana-side mint/burn.</span></li>
-        <li className="flex gap-2"><span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-accent flex-shrink-0"></span><span><span className="text-text font-medium">Outflow</span> — z-score over rolling 30-day distribution of 5-min bucket counts.</span></li>
-        <li className="flex gap-2"><span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-accent flex-shrink-0"></span><span><span className="text-text font-medium">Signer-set drift</span> — diffs the canonical signer registry per bridge.</span></li>
-        <li className="flex gap-2"><span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-accent flex-shrink-0"></span><span><span className="text-text font-medium">Frontend hash</span> — sha256 of each bridge&apos;s served bundle.</span></li>
-        <li className="flex gap-2"><span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-accent flex-shrink-0"></span><span><span className="text-text font-medium">Oracle staleness</span> — Pyth feed age per bridge dependency.</span></li>
+        <li className="flex gap-2"><span className="text-accent mt-1.5 w-1.5 h-1.5 rounded-full bg-accent flex-shrink-0"></span><span><span className="text-text font-medium">Parity</span> — origin-side lock/unlock vs. Solana-side mint/burn.</span></li>
+        <li className="flex gap-2"><span className="text-accent mt-1.5 w-1.5 h-1.5 rounded-full bg-accent flex-shrink-0"></span><span><span className="text-text font-medium">Outflow</span> — z-score over rolling 30-day distribution of 5-min bucket counts.</span></li>
+        <li className="flex gap-2"><span className="text-accent mt-1.5 w-1.5 h-1.5 rounded-full bg-accent flex-shrink-0"></span><span><span className="text-text font-medium">Signer-set drift</span> — diffs the canonical signer registry per bridge.</span></li>
+        <li className="flex gap-2"><span className="text-accent mt-1.5 w-1.5 h-1.5 rounded-full bg-accent flex-shrink-0"></span><span><span className="text-text font-medium">Frontend hash</span> — sha256 of each bridge&apos;s served bundle.</span></li>
+        <li className="flex gap-2"><span className="text-accent mt-1.5 w-1.5 h-1.5 rounded-full bg-accent flex-shrink-0"></span><span><span className="text-text font-medium">Oracle staleness</span> — Pyth feed age per bridge dependency.</span></li>
       </ul>
 
       <div>

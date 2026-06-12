@@ -47,6 +47,7 @@ export function HealthCard({ bridge }: { bridge: BridgeWithHealth }) {
         </div>
       </div>
 
+      {/* Health bar */}
       <div className="mt-4 health-bar">
         <div
           className={`health-bar-fill ${bandBarClass[band]}`}
@@ -54,6 +55,7 @@ export function HealthCard({ bridge }: { bridge: BridgeWithHealth }) {
         />
       </div>
 
+      {/* Status and time */}
       <div className="mt-3 flex items-center justify-between text-xs">
         <span className="inline-flex items-center gap-1.5">
           <span className={`status-dot ${bandDot[band]}`}></span>
@@ -66,6 +68,7 @@ export function HealthCard({ bridge }: { bridge: BridgeWithHealth }) {
         </span>
       </div>
 
+      {/* DeFiLlama context */}
       {defilama && (
         <div className="mt-3 space-y-1 border-t border-border-subtle pt-3">
           <div className="flex justify-between text-xs">

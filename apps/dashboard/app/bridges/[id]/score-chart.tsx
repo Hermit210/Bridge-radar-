@@ -33,7 +33,11 @@ export function ScoreChart({ history }: { history: HealthScore[] }) {
               <stop offset="100%" stopColor="#6ea8ff" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(31,36,44,0.4)" vertical={false} />
+          <CartesianGrid
+            strokeDasharray="3 3"
+            stroke="rgba(31,36,44,0.4)"
+            vertical={false}
+          />
           <XAxis
             dataKey="t"
             type="number"
