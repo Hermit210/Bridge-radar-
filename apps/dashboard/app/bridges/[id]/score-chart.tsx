@@ -14,8 +14,9 @@ import type { HealthScore } from "@radar/shared";
 export function ScoreChart({ history }: { history: HealthScore[] }) {
   if (history.length === 0) {
     return (
-      <div className="glass-card p-8 text-center text-sm text-muted">
-        No score history yet — the scorer hasn&apos;t run.
+      <div className="glass-card-elevated p-10 text-center space-y-2">
+        <p className="text-sm text-muted">No score history yet</p>
+        <p className="text-xs text-muted-dark">The scorer hasn&apos;t run. Start it to see health score trends over time.</p>
       </div>
     );
   }
@@ -24,18 +25,22 @@ export function ScoreChart({ history }: { history: HealthScore[] }) {
     score: h.score,
   }));
   return (
-    <div className="h-56 w-full">
+    <div className="h-64 w-full">
       <ResponsiveContainer>
         <AreaChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#6ea8ff" stopOpacity={0.3} />
-              <stop offset="100%" stopColor="#6ea8ff" stopOpacity={0} />
+              <stop offset="40%" stopColor="#a78bfa" stopOpacity={0.15} />
+              <stop offset="100%" stopColor="#a78bfa" stopOpacity={0} />
             </linearGradient>
+            <filter id="lineShadow">
+              <feDropShadow dx="0" dy="0" stdDeviation="2" floodColor="#6ea8ff" floodOpacity="0.4" />
+            </filter>
           </defs>
           <CartesianGrid
             strokeDasharray="3 3"
-            stroke="rgba(31,36,44,0.4)"
+            stroke="rgba(31,36,44,0.5)"
             vertical={false}
           />
           <XAxis
@@ -56,7 +61,7 @@ export function ScoreChart({ history }: { history: HealthScore[] }) {
             contentStyle={{
               background: "rgba(15,18,22,0.95)",
               border: "1px solid rgba(31,36,44,0.6)",
-              borderRadius: "0.75rem",
+              borderRadius: "1rem",
               padding: "12px 16px",
               fontSize: 13,
               boxShadow: "0 4px 30px rgba(0,0,0,0.3)",
@@ -67,11 +72,12 @@ export function ScoreChart({ history }: { history: HealthScore[] }) {
             type="monotone"
             dataKey="score"
             stroke="#6ea8ff"
-            strokeWidth={2}
+            strokeWidth={2.5}
             fill="url(#scoreGradient)"
             fillOpacity={1}
             dot={false}
-            activeDot={{ r: 4, stroke: "#6ea8ff", strokeWidth: 2, fill: "#0f1216" }}
+            activeDot={{ r: 5, stroke: "#6ea8ff", strokeWidth: 2, fill: "#0f1216" }}
+            style={{ filter: "url(#lineShadow)" }}
           />
         </AreaChart>
       </ResponsiveContainer>

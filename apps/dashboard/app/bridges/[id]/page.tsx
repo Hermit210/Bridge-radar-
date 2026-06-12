@@ -19,6 +19,12 @@ const bandStroke = {
   red: "#fb7185",
 } as const;
 
+const bandStrokeEnd = {
+  green: "#34d399",
+  yellow: "#fbbf24",
+  red: "#f87171",
+} as const;
+
 const bandGlow = {
   green: "shadow-glow-green",
   yellow: "shadow-glow-yellow",
@@ -29,6 +35,12 @@ const bandDot = {
   green: "status-dot-green",
   yellow: "status-dot-yellow",
   red: "status-dot-red",
+} as const;
+
+const bandBorderLeft = {
+  green: "border-l-green/30",
+  yellow: "border-l-yellow/30",
+  red: "border-l-red/30",
 } as const;
 
 export default function BridgePage({
@@ -61,7 +73,7 @@ export default function BridgePage({
         ]);
 
         if (!cancelled) {
-          setDetail(bridgeData);
+          setDetail(bridgeData?.bridge ?? null);
           setHistory(historyData.history);
           setEvents(eventsData.events);
           setLoading(false);
@@ -84,30 +96,31 @@ export default function BridgePage({
   if (loading || !detail) {
     return (
       <div className="space-y-8 animate-fade-in">
-        <div className="skeleton h-4 w-24"></div>
+        <div className="skeleton h-4 w-24 rounded-lg"></div>
         <div className="space-y-2">
-          <div className="skeleton h-8 w-64"></div>
-          <div className="skeleton h-4 w-32"></div>
+          <div className="skeleton h-8 w-64 rounded-lg"></div>
+          <div className="skeleton h-4 w-32 rounded-lg"></div>
         </div>
+        <div className="section-divider" />
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-          <div className="glass-card p-6 space-y-4">
-            <div className="skeleton h-4 w-24"></div>
-            <div className="skeleton h-16 w-20 mx-auto"></div>
-            <div className="skeleton h-3 w-40 mx-auto"></div>
+          <div className="glass-card p-8 space-y-4">
+            <div className="skeleton h-4 w-24 rounded-lg"></div>
+            <div className="skeleton h-40 w-40 rounded-full mx-auto"></div>
+            <div className="skeleton h-3 w-40 mx-auto rounded-lg"></div>
           </div>
           <div className="md:col-span-2 glass-card p-6 space-y-3">
-            <div className="skeleton h-4 w-24"></div>
+            <div className="skeleton h-4 w-24 rounded-lg"></div>
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="flex justify-between items-center">
-                <div className="skeleton h-3 w-28"></div>
-                <div className="skeleton h-2 w-32 rounded-full"></div>
+                <div className="skeleton h-3 w-28 rounded-lg"></div>
+                <div className="skeleton h-2.5 w-44 rounded-full"></div>
               </div>
             ))}
           </div>
         </div>
         <div className="glass-card p-6 space-y-4">
-          <div className="skeleton h-4 w-48"></div>
-          <div className="skeleton h-48 w-full"></div>
+          <div className="skeleton h-4 w-48 rounded-lg"></div>
+          <div className="skeleton h-64 w-full rounded-xl"></div>
         </div>
       </div>
     );
@@ -117,20 +130,21 @@ export default function BridgePage({
   const band = score !== undefined ? bandOf(score) : "yellow";
   const c = detail.health?.components;
   const defilama = detail.defilama;
-  const circumference = 2 * Math.PI * 52;
+  const ringRadius = 68;
+  const circumference = 2 * Math.PI * ringRadius;
 
   return (
     <div className="space-y-8 animate-fade-in">
       {/* Header */}
-      <div className="pb-6 border-b border-border-subtle">
-        <Link href="/bridges" className="text-xs text-muted hover:text-accent transition-colors inline-flex items-center gap-1">
+      <div className="pb-6">
+        <Link href="/bridges" className="text-xs text-muted hover:text-accent transition-colors inline-flex items-center gap-1 font-medium">
           ← All bridges
         </Link>
         <div className="mt-3 flex items-baseline gap-4">
           <h1 className="text-3xl font-bold tracking-tight">
             {detail.display_name}
           </h1>
-          <span className="text-xs text-muted-dark font-mono">{detail.id}</span>
+          <span className="badge font-mono">{detail.id}</span>
           {detail.homepage ? (
             <a
               href={detail.homepage}
@@ -142,28 +156,40 @@ export default function BridgePage({
             </a>
           ) : null}
         </div>
+        <div className="section-divider mt-6" />
       </div>
 
       {/* Health Score & Components */}
       <section className="grid grid-cols-1 gap-6 md:grid-cols-3">
         <div className={`glass-card-elevated p-8 flex flex-col items-center justify-center text-center ${bandGlow[band]}`}>
           <p className="text-xs uppercase tracking-widest text-muted font-semibold mb-4">Health Score</p>
-          <div className="relative w-32 h-32">
-            <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
-              <circle cx="60" cy="60" r="52" className="score-ring-track" strokeWidth="6" />
+          <div className="relative w-40 h-40">
+            {/* Pulsing glow behind ring */}
+            <div
+              className="absolute inset-2 rounded-full animate-glow-pulse opacity-30"
+              style={{ background: `radial-gradient(circle, ${bandStroke[band]}22, transparent 70%)` }}
+            />
+            <svg className="w-full h-full -rotate-90" viewBox="0 0 160 160">
+              <defs>
+                <linearGradient id="ring-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor={bandStroke[band]} />
+                  <stop offset="100%" stopColor={bandStrokeEnd[band]} />
+                </linearGradient>
+              </defs>
+              <circle cx="80" cy="80" r={ringRadius} className="score-ring-track" strokeWidth="7" />
               <circle
-                cx="60"
-                cy="60"
-                r="52"
+                cx="80"
+                cy="80"
+                r={ringRadius}
                 className="score-ring-fill"
-                strokeWidth="6"
-                stroke={bandStroke[band]}
+                strokeWidth="7"
+                stroke="url(#ring-gradient)"
                 strokeDasharray={`${circumference}`}
                 strokeDashoffset={`${circumference * (1 - (score ?? 0) / 100)}`}
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className={`text-4xl font-bold font-mono tabular-nums ${bandClass[band]}`}>
+              <span className={`text-5xl font-bold font-mono tabular-nums ${bandClass[band]}`}>
                 {score ?? "—"}
               </span>
             </div>
@@ -175,7 +201,7 @@ export default function BridgePage({
           </p>
         </div>
         <div className="md:col-span-2 glass-card p-6">
-          <p className="text-xs uppercase tracking-widest text-muted font-semibold">Components</p>
+          <p className="text-xs uppercase tracking-widest gradient-text-vivid font-semibold">Components</p>
           <ul className="mt-4 space-y-3 text-sm">
             <Component label="Parity break" value={c?.parity_severity} weight={40} />
             <Component label="Outflow anomaly" value={c?.outflow_severity} weight={25} />
@@ -188,22 +214,30 @@ export default function BridgePage({
 
       {/* Bridge Context - DeFiLlama Data */}
       {defilama && (
-        <section className="glass-card p-6">
-          <h2 className="mb-1 text-sm font-semibold">Bridge Context</h2>
-          <div className="h-0.5 w-8 rounded-full bg-accent/50 mb-5" />
+        <section>
+          <h2 className="mb-4 text-sm font-semibold">Bridge Context</h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div>
-              <p className="text-xs text-muted">Total Value Locked</p>
-              <p className="mt-1 text-2xl font-bold font-mono text-text tabular-nums">{defilama.tvlFormatted}</p>
+            <div className="glass-card p-5">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-1 h-4 rounded-full bg-accent/50" />
+                <p className="text-xs text-muted">Total Value Locked</p>
+              </div>
+              <p className="text-3xl font-bold font-mono gradient-text-vivid tabular-nums">{defilama.tvlFormatted}</p>
             </div>
-            <div>
-              <p className="text-xs text-muted">24h Volume</p>
-              <p className="mt-1 text-2xl font-bold font-mono text-text tabular-nums">{defilama.volumeFormatted}</p>
+            <div className="glass-card p-5">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-1 h-4 rounded-full bg-purple/50" />
+                <p className="text-xs text-muted">24h Volume</p>
+              </div>
+              <p className="text-3xl font-bold font-mono gradient-text-vivid tabular-nums">{defilama.volumeFormatted}</p>
             </div>
-            <div>
-              <p className="text-xs text-muted">Supported Chains</p>
+            <div className="glass-card p-5">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-1 h-4 rounded-full bg-green/50" />
+                <p className="text-xs text-muted">Supported Chains</p>
+              </div>
               <p className="mt-1 text-sm font-mono text-text-secondary">
-                {defilama.chains.map((c) => c.toUpperCase()).join(", ")}
+                {defilama.chains.map((ch) => ch.toUpperCase()).join(", ")}
               </p>
             </div>
           </div>
@@ -211,13 +245,7 @@ export default function BridgePage({
       )}
 
       {/* Status */}
-      <section className={`glass-card p-6 ${
-        score !== undefined && score >= 80
-          ? "border-green/10"
-          : score !== undefined && score >= 50
-          ? "border-yellow/10"
-          : "border-red/10"
-      }`}>
+      <section className={`glass-card p-6 border-l-2 ${bandBorderLeft[band]}`} style={{ animation: "border-glow 3s ease-in-out infinite" }}>
         <h2 className="mb-3 text-sm font-semibold">Status</h2>
         <div className="flex items-center gap-2.5">
           {score !== undefined && score >= 80 ? (
@@ -241,12 +269,13 @@ export default function BridgePage({
 
       {/* Score History Chart */}
       <section className="glass-card p-6">
-        <h2 className="mb-4 text-sm font-semibold">Score history (last 24h)</h2>
+        <div className="section-divider mb-6" />
+        <h2 className="mb-4 text-sm font-semibold gradient-text-vivid">Score history (last 24h)</h2>
         <ScoreChart history={history} />
       </section>
 
       {/* Recent Events */}
-      <section className="glass-card overflow-hidden">
+      <section className="glass-card-elevated overflow-hidden">
         <header className="border-b border-border-subtle px-6 py-4">
           <h2 className="text-sm font-semibold">Recent events</h2>
         </header>
@@ -298,14 +327,17 @@ function Component({
     <li className="flex items-center justify-between">
       <span className="text-text-secondary">{label}</span>
       <span className="flex items-center gap-3">
-        <span className="h-2 w-36 overflow-hidden rounded-full bg-surface-2">
+        <span className="relative h-2.5 w-44 overflow-hidden rounded-full bg-surface-2">
           <span
             className={`block h-full health-bar-fill ${barColor}`}
             style={{ width: `${Math.min(100, v * 100)}%` }}
           />
+          {/* Threshold markers */}
+          <span className="absolute top-0 left-[30%] w-px h-full bg-muted-dark/40" />
+          <span className="absolute top-0 left-[70%] w-px h-full bg-muted-dark/40" />
         </span>
         <span className="w-10 text-right font-mono tabular-nums font-medium">{v.toFixed(2)}</span>
-        <span className="w-12 text-right font-mono text-xs text-muted-dark tabular-nums">−{weight}</span>
+        <span className="w-12 text-right font-mono text-xs text-muted-dark tabular-nums">&minus;{weight}</span>
       </span>
     </li>
   );

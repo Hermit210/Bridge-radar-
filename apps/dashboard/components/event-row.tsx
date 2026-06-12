@@ -10,18 +10,19 @@ const kindColor: Record<string, string> = {
   oracle_stale: "text-red",
 };
 
-const kindBg: Record<string, string> = {
-  lock: "bg-accent",
-  unlock: "bg-accent",
-  mint: "bg-green",
-  burn: "bg-yellow",
-  signer_change: "bg-red",
-  frontend_change: "bg-red",
-  oracle_stale: "bg-red",
+const kindBgPill: Record<string, string> = {
+  lock: "bg-accent/10 text-accent",
+  unlock: "bg-accent/10 text-accent",
+  mint: "bg-green/10 text-green",
+  burn: "bg-yellow/10 text-yellow",
+  signer_change: "bg-red/10 text-red",
+  frontend_change: "bg-red/10 text-red",
+  oracle_stale: "bg-red/10 text-red",
 };
 
 export function EventRow({ event }: { event: BridgeEvent }) {
   const t = new Date(event.event_time).toLocaleTimeString();
+  const isLargeAmount = typeof event.amount_usd === "number" && event.amount_usd >= 10000;
   const amt = typeof event.amount_usd === "number" && event.amount_usd > 0
     ? `$${event.amount_usd.toLocaleString()}`
     : "—";
@@ -30,9 +31,8 @@ export function EventRow({ event }: { event: BridgeEvent }) {
       <td className="py-3 px-5 text-muted font-mono text-xs tabular-nums whitespace-nowrap">{t}</td>
       <td className="py-3 pr-4 font-medium text-text-secondary">{event.bridge_id}</td>
       <td className="py-3 pr-4">
-        <span className="inline-flex items-center gap-2">
-          <span className={`inline-block w-1.5 h-1.5 rounded-full ${kindBg[event.type] ?? "bg-muted"}`}></span>
-          <span className={`font-mono text-xs ${kindColor[event.type] ?? ""}`}>{event.type}</span>
+        <span className={`inline-flex items-center font-mono text-xs px-2 py-0.5 rounded-md ${kindBgPill[event.type] ?? "bg-surface-2 text-muted"}`}>
+          {event.type}
         </span>
       </td>
       <td className="py-3 pr-4 text-muted font-mono text-xs">
@@ -41,8 +41,8 @@ export function EventRow({ event }: { event: BridgeEvent }) {
       <td className="py-3 pr-4 text-muted font-mono text-xs">
         {typeof event.asset === "string" ? event.asset : "—"}
       </td>
-      <td className="py-3 pr-4 font-mono text-text-secondary tabular-nums">{amt}</td>
-      <td className="py-3 pr-2 truncate max-w-[18ch] text-muted-dark font-mono text-xs">
+      <td className={`py-3 pr-4 font-mono tabular-nums ${isLargeAmount ? "text-text font-bold" : "text-text-secondary"}`}>{amt}</td>
+      <td className="py-3 pr-2 truncate max-w-[18ch] text-muted-dark font-mono text-xs hover:text-accent transition-colors cursor-default" title="Click to copy">
         {typeof event.tx === "string" ? event.tx.slice(0, 12) + "…" : "—"}
       </td>
     </tr>
