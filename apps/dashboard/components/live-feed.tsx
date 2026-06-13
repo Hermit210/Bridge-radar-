@@ -79,7 +79,7 @@ export function LiveFeed({ initial }: Props) {
                       <div className="absolute inset-0 rounded-full border border-border" />
                       <div className="absolute inset-2 rounded-full border border-border/60" />
                       <div className="absolute inset-0 rounded-full" style={{
-                        background: "conic-gradient(from 0deg, transparent 0deg, rgba(99,135,210,0.12) 60deg, transparent 120deg)",
+                        background: "conic-gradient(from 0deg, transparent 0deg, rgba(212,165,116,0.14) 60deg, transparent 120deg)",
                         animation: "spin 4s linear infinite",
                       }} />
                       <div className="absolute inset-0 flex items-center justify-center">
