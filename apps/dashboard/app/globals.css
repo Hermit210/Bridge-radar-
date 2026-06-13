@@ -8,16 +8,16 @@ html {
 }
 
 html, body {
-  background: #0a0e17;
-  color: #e1e6f0;
+  background: #0a0e1a;
+  color: #e8eaed;
   font-feature-settings: "ss01", "cv11";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 ::selection {
-  background: rgba(99, 135, 210, 0.25);
-  color: #e1e6f0;
+  background: rgba(212, 165, 116, 0.28);
+  color: #e8eaed;
 }
 
 /* ===== Scrollbar ===== */
@@ -29,37 +29,37 @@ html, body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1e2740;
+  background: #2a3544;
   border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #283350;
+  background: #354254;
 }
 
 /* ===== Cards ===== */
 @layer components {
   .glass-card {
-    background: rgba(20, 26, 38, 0.7);
+    background: rgba(20, 26, 40, 0.75);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(30, 39, 64, 0.6);
+    border: 1px solid rgba(42, 53, 68, 0.65);
     border-radius: 0.875rem;
   }
 
   .glass-card-elevated {
-    background: rgba(20, 26, 38, 0.85);
+    background: rgba(20, 26, 40, 0.88);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(30, 39, 64, 0.7);
+    border: 1px solid rgba(42, 53, 68, 0.75);
     border-radius: 0.875rem;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 28px rgba(0, 0, 0, 0.4);
   }
 
   .glass-card-interactive {
-    background: rgba(20, 26, 38, 0.7);
+    background: rgba(20, 26, 40, 0.75);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(30, 39, 64, 0.6);
+    border: 1px solid rgba(42, 53, 68, 0.65);
     border-radius: 0.875rem;
     cursor: pointer;
     transition: all 0.25s ease;
@@ -67,8 +67,8 @@ html, body {
 
   .glass-card-interactive:hover {
     transform: translateY(-2px);
-    border-color: rgba(99, 135, 210, 0.2);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    border-color: rgba(212, 165, 116, 0.25);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), 0 0 40px -10px rgba(212, 165, 116, 0.15);
   }
 
   .gradient-border {
@@ -77,8 +77,8 @@ html, body {
     padding: 1px;
     background: linear-gradient(
       135deg,
-      rgba(99, 135, 210, 0.25),
-      rgba(99, 135, 210, 0.08)
+      rgba(212, 165, 116, 0.28),
+      rgba(212, 165, 116, 0.1)
     );
   }
   .gradient-border > * {
@@ -93,16 +93,16 @@ html, body {
     border-radius: 0.375rem;
     font-size: 0.75rem;
     font-weight: 500;
-    background: rgba(99, 135, 210, 0.08);
-    border: 1px solid rgba(99, 135, 210, 0.12);
-    color: #97a3bd;
+    background: rgba(212, 165, 116, 0.1);
+    border: 1px solid rgba(212, 165, 116, 0.15);
+    color: #b4b8c5;
   }
 }
 
 /* ===== Section Divider ===== */
 .section-divider {
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(99, 135, 210, 0.15), transparent);
+  background: linear-gradient(90deg, transparent, rgba(212, 165, 116, 0.18), transparent);
   border: none;
 }
 
@@ -110,7 +110,7 @@ html, body {
 .health-bar {
   height: 6px;
   border-radius: 999px;
-  background: rgba(30, 39, 64, 0.6);
+  background: rgba(42, 53, 68, 0.65);
   overflow: hidden;
 }
 
@@ -121,16 +121,16 @@ html, body {
 }
 
 .health-bar-green {
-  background: linear-gradient(90deg, #3ec99d, #34b38a);
-  box-shadow: 0 0 8px rgba(62, 201, 157, 0.25);
+  background: linear-gradient(90deg, #2d9a77, #27856a);
+  box-shadow: 0 0 10px rgba(45, 154, 119, 0.3);
 }
 .health-bar-yellow {
-  background: linear-gradient(90deg, #e5b94e, #d4a843);
-  box-shadow: 0 0 8px rgba(229, 185, 78, 0.25);
+  background: linear-gradient(90deg, #c98a3f, #b57a38);
+  box-shadow: 0 0 10px rgba(201, 138, 63, 0.3);
 }
 .health-bar-red {
-  background: linear-gradient(90deg, #e5697b, #d4586a);
-  box-shadow: 0 0 8px rgba(229, 105, 123, 0.25);
+  background: linear-gradient(90deg, #b84f5e, #a44454);
+  box-shadow: 0 0 10px rgba(184, 79, 94, 0.3);
 }
 
 /* ===== Skeleton Loading ===== */
@@ -138,9 +138,9 @@ html, body {
   .skeleton {
     background: linear-gradient(
       90deg,
-      rgba(30, 39, 64, 0.3) 25%,
-      rgba(30, 39, 64, 0.5) 50%,
-      rgba(30, 39, 64, 0.3) 75%
+      rgba(42, 53, 68, 0.35) 25%,
+      rgba(42, 53, 68, 0.55) 50%,
+      rgba(42, 53, 68, 0.35) 75%
     );
     background-size: 200% 100%;
     animation: shimmer 2s linear infinite;
@@ -167,29 +167,29 @@ html, body {
 }
 
 .status-dot-green {
-  background: #3ec99d;
+  background: #2d9a77;
 }
 .status-dot-green::before {
-  background: rgba(62, 201, 157, 0.25);
+  background: rgba(45, 154, 119, 0.3);
 }
 
 .status-dot-yellow {
-  background: #e5b94e;
+  background: #c98a3f;
 }
 .status-dot-yellow::before {
-  background: rgba(229, 185, 78, 0.25);
+  background: rgba(201, 138, 63, 0.3);
 }
 
 .status-dot-red {
-  background: #e5697b;
+  background: #b84f5e;
   animation: pulse-dot 2s ease-in-out infinite;
 }
 .status-dot-red::before {
-  background: rgba(229, 105, 123, 0.25);
+  background: rgba(184, 79, 94, 0.3);
 }
 
 .status-dot-muted {
-  background: #475470;
+  background: #5a6478;
 }
 .status-dot-muted::before {
   background: transparent;
@@ -198,7 +198,7 @@ html, body {
 
 /* ===== Gradient Text — used ONLY on hero headline ===== */
 .text-gradient {
-  background: linear-gradient(135deg, #7ea0e8 0%, #6387d2 100%);
+  background: linear-gradient(135deg, #e6bc91 0%, #d4a574 50%, #c9935f 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -206,7 +206,7 @@ html, body {
 
 /* ===== Score Ring ===== */
 .score-ring-track {
-  stroke: rgba(30, 39, 64, 0.6);
+  stroke: rgba(42, 53, 68, 0.65);
   fill: none;
 }
 .score-ring-fill {
@@ -219,11 +219,11 @@ html, body {
 .premium-table thead th {
   position: sticky;
   top: 0;
-  background: rgba(20, 26, 38, 0.95);
+  background: rgba(20, 26, 40, 0.96);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   z-index: 10;
-  border-bottom: 1px solid rgba(30, 39, 64, 0.6);
+  border-bottom: 1px solid rgba(42, 53, 68, 0.65);
 }
 
 .premium-table tbody tr {
@@ -231,22 +231,22 @@ html, body {
 }
 
 .premium-table tbody tr:hover {
-  background: rgba(99, 135, 210, 0.04);
+  background: rgba(212, 165, 116, 0.05);
 }
 
 .premium-table tbody tr:nth-child(even) {
-  background: rgba(20, 26, 38, 0.3);
+  background: rgba(20, 26, 40, 0.35);
 }
 
 .premium-table tbody tr:nth-child(even):hover {
-  background: rgba(99, 135, 210, 0.06);
+  background: rgba(212, 165, 116, 0.08);
 }
 
 /* ===== Hero Grid Background ===== */
 .hero-grid {
   background-image:
-    linear-gradient(rgba(99, 135, 210, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(99, 135, 210, 0.025) 1px, transparent 1px);
+    linear-gradient(rgba(212, 165, 116, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(212, 165, 116, 0.03) 1px, transparent 1px);
   background-size: 72px 72px;
   mask-image: radial-gradient(ellipse 50% 45% at 50% 50%, black 30%, transparent 100%);
   -webkit-mask-image: radial-gradient(ellipse 50% 45% at 50% 50%, black 30%, transparent 100%);

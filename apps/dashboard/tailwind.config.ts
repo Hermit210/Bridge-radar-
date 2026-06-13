@@ -5,37 +5,37 @@ export default {
   theme: {
     extend: {
       colors: {
-        /* Deep navy base — warm enough to not feel dead */
-        bg: "#0a0e17",
-        "surface-0": "#0f1420",
-        surface: "#141a26",
-        "surface-2": "#1a2133",
-        "surface-3": "#212940",
-        "surface-4": "#283350",
+        /* Deep navy foundation — sophisticated, premium depth */
+        bg: "#0a0e1a",
+        "surface-0": "#0f141f",
+        surface: "#141a28",
+        "surface-2": "#1a2030",
+        "surface-3": "#202938",
+        "surface-4": "#283244",
 
-        border: "#1e2740",
-        "border-subtle": "#161d30",
-        "border-glow": "rgba(99,135,210,0.12)",
+        border: "#2a3544",
+        "border-subtle": "#1e2634",
+        "border-glow": "rgba(212,165,116,0.12)",
 
-        /* Text — warm-tinted whites, never pure white */
-        text: "#e1e6f0",
-        "text-secondary": "#97a3bd",
-        muted: "#6b7a96",
-        "muted-dark": "#475470",
+        /* Premium text — platinum hierarchy */
+        text: "#e8eaed",
+        "text-secondary": "#b4b8c5",
+        muted: "#7a8396",
+        "muted-dark": "#5a6478",
 
-        /* Semantic — desaturated, professional */
-        green: "#3ec99d",
-        "green-glow": "rgba(62,201,157,0.12)",
-        yellow: "#e5b94e",
-        "yellow-glow": "rgba(229,185,78,0.12)",
-        red: "#e5697b",
-        "red-glow": "rgba(229,105,123,0.12)",
+        /* Semantic — refined, professional palette */
+        green: "#2d9a77",
+        "green-glow": "rgba(45,154,119,0.15)",
+        yellow: "#c98a3f",
+        "yellow-glow": "rgba(201,138,63,0.15)",
+        red: "#b84f5e",
+        "red-glow": "rgba(184,79,94,0.15)",
 
-        /* Primary accent — one confident blue */
-        accent: "#6387d2",
-        "accent-glow": "rgba(99,135,210,0.08)",
-        "accent-dim": "#4e6db3",
-        "accent-bright": "#7ea0e8",
+        /* Primary accent — rich gold/amber, conveys luxury & trust */
+        accent: "#d4a574",
+        "accent-glow": "rgba(212,165,116,0.10)",
+        "accent-dim": "#c9935f",
+        "accent-bright": "#e6bc91",
       },
       fontFamily: {
         sans: [
@@ -60,15 +60,15 @@ export default {
         "3xl": "1.25rem",
       },
       boxShadow: {
-        "glow-sm": "0 0 20px -5px rgba(99,135,210,0.12)",
-        "glow-md": "0 0 40px -8px rgba(99,135,210,0.15)",
-        "glow-lg": "0 0 60px -10px rgba(99,135,210,0.18)",
-        "glow-green": "0 0 25px -6px rgba(62,201,157,0.2)",
-        "glow-yellow": "0 0 25px -6px rgba(229,185,78,0.2)",
-        "glow-red": "0 0 25px -6px rgba(229,105,123,0.2)",
-        card: "0 1px 3px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.25)",
+        "glow-sm": "0 0 20px -5px rgba(212,165,116,0.14)",
+        "glow-md": "0 0 40px -8px rgba(212,165,116,0.18)",
+        "glow-lg": "0 0 60px -10px rgba(212,165,116,0.22)",
+        "glow-green": "0 0 25px -6px rgba(45,154,119,0.25)",
+        "glow-yellow": "0 0 25px -6px rgba(201,138,63,0.25)",
+        "glow-red": "0 0 25px -6px rgba(184,79,94,0.25)",
+        card: "0 1px 3px rgba(0,0,0,0.5), 0 8px 28px rgba(0,0,0,0.35)",
         "card-hover":
-          "0 4px 16px rgba(0,0,0,0.5), 0 0 30px -8px rgba(99,135,210,0.1)",
+          "0 4px 20px rgba(0,0,0,0.6), 0 0 40px -8px rgba(212,165,116,0.15)",
       },
       animation: {
         "pulse-dot": "pulse-dot 2.5s ease-in-out infinite",
