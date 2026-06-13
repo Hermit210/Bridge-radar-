@@ -29,13 +29,13 @@ export function ScoreChart({ history }: { history: HealthScore[] }) {
         <AreaChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#6387d2" stopOpacity={0.2} />
-              <stop offset="100%" stopColor="#6387d2" stopOpacity={0} />
+              <stop offset="0%" stopColor="#d4a574" stopOpacity={0.22} />
+              <stop offset="100%" stopColor="#d4a574" stopOpacity={0} />
             </linearGradient>
           </defs>
           <CartesianGrid
             strokeDasharray="3 3"
-            stroke="rgba(30,39,64,0.4)"
+            stroke="rgba(42,53,68,0.45)"
             vertical={false}
           />
           <XAxis
@@ -43,35 +43,35 @@ export function ScoreChart({ history }: { history: HealthScore[] }) {
             type="number"
             domain={["dataMin", "dataMax"]}
             tickFormatter={(t) => new Date(t).toLocaleTimeString()}
-            stroke="#1e2740"
-            tick={{ fontSize: 10, fill: "#475470" }}
+            stroke="#2a3544"
+            tick={{ fontSize: 10, fill: "#5a6478" }}
           />
           <YAxis
             domain={[0, 100]}
-            stroke="#1e2740"
-            tick={{ fontSize: 10, fill: "#475470" }}
+            stroke="#2a3544"
+            tick={{ fontSize: 10, fill: "#5a6478" }}
             width={28}
           />
           <Tooltip
             contentStyle={{
-              background: "rgba(20,26,38,0.95)",
-              border: "1px solid rgba(30,39,64,0.6)",
+              background: "rgba(20,26,40,0.96)",
+              border: "1px solid rgba(42,53,68,0.65)",
               borderRadius: "0.5rem",
               padding: "8px 12px",
               fontSize: 12,
-              boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+              boxShadow: "0 4px 24px rgba(0,0,0,0.4)",
             }}
             labelFormatter={(t) => new Date(t as number).toLocaleString()}
           />
           <Area
             type="monotone"
             dataKey="score"
-            stroke="#6387d2"
+            stroke="#d4a574"
             strokeWidth={2}
             fill="url(#scoreGradient)"
             fillOpacity={1}
             dot={false}
-            activeDot={{ r: 4, stroke: "#6387d2", strokeWidth: 2, fill: "#141a26" }}
+            activeDot={{ r: 4, stroke: "#d4a574", strokeWidth: 2, fill: "#141a28" }}
           />
         </AreaChart>
       </ResponsiveContainer>
