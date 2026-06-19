@@ -17,11 +17,11 @@ export default {
         "border-subtle": "#1e2634",
         "border-glow": "rgba(212,165,116,0.12)",
 
-        /* Premium text — platinum hierarchy */
-        text: "#e8eaed",
-        "text-secondary": "#b4b8c5",
-        muted: "#7a8396",
-        "muted-dark": "#5a6478",
+        /* Premium text — platinum hierarchy with enhanced contrast */
+        text: "#eff1f3",
+        "text-secondary": "#b8bcc9",
+        muted: "#7f8799",
+        "muted-dark": "#5f6678",
 
         /* Semantic — refined, professional palette */
         green: "#2d9a77",
@@ -38,6 +38,13 @@ export default {
         "accent-bright": "#e6bc91",
       },
       fontFamily: {
+        display: [
+          "var(--font-outfit)",
+          "Outfit",
+          "system-ui",
+          "-apple-system",
+          "sans-serif",
+        ],
         sans: [
           "var(--font-inter)",
           "Inter",
@@ -54,6 +61,19 @@ export default {
           "Consolas",
           "monospace",
         ],
+      },
+      fontSize: {
+        xs: ["0.6875rem", { lineHeight: "1rem", letterSpacing: "0.01em" }],
+        sm: ["0.8125rem", { lineHeight: "1.25rem", letterSpacing: "0" }],
+        base: ["0.9375rem", { lineHeight: "1.5rem", letterSpacing: "-0.01em" }],
+        lg: ["1.0625rem", { lineHeight: "1.75rem", letterSpacing: "-0.01em" }],
+        xl: ["1.25rem", { lineHeight: "1.875rem", letterSpacing: "-0.02em" }],
+        "2xl": ["1.5rem", { lineHeight: "2rem", letterSpacing: "-0.02em" }],
+        "3xl": ["1.875rem", { lineHeight: "2.25rem", letterSpacing: "-0.03em" }],
+        "4xl": ["2.25rem", { lineHeight: "2.5rem", letterSpacing: "-0.03em" }],
+        "5xl": ["3rem", { lineHeight: "1.08", letterSpacing: "-0.04em" }],
+        "6xl": ["3.75rem", { lineHeight: "1", letterSpacing: "-0.04em" }],
+        "7xl": ["4.5rem", { lineHeight: "1", letterSpacing: "-0.05em" }],
       },
       borderRadius: {
         "2xl": "1rem",
