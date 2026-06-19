@@ -43,7 +43,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/bridges" className="transition-colors duration-150 hover:text-text">Bridges</Link>
               <Link href="/events" className="transition-colors duration-150 hover:text-text">Events</Link>
               <Link href="/about" className="transition-colors duration-150 hover:text-text">About</Link>
-              <a href="https://github.com/Hermit210/Bridge-radar-/blob/master/WHITEPAPER.md" className="transition-colors duration-150 hover:text-text" target="_blank" rel="noreferrer">Whitepaper</a>
             </nav>
             <div className="ml-auto badge text-[11px] font-medium">v0-preview</div>
           </div>
