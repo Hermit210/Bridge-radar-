@@ -10,7 +10,15 @@ html {
 html, body {
   background: #0a0e1a;
   color: #e8eaed;
-  font-feature-settings: "ss01", "cv11";
+  font-feature-settings: "ss01", "cv11", "liga", "calt";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-variant-ligatures: common-ligatures;
+}
+
+/* Premium button text rendering */
+button, a {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
