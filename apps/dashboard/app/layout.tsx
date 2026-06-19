@@ -44,7 +44,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/events" className="transition-colors duration-150 hover:text-text">Events</Link>
               <Link href="/about" className="transition-colors duration-150 hover:text-text">About</Link>
               <a href="https://github.com/Hermit210/Bridge-radar-/blob/master/WHITEPAPER.md" className="transition-colors duration-150 hover:text-text" target="_blank" rel="noreferrer">Whitepaper</a>
-              <a href="https://github.com/Hermit210/Bridge-radar-" className="transition-colors duration-150 hover:text-text" target="_blank" rel="noreferrer">GitHub</a>
             </nav>
             <div className="ml-auto badge text-[11px] font-medium">v0-preview</div>
           </div>
@@ -68,7 +67,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <Link href="/bridges" className="hover:text-text transition-colors">Dashboard</Link>
                   <Link href="/events" className="hover:text-text transition-colors">Events</Link>
                   <Link href="/about" className="hover:text-text transition-colors">About</Link>
-                  <a href="https://github.com/Hermit210/Bridge-radar-" target="_blank" rel="noreferrer" className="hover:text-text transition-colors">GitHub</a>
                 </div>
               </div>
               <div className="space-y-3">
