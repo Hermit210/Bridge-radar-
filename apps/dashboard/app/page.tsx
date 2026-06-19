@@ -38,21 +38,13 @@ export default function LandingPage() {
             <strong className="text-text font-semibold">is this bridge safe right now?</strong>
           </p>
 
-          <div className="flex items-center justify-center gap-3 pt-2">
+          <div className="flex items-center justify-center pt-2">
             <Link
               href="/bridges"
               className="rounded-lg bg-accent px-7 py-3.5 text-[13px] font-display font-semibold tracking-[-0.01em] text-bg shadow-glow-sm hover:bg-accent-bright hover:shadow-glow-md transition-all duration-200"
             >
               View Live Dashboard
             </Link>
-            <a
-              href="https://github.com/Hermit210/Bridge-radar-"
-              target="_blank"
-              rel="noreferrer"
-              className="glass-card px-7 py-3.5 text-[13px] font-display font-semibold tracking-[-0.01em] text-text-secondary hover:text-text transition-colors duration-200"
-            >
-              GitHub
-            </a>
           </div>
         </div>
       </section>
