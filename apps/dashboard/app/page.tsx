@@ -26,22 +26,22 @@ export default function LandingPage() {
             </span>
           </div>
 
-          <h1 className="text-5xl sm:text-7xl font-bold tracking-tight leading-[1.08]">
+          <h1 className="text-5xl sm:text-7xl font-display font-bold tracking-[-0.04em] leading-[1.08]">
             Real-time{" "}
             <span className="text-gradient">Bridge Health</span>
             <br />
             for Solana
           </h1>
 
-          <p className="text-lg text-text-secondary max-w-2xl mx-auto leading-relaxed">
+          <p className="text-lg text-text-secondary max-w-2xl mx-auto leading-[1.7] font-medium">
             Bridge Radar monitors every bridge with a Solana leg and gives you a single answer:{" "}
-            <strong className="text-text">is this bridge safe right now?</strong>
+            <strong className="text-text font-semibold">is this bridge safe right now?</strong>
           </p>
 
           <div className="flex items-center justify-center gap-3 pt-2">
             <Link
               href="/bridges"
-              className="rounded-lg bg-accent px-7 py-3 text-sm font-semibold text-white shadow-glow-sm hover:bg-accent-dim hover:shadow-glow-md transition-all duration-200"
+              className="rounded-lg bg-accent px-7 py-3.5 text-[13px] font-display font-semibold tracking-[-0.01em] text-bg shadow-glow-sm hover:bg-accent-bright hover:shadow-glow-md transition-all duration-200"
             >
               View Live Dashboard
             </Link>
@@ -49,7 +49,7 @@ export default function LandingPage() {
               href="https://github.com/Hermit210/Bridge-radar-"
               target="_blank"
               rel="noreferrer"
-              className="glass-card px-7 py-3 text-sm font-medium text-text-secondary hover:text-text transition-colors duration-200"
+              className="glass-card px-7 py-3.5 text-[13px] font-display font-semibold tracking-[-0.01em] text-text-secondary hover:text-text transition-colors duration-200"
             >
               GitHub
             </a>
@@ -68,8 +68,8 @@ export default function LandingPage() {
             key={s.label}
             className="glass-card p-8 space-y-2 transition-all duration-200 hover:border-border-glow"
           >
-            <div className="text-3xl font-bold font-mono text-text">{s.value}</div>
-            <div className="text-xs text-muted tracking-wide uppercase">{s.label}</div>
+            <div className="text-3xl font-display font-bold text-accent">{s.value}</div>
+            <div className="text-xs text-muted tracking-[0.08em] uppercase font-medium">{s.label}</div>
           </div>
         ))}
       </section>
@@ -77,8 +77,8 @@ export default function LandingPage() {
       {/* What it detects */}
       <section className="space-y-6">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">What it detects</h2>
-          <p className="mt-1 text-sm text-muted">Six independent risk signals, scored and composed in real-time.</p>
+          <h2 className="text-3xl font-display font-bold tracking-[-0.02em]">What it detects</h2>
+          <p className="mt-2 text-sm text-muted font-medium">Six independent risk signals, scored and composed in real-time.</p>
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 stagger-children">
           {features.map((f, i) => (
@@ -87,14 +87,14 @@ export default function LandingPage() {
               className="glass-card-interactive p-6 space-y-2 group"
             >
               <div className="flex items-center gap-2.5">
-                <span className="text-xs font-mono text-muted-dark">
+                <span className="text-xs font-mono text-muted-dark font-medium">
                   {String(i + 1).padStart(2, "0")}
                 </span>
-                <span className="text-sm font-semibold text-text group-hover:text-accent-bright transition-colors">
+                <span className="text-[13px] font-display font-semibold tracking-[-0.01em] text-text group-hover:text-accent-bright transition-colors">
                   {f.title}
                 </span>
               </div>
-              <div className="text-sm text-muted leading-relaxed pl-7">{f.desc}</div>
+              <div className="text-sm text-muted leading-[1.7] pl-7">{f.desc}</div>
             </div>
           ))}
         </div>
@@ -103,11 +103,11 @@ export default function LandingPage() {
       {/* CTA */}
       <div className="gradient-border">
         <section className="glass-card-elevated p-12 text-center space-y-5">
-          <h2 className="text-2xl font-bold">Ready to check bridge health?</h2>
-          <p className="text-text-secondary text-sm">Live data. No token. No signup. Fully open source.</p>
+          <h2 className="text-3xl font-display font-bold tracking-[-0.02em]">Ready to check bridge health?</h2>
+          <p className="text-text-secondary text-sm font-medium leading-relaxed">Live data. No token. No signup. Fully open source.</p>
           <Link
             href="/bridges"
-            className="inline-block rounded-lg bg-accent px-7 py-3 text-sm font-semibold text-white shadow-glow-sm hover:bg-accent-dim hover:shadow-glow-md transition-all duration-200"
+            className="inline-block rounded-lg bg-accent px-7 py-3.5 text-[13px] font-display font-semibold tracking-[-0.01em] text-bg shadow-glow-sm hover:bg-accent-bright hover:shadow-glow-md transition-all duration-200"
           >
             Open Dashboard
           </Link>
