@@ -2,7 +2,7 @@
 
 ## Current State
 
-Health scores are **not displaying real data** because the bridge adapters for CCTP and Hyperlane are missing their Solana program IDs.
+Health scores are **not  fully displaying real data / partially displaying soon gonna display all** because the bridge adapters for CCTP and Hyperlane are missing their Solana program IDs.
 
 ## Root Cause Analysis
 
