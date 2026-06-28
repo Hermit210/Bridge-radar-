@@ -46,7 +46,7 @@
 - Real-time market data (not needed for registry)
 
 ---
-
+( soon gonna use all bridges api to be stay updated with it ) 
 ## Bridge Registry Structure
 
 Located in: `apps/api/src/bridges.ts`
