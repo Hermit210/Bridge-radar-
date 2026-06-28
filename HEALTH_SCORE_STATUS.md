@@ -131,7 +131,7 @@ curl http://localhost:3001/v1/events?bridge=wormhole
 
 curl http://localhost:3001/v1/events?bridge=hyperlane
 # Currently returns empty (no events indexed)
-```
+
 
 To verify health scores:
 ```bash
