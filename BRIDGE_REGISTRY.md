@@ -2,7 +2,7 @@
 
 ## Current Status (Updated with Real Data)
 
-**Total Bridges:** 17 (7 implemented + 10 planned)  
+**Total Bridges:** 17 (7 implemented + 10 planned)  ( gonna add more till how much solana has bridges ) 
 **Total TVL:** ~$19.5B across all bridges  
 **Solana Support:** 100% of tracked bridges
 
