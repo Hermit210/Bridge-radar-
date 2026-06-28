@@ -6,7 +6,7 @@ Health scores are **not displaying real data** because the bridge adapters for C
 
 ## Root Cause Analysis
 
-### Why Scores Aren't Showing
+## Why Scores Aren't Showing
 
 1. **Adapters have empty Solana program arrays**
    - `crates/radar-core/src/bridges/cctp.rs`: `const SOLANA_PROGRAMS: &[&str] = &[];`
