@@ -42,3 +42,9 @@ data/
 # Logs
 *.log
 logs/
+
+# Local grant/application artifacts
+AGENTIC_ENGINEERING_GRANT_DRAFT.*
+claude-session.jsonl
+codex-session.jsonl
+wsl.localhost/
