@@ -46,10 +46,12 @@ Open `http://localhost:3000`. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the f
 Over $2.8B drained from bridges since 2022. Most exploits emitted detectable signals — anomalous outflows, signer rotations, parity breaks, frontend drift — minutes to days before drain completed. No public, real-time, neutral, Solana-focused service aggregates them today.
 
 ## Docs
-
+   
 - [Whitepaper](./WHITEPAPER.md)
 
 ## License
+
+
 
 MIT (code), CC-BY 4.0 (docs). No token, no equity, no premine.
 Built by: Khan Saloni ([@Hermit210](https://github.com/Hermit210))
