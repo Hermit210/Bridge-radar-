@@ -1,6 +1,6 @@
 # Bridge Radar
 
-Real-time bridge-health intelligence layer for Solana. Open source, public good, no token.
+Real-time bridge-health intelligence layer for Solana. Open source, public good, no token......
 
 ## What it does
       
