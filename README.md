@@ -3,7 +3,7 @@
 Real-time bridge-health intelligence layer for Solana. Open source, public good, no token.
 
 ## What it does
-
+      
 Monitors every bridge with a Solana leg (Wormhole, LayerZero, Allbridge, deBridge, Mayan, Portal, Axelar) and exposes a single answer: **is this bridge healthy right now?**
 
 Detectors:
