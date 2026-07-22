@@ -72,6 +72,14 @@ export function bandOf(score: number): HealthBand {
   return "red";
 }
 
+/** Compact USD formatting for real dollar figures (TVL, volume). */
+export function formatUsd(value: number): string {
+  if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(2)}B`;
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(2)}K`;
+  return `$${value.toFixed(2)}`;
+}
+
 export interface BridgeRow {
   id: BridgeId;
   display_name: string;
@@ -79,16 +87,20 @@ export interface BridgeRow {
   enabled: boolean;
 }
 
-export interface DeFiLlamaData {
-  tvl: number;
-  tvlFormatted: string;
-  volume24h: number;
-  volumeFormatted: string;
-  chains: string[];
+// Real DeFiLlama protocol TVL for a bridge (crates/radar-defillama →
+// defillama_cache → GET /v1/bridges). Absent when the bridge has no verified
+// DeFiLlama protocol slug or no sync has run yet — never a fabricated number.
+export interface DefiLlamaProtocolTvl {
+  source: "defillama";
+  fetched_at: string;
+  defillama_slug: string;
+  defillama_name: string;
+  category: string | null;
+  tvl_usd: number;
 }
 
 export interface BridgeWithHealth extends BridgeRow {
-  defilama?: DeFiLlamaData;
+  defillama?: DefiLlamaProtocolTvl;
   health?: HealthScore;
 }
 

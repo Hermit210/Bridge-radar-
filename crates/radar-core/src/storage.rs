@@ -30,6 +30,23 @@ pub struct ParityState {
     pub updated_at: DateTime<Utc>,
 }
 
+/// One cached row from an external DeFiLlama data category. `category` is a
+/// stable slug (e.g. `"chain_tvl"`, `"stablecoins"`) and `key` disambiguates
+/// rows within it (an ISO date, a stablecoin symbol, a protocol slug, or the
+/// constant `"solana"` for single-row summaries). `payload` is the
+/// normalized JSON we chose to keep from that category's response — never
+/// the full raw blob — so callers get a stable shape even as DeFiLlama's API
+/// evolves. This is deliberately generic (one table, not nine) because it's
+/// external reference data: cross-verification context, never a replacement
+/// for our own on-chain-derived numbers.
+#[derive(Debug, Clone)]
+pub struct DefiLlamaRecord {
+    pub category: String,
+    pub key: String,
+    pub payload: serde_json::Value,
+    pub fetched_at: DateTime<Utc>,
+}
+
 /// Storage abstraction. v0 ships a SQLite implementation; a Postgres+Timescale
 /// impl plugs in by implementing the same trait.
 #[async_trait]
@@ -55,6 +72,22 @@ pub trait Storage: Send + Sync {
     /// keyed by `floor(unix_seconds / 300)`. Used by the outflow z-score
     /// detector to assemble a baseline distribution.
     async fn event_count_buckets(&self, bridge_id: &str, since: DateTime<Utc>) -> Result<Vec<u32>>;
+
+    /// Upsert one row of external DeFiLlama reference data. See
+    /// [`DefiLlamaRecord`] for the (category, key) addressing scheme.
+    async fn defillama_upsert(
+        &self,
+        category: &str,
+        key: &str,
+        payload: &serde_json::Value,
+        fetched_at: DateTime<Utc>,
+    ) -> Result<()>;
+
+    /// All cached rows for `category`, most-recently-fetched first.
+    async fn defillama_list(&self, category: &str) -> Result<Vec<DefiLlamaRecord>>;
+
+    /// The single cached row for `category`/`key`, if present.
+    async fn defillama_get(&self, category: &str, key: &str) -> Result<Option<DefiLlamaRecord>>;
 }
 
 #[derive(Debug, Clone)]
