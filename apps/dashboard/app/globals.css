@@ -140,6 +140,10 @@ button, a {
   background: linear-gradient(90deg, #b84f5e, #a44454);
   box-shadow: 0 0 10px rgba(184, 79, 94, 0.3);
 }
+.health-bar-muted {
+  background: #3a4356;
+  box-shadow: none;
+}
 
 /* ===== Skeleton Loading ===== */
 @layer components {

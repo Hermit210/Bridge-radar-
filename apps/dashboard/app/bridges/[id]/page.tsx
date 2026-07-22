@@ -4,25 +4,28 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ScoreChart } from "./score-chart";
 import { EventRow } from "@/components/event-row";
-import { bandOf, formatUsd, type BridgeWithHealth, type BridgeEvent, type HealthScore } from "@radar/shared";
+import { bandFor, formatUsd, type BridgeWithHealth, type BridgeEvent, type HealthScore } from "@radar/shared";
 import { getBridge, getBridgeHistory, listEvents } from "@/lib/api";
 
 const bandClass = {
   green: "text-green",
   yellow: "text-yellow",
   red: "text-red",
+  unmonitored: "text-muted-dark",
 } as const;
 
 const bandStroke = {
   green: "#3ec99d",
   yellow: "#e5b94e",
   red: "#e5697b",
+  unmonitored: "#5a6478",
 } as const;
 
 const bandGlow = {
   green: "shadow-glow-green",
   yellow: "shadow-glow-yellow",
   red: "shadow-glow-red",
+  unmonitored: "",
 } as const;
 
 export default function BridgePage({
@@ -107,9 +110,9 @@ export default function BridgePage({
     );
   }
 
-  const score = detail.health?.score;
-  const band = score !== undefined ? bandOf(score) : "yellow";
-  const c = detail.health?.components;
+  const band = bandFor(detail);
+  const score = band === "unmonitored" ? undefined : detail.health?.score;
+  const c = band === "unmonitored" ? undefined : detail.health?.components;
   const defillama = detail.defillama;
   const circumference = 2 * Math.PI * 52;
 
@@ -163,20 +166,31 @@ export default function BridgePage({
             </div>
           </div>
           <p className="mt-3 text-xs text-muted">
-            {detail.health?.computed_at
-              ? `as of ${new Date(detail.health.computed_at).toLocaleString()}`
-              : "no score yet — start the scorer"}
+            {band === "unmonitored"
+              ? "no adapter watching this bridge yet"
+              : detail.health?.computed_at
+                ? `as of ${new Date(detail.health.computed_at).toLocaleString()}`
+                : "no score yet — start the scorer"}
           </p>
         </div>
         <div className="md:col-span-2 glass-card p-6">
           <p className="text-xs uppercase tracking-widest text-muted font-medium">Components</p>
-          <ul className="mt-4 space-y-3 text-sm">
-            <Component label="Parity break" value={c?.parity_severity} weight={40} />
-            <Component label="Outflow anomaly" value={c?.outflow_severity} weight={25} />
-            <Component label="Signer change" value={c?.signer_recency} weight={15} />
-            <Component label="Frontend drift" value={c?.frontend_recency} weight={10} />
-            <Component label="Oracle staleness" value={c?.oracle_staleness} weight={10} />
-          </ul>
+          {band === "unmonitored" ? (
+            <p className="mt-4 text-sm text-muted">
+              This bridge has no adapter watching a verified Solana program yet, so there
+              is no real on-chain data to break down into components. Showing zeros here
+              would look identical to a genuinely quiet, healthy bridge — so we show
+              nothing instead.
+            </p>
+          ) : (
+            <ul className="mt-4 space-y-3 text-sm">
+              <Component label="Parity break" value={c?.parity_severity} weight={40} />
+              <Component label="Outflow anomaly" value={c?.outflow_severity} weight={25} />
+              <Component label="Signer change" value={c?.signer_recency} weight={15} />
+              <Component label="Frontend drift" value={c?.frontend_recency} weight={10} />
+              <Component label="Oracle staleness" value={c?.oracle_staleness} weight={10} />
+            </ul>
+          )}
         </div>
       </section>
 
@@ -210,7 +224,14 @@ export default function BridgePage({
       <section className="glass-card p-6">
         <h2 className="mb-3 text-sm font-semibold text-text">Status</h2>
         <div className="flex items-center gap-2">
-          {score !== undefined && score >= 80 ? (
+          {band === "unmonitored" ? (
+            <>
+              <span className="status-dot status-dot-muted"></span>
+              <span className="text-sm text-text-secondary">
+                Not monitored — no adapter is watching this bridge on Solana yet
+              </span>
+            </>
+          ) : score !== undefined && score >= 80 ? (
             <>
               <span className="status-dot status-dot-green"></span>
               <span className="text-sm text-text-secondary">No anomalies detected</span>

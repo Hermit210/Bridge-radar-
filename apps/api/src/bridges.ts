@@ -133,16 +133,8 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
   },
 
   // ─── TIER 2: Registered, detection not yet verified/implemented ──────────
+  // (stargate removed — confirmed not deployed on Solana, see BRIDGE_DISCOVERY.md)
 
-  {
-    id: "stargate",
-    name: "Stargate",
-    homepage: "https://stargate.finance",
-    supportedChains: ["solana", "ethereum", "polygon", "arbitrum", "optimism", "avalanche", "bsc"],
-    hasSolana: true,
-    status: "active",
-    detectionStatus: "not_yet_supported",
-  },
   {
     id: "hyperlane",
     name: "Hyperlane",
@@ -172,7 +164,9 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
   },
 
   // ─── TIER 3: Unverified — DeFiLlama may mislabel these as bridges; pending
-  // the Task 2 discovery/verification pass before any adapter is written ────
+  // the Task 2 discovery/verification pass before any adapter is written.
+  // (lido removed — liquid staking, not a bridge. magic-eden removed — NFT
+  // marketplace, not a bridge. Neither is a genuine Solana-connected bridge.)
 
   {
     id: "marinade",
@@ -184,28 +178,10 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
     detectionStatus: "not_yet_supported",
   },
   {
-    id: "lido",
-    name: "Lido",
-    homepage: "https://lido.fi",
-    supportedChains: ["solana", "ethereum"],
-    hasSolana: true,
-    status: "active",
-    detectionStatus: "not_yet_supported",
-  },
-  {
     id: "jito",
     name: "Jito",
     homepage: "https://jito.co",
     supportedChains: ["solana"],
-    hasSolana: true,
-    status: "active",
-    detectionStatus: "not_yet_supported",
-  },
-  {
-    id: "magic-eden",
-    name: "Magic Eden Bridge",
-    homepage: "https://magiceden.io",
-    supportedChains: ["solana", "ethereum"],
     hasSolana: true,
     status: "active",
     detectionStatus: "not_yet_supported",

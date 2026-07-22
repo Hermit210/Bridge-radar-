@@ -82,14 +82,9 @@ export const BRIDGE_CONFIG: BridgeConfig[] = [
   },
 
   // ─── TIER 2: Planned - High Priority ──────────────────────────────────────
-  {
-    id: "stargate",
-    name: "Stargate",
-    homepage: "https://stargate.finance",
-    chains: ["solana", "ethereum", "polygon", "arbitrum", "optimism", "avalanche", "bsc"],
-    status: "partial",
-    detectionStatus: "not_yet_supported",
-  },
+  // (stargate removed — confirmed not deployed on Solana; lido/magic-eden
+  // removed — liquid staking and an NFT marketplace, not bridges. See
+  // BRIDGE_DISCOVERY.md and BRIDGE_REGISTRY.md.)
   {
     id: "cctp",
     name: "Circle CCTP",
@@ -103,22 +98,6 @@ export const BRIDGE_CONFIG: BridgeConfig[] = [
     name: "Hyperlane",
     homepage: "https://hyperlane.xyz",
     chains: ["solana", "ethereum", "polygon", "arbitrum", "optimism", "base"],
-    status: "partial",
-    detectionStatus: "not_yet_supported",
-  },
-  {
-    id: "lido",
-    name: "Lido",
-    homepage: "https://lido.fi",
-    chains: ["solana", "ethereum"],
-    status: "partial",
-    detectionStatus: "not_yet_supported",
-  },
-  {
-    id: "magic-eden",
-    name: "Magic Eden Bridge",
-    homepage: "https://magiceden.io",
-    chains: ["solana", "ethereum"],
     status: "partial",
     detectionStatus: "not_yet_supported",
   },
