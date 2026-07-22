@@ -10,6 +10,7 @@ pub mod hyperlane;
 pub mod layerzero;
 pub mod mayan;
 pub mod portal;
+pub mod relay;
 pub mod stargate;
 pub mod wormhole;
 
@@ -29,5 +30,6 @@ pub fn registry() -> Vec<Arc<dyn BridgeAdapter>> {
         Arc::new(cctp::CctpAdapter),
         Arc::new(hyperlane::HyperlaneAdapter),
         Arc::new(stargate::StargateAdapter),
+        Arc::new(relay::RelayAdapter),
     ]
 }
