@@ -64,12 +64,23 @@ export interface HealthScore {
   components: HealthComponents;
 }
 
-export type HealthBand = "green" | "yellow" | "red";
+export type HealthBand = "green" | "yellow" | "red" | "unmonitored";
 
 export function bandOf(score: number): HealthBand {
   if (score >= 80) return "green";
   if (score >= 50) return "yellow";
   return "red";
+}
+
+/**
+ * Band for a bridge row, honoring `enabled` and score presence — not just
+ * the score. A disabled bridge (real bridge, no adapter watching it yet) or
+ * one with no health row at all must render as "unmonitored", never fall
+ * through to a colored band that implies real on-chain data backs it.
+ */
+export function bandFor(bridge: { enabled: boolean; health?: HealthScore }): HealthBand {
+  if (!bridge.enabled || !bridge.health) return "unmonitored";
+  return bandOf(bridge.health.score);
 }
 
 /** Compact USD formatting for real dollar figures (TVL, volume). */

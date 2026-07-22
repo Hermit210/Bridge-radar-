@@ -89,6 +89,35 @@ INSERT OR IGNORE INTO bridges (id, display_name, homepage) VALUES
     ('across',    'Across Protocol', 'https://across.to'),
     ('garden',    'Garden Finance', 'https://garden.finance'),
     ('base-solana-bridge', 'Coinbase Bridge (Base-Solana)', 'https://docs.base.org/base-chain/quickstart/base-solana-bridge');
+
+-- cctp/hyperlane are real bridges but have no adapter watching a verified
+-- Solana program yet (see crate::bridges::registry doc comment) — seeded
+-- disabled so the scorer (`if !bridge.enabled { continue }`) never writes a
+-- score for them, instead of silently showing a green 100 for "never
+-- monitored". Separate statement because it needs a different column list
+-- (explicit `enabled = 0`) than the block above.
+INSERT OR IGNORE INTO bridges (id, display_name, homepage, enabled) VALUES
+    ('cctp',      'Circle CCTP', 'https://www.circle.com/en/usdc/bridge', 0),
+    ('hyperlane', 'Hyperlane',   'https://hyperlane.xyz', 0);
+
+-- One-time reconciliation for local DBs that were seeded before this fix:
+-- lido / magic-eden (not bridges at all) and stargate (confirmed not
+-- deployed on Solana) were previously inserted by the API's own seed list
+-- and picked up a false 100 health score because the scorer scores every
+-- *enabled* row regardless of whether a real adapter watches it. Idempotent
+-- no-op once cleaned.
+DELETE FROM bridge_health_scores WHERE bridge_id IN ('lido','magic-eden','stargate');
+DELETE FROM parity_state         WHERE bridge_id IN ('lido','magic-eden','stargate');
+DELETE FROM bridge_events        WHERE bridge_id IN ('lido','magic-eden','stargate');
+DELETE FROM bridges              WHERE id        IN ('lido','magic-eden','stargate');
+
+-- cctp/hyperlane rows (and any score/event history from before they were
+-- disabled) also get reconciled every startup in case an older run left
+-- them enabled with a stale score.
+DELETE FROM bridge_health_scores WHERE bridge_id IN ('cctp','hyperlane');
+DELETE FROM parity_state         WHERE bridge_id IN ('cctp','hyperlane');
+DELETE FROM bridge_events        WHERE bridge_id IN ('cctp','hyperlane');
+UPDATE bridges SET enabled = 0   WHERE id        IN ('cctp','hyperlane');
 "#;
 
 #[derive(Clone)]
@@ -467,11 +496,39 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn eleven_bridges_seeded() {
+    async fn thirteen_bridges_seeded() {
         // Original 7 v0 adapters + relay + across + garden + base-solana-bridge
-        // (discovery/verification pass).
+        // (discovery/verification pass) + cctp + hyperlane (real bridges,
+        // seeded disabled since no verified Solana program watches them yet).
         let store = SqliteStorage::connect("sqlite::memory:").await.unwrap();
         let bridges = store.list_bridges().await.unwrap();
-        assert_eq!(bridges.len(), 11);
+        assert_eq!(bridges.len(), 13);
+    }
+
+    #[tokio::test]
+    async fn cctp_and_hyperlane_seeded_disabled() {
+        let store = SqliteStorage::connect("sqlite::memory:").await.unwrap();
+        let bridges = store.list_bridges().await.unwrap();
+        for id in ["cctp", "hyperlane"] {
+            let bridge = bridges.iter().find(|b| b.id == id).unwrap_or_else(|| {
+                panic!("expected {id} to be seeded");
+            });
+            assert!(
+                !bridge.enabled,
+                "{id} should be seeded disabled — no verified Solana program watches it yet"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn removed_non_bridges_are_not_seeded() {
+        let store = SqliteStorage::connect("sqlite::memory:").await.unwrap();
+        let bridges = store.list_bridges().await.unwrap();
+        for id in ["lido", "magic-eden", "stargate"] {
+            assert!(
+                bridges.iter().all(|b| b.id != id),
+                "{id} should not be in the registry: lido/magic-eden aren't bridges, stargate isn't on Solana"
+            );
+        }
     }
 }
