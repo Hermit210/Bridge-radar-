@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { bandOf, type BridgeWithHealth } from "@radar/shared";
+import { bandOf, formatUsd, type BridgeWithHealth } from "@radar/shared";
 
 const bandColor = {
   green: "text-green",
@@ -28,7 +28,7 @@ const bandDot = {
 export function HealthCard({ bridge }: { bridge: BridgeWithHealth }) {
   const score = bridge.health?.score;
   const band = score !== undefined ? bandOf(score) : "yellow";
-  const defilama = bridge.defilama;
+  const defillama = bridge.defillama;
 
   return (
     <Link
@@ -71,20 +71,15 @@ export function HealthCard({ bridge }: { bridge: BridgeWithHealth }) {
         </span>
       </div>
 
-      {/* DeFiLlama context */}
-      {defilama && (
+      {/* DeFiLlama context — real protocol TVL, external reference only */}
+      {defillama && (
         <div className="mt-3 space-y-1.5 border-t border-border/40 pt-3">
           <div className="flex justify-between text-xs">
-            <span className="text-muted">TVL</span>
-            <span className="font-mono text-text-secondary tabular-nums">{defilama.tvlFormatted}</span>
+            <span className="text-muted">Protocol TVL</span>
+            <span className="font-mono text-text-secondary tabular-nums">{formatUsd(defillama.tvl_usd)}</span>
           </div>
-          <div className="flex justify-between text-xs">
-            <span className="text-muted">24h Vol</span>
-            <span className="font-mono text-text-secondary tabular-nums">{defilama.volumeFormatted}</span>
-          </div>
-          <div className="flex justify-between text-xs">
-            <span className="text-muted">Chains</span>
-            <span className="font-mono text-text-secondary tabular-nums">{defilama.chains.length}</span>
+          <div className="flex justify-between text-[10px] text-muted-dark">
+            <span>via DeFiLlama ({defillama.defillama_name})</span>
           </div>
         </div>
       )}

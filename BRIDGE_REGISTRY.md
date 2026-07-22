@@ -1,49 +1,54 @@
 # Bridge Registry & Expansion Guide
 
-## Current Status (Updated with Real Data)
+## Current Status
 
-**Total Bridges:** 17 (7 implemented + 10 planned)  
-**Total TVL:** ~$19.5B across all bridges  
+**Total Bridges:** 17 registered (7 implemented + 10 planned/unverified)
 **Solana Support:** 100% of tracked bridges
 
-### Tier 1: Implemented & High TVL (7 bridges)
-- **Wormhole** - $850M TVL - Largest cross-chain bridge
-- **Portal** - $320M TVL - Wormhole's UI
-- **LayerZero** - $200M TVL - Omnichain protocol
-- **Axelar** - $180M TVL - General message passing
-- **Allbridge** - $120M TVL - Multi-chain bridge
-- **deBridge** - $95M TVL - Cross-chain infrastructure
-- **Mayan** - $45M TVL - Solana-focused bridge
+The per-bridge TVL figures previously listed here (e.g. "Wormhole - $850M TVL")
+were hardcoded placeholder numbers, not live data — they have been removed
+from both this doc and the code (`apps/api/src/bridges.ts` no longer has a
+`tvl` field). Real, live TVL now comes from DeFiLlama's `/protocols` endpoint
+via `crates/radar-defillama` → `GET /v1/defillama/protocols` and
+`GET /v1/bridges` (per-bridge `defillama` field). Verified as of 2026-07-22
+(see [[project-defillama-paywall]] for the full picture): Wormhole/Portal
+~$1.67B (DeFiLlama tracks both under one "Portal" protocol entry), LayerZero
+~$6.85B, Axelar ~$134M, Allbridge ~$5.95M, deBridge ~$2.06M, Hyperlane
+~$88.5M, Stargate ~$70.3M, Mayan ~$124K. Circle CCTP has no TVL concept in
+DeFiLlama's model (burn-and-mint, not locked liquidity) — correctly absent,
+not a bug. Check the live endpoint for current numbers; don't hardcode these
+back into source.
 
-### Tier 2: Planned - High Priority (4 bridges)
-- **Stargate** - $450M TVL - Stable swap bridge
-- **Circle CCTP** - $600M TVL - USDC native bridge
-- **Hyperlane** - $75M TVL - Interoperability protocol
-- **Orca** - $35M TVL - Solana DEX with bridging
+### Tier 1: Implemented (7 bridges)
+Wormhole, Portal, LayerZero, Axelar, Allbridge, deBridge, Mayan.
 
-### Tier 3: Emerging (5 bridges)
-- **Lido** - $15B TVL - Liquid staking (Solana support)
-- **Marinade** - $280M TVL - Solana liquid staking
-- **Jito** - $150M TVL - Solana MEV infrastructure
-- **Magic Eden Bridge** - $25M TVL - NFT bridge
-- **Phantom Bridge** - $15M TVL - Wallet-integrated bridge
+### Tier 2: Registered, detection not yet implemented (4 bridges)
+Stargate, Circle CCTP, Hyperlane, Orca.
+
+### Tier 3: Unverified — pending discovery/verification pass (5 bridges)
+Lido, Marinade, Jito, Magic Eden Bridge, Phantom Bridge. These may be
+DeFiLlama-mislabeled non-bridges (LSTs, wallets, MEV infra) rather than
+genuine cross-chain bridges — do not write adapters for these without
+verifying a real Solana program ID from an authoritative source first.
 
 ### Tier 4: Inactive (1 bridge)
-- **Gravity Bridge** - $5M TVL - Deprecated
+Gravity Bridge — deprecated.
 
 ---
 
 ## Data Sources
 
-✅ **Used:**
-- DeFiLlama bridges documentation
-- Solana ecosystem official list
-- Bridge official websites
-- Public TVL data
+✅ **Used (free, live, verified 2026-07-22):**
+- `api.llama.fi/protocols`, `/v2/historicalChainTvl/solana`, `/overview/dexs/solana`, `/overview/fees/solana`
+- `stablecoins.llama.fi/stablecoins`
+- `coins.llama.fi/prices/current/solana:{mint}`
+- Bridge official websites / docs / GitHub / Solscan for program ID verification
 
-❌ **Not Used:**
-- DeFiLlama paid API (HTTP 402 - requires subscription)
-- Real-time market data (not needed for registry)
+❌ **Behind DeFiLlama's Pro API ($300/mo, not purchased):**
+- Bridges list (`bridges.llama.fi/bridges`), bridge volume
+  (`bridges.llama.fi/bridgevolume/{chain}`), oracles TVS (`api.llama.fi/oracles`)
+- These honestly report "unavailable — requires DeFiLlama Pro API key" via
+  `GET /v1/defillama/{bridges,bridge-volume,oracles}` — never fake data.
 
 ---
 

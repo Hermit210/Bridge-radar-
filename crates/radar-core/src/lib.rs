@@ -13,6 +13,7 @@
 pub mod adapter;
 pub mod bridges;
 pub mod chain;
+pub mod defillama;
 pub mod event;
 pub mod health;
 pub mod pricing;

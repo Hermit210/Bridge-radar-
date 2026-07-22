@@ -2846,6 +2846,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "radar-defillama"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "dotenvy",
+ "futures",
+ "radar-core",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "radar-indexer-evm"
 version = "0.1.0"
 dependencies = [

@@ -240,6 +240,11 @@ export class RadarDb {
     const r = this.db.prepare("SELECT COUNT(*) AS c FROM bridge_events").get() as { c: number };
     return r.c;
   }
+
+  /** Underlying connection, for readers of tables this class doesn't own (e.g. defillama_cache). */
+  raw(): Database.Database {
+    return this.db;
+  }
 }
 
 interface DbScoreRow {

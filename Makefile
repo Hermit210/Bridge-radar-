@@ -1,4 +1,4 @@
-.PHONY: help install build test lint fmt up down reset dev-indexer dev-scorer dev-api dev-dash anchor
+.PHONY: help install build test lint fmt up down reset dev-indexer dev-scorer dev-api dev-dash dev-defillama anchor
 
 help:
 	@echo "Bridge Radar — common tasks"
@@ -16,6 +16,7 @@ help:
 	@echo "  make dev-attester  Run attester (pushes scores to on-chain oracle)"
 	@echo "  make dev-watchers  Run periodic detectors (signer + frontend + oracle)"
 	@echo "  make dev-alerter   Run alerter (Telegram + Discord + webhook fan-out)"
+	@echo "  make dev-defillama Run DeFiLlama Solana data layer sync (9 categories, own schedules)"
 	@echo "  make dev-api       Run API gateway on :3001"
 	@echo "  make dev-dash      Run Next.js dashboard on :3000"
 	@echo "  make anchor        anchor build the on-chain oracle program"
@@ -68,6 +69,9 @@ dev-watchers:
 
 dev-alerter:
 	cargo run -p radar-alerter
+
+dev-defillama:
+	cargo run -p radar-defillama
 
 dev-api:
 	pnpm --filter @radar/api dev

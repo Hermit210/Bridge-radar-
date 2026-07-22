@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ScoreChart } from "./score-chart";
 import { EventRow } from "@/components/event-row";
-import { bandOf, type BridgeWithHealth, type BridgeEvent, type HealthScore } from "@radar/shared";
+import { bandOf, formatUsd, type BridgeWithHealth, type BridgeEvent, type HealthScore } from "@radar/shared";
 import { getBridge, getBridgeHistory, listEvents } from "@/lib/api";
 
 const bandClass = {
@@ -110,7 +110,7 @@ export default function BridgePage({
   const score = detail.health?.score;
   const band = score !== undefined ? bandOf(score) : "yellow";
   const c = detail.health?.components;
-  const defilama = detail.defilama;
+  const defillama = detail.defillama;
   const circumference = 2 * Math.PI * 52;
 
   return (
@@ -180,26 +180,29 @@ export default function BridgePage({
         </div>
       </section>
 
-      {/* Bridge Context - DeFiLlama Data */}
-      {defilama && (
+      {/* Bridge Context - real DeFiLlama protocol TVL, external reference only */}
+      {defillama ? (
         <section className="glass-card p-6">
           <h2 className="mb-4 text-sm font-semibold text-text">Bridge Context</h2>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <p className="text-xs text-muted">Total Value Locked</p>
-              <p className="mt-1 text-xl font-bold font-mono text-text tabular-nums">{defilama.tvlFormatted}</p>
+              <p className="text-xs text-muted">Protocol TVL (DeFiLlama)</p>
+              <p className="mt-1 text-xl font-bold font-mono text-text tabular-nums">{formatUsd(defillama.tvl_usd)}</p>
             </div>
             <div>
-              <p className="text-xs text-muted">24h Volume</p>
-              <p className="mt-1 text-xl font-bold font-mono text-text tabular-nums">{defilama.volumeFormatted}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted">Supported Chains</p>
+              <p className="text-xs text-muted">Source</p>
               <p className="mt-1 text-sm font-mono text-text-secondary">
-                {defilama.chains.map((ch) => ch.toUpperCase()).join(", ")}
+                {defillama.defillama_name} · as of {new Date(defillama.fetched_at).toLocaleString()}
               </p>
             </div>
           </div>
+        </section>
+      ) : (
+        <section className="glass-card p-6">
+          <h2 className="mb-2 text-sm font-semibold text-text">Bridge Context</h2>
+          <p className="text-sm text-muted">
+            No DeFiLlama protocol TVL available for this bridge yet.
+          </p>
         </section>
       )}
 

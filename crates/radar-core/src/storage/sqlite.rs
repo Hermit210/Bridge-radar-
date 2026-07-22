@@ -5,7 +5,7 @@
 //! uses SQLite types: `TEXT` timestamps stored as RFC 3339, `REAL` for
 //! numerics, JSON kept as `TEXT`.
 
-use super::{BridgeRow, ParityState, Result, Storage, StorageError};
+use super::{BridgeRow, DefiLlamaRecord, ParityState, Result, Storage, StorageError};
 use crate::chain::ChainId;
 use crate::event::{BridgeEvent, BridgeEventKind, EventFilter};
 use crate::health::{HealthComponents, HealthScore};
@@ -63,6 +63,19 @@ CREATE TABLE IF NOT EXISTS parity_state (
     updated_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
     PRIMARY KEY (bridge_id, asset)
 );
+
+-- External reference data from DeFiLlama (never our primary detection
+-- source, see crate::defillama). One row per (category, key) pair, where
+-- payload is the normalized JSON we chose to keep, not the raw API blob.
+CREATE TABLE IF NOT EXISTS defillama_cache (
+    category    TEXT NOT NULL,
+    key         TEXT NOT NULL,
+    payload     TEXT NOT NULL,
+    fetched_at  TEXT NOT NULL,
+    PRIMARY KEY (category, key)
+);
+CREATE INDEX IF NOT EXISTS defillama_cache_category_idx
+    ON defillama_cache (category, fetched_at DESC);
 
 INSERT OR IGNORE INTO bridges (id, display_name, homepage) VALUES
     ('wormhole',  'Wormhole',  'https://wormhole.com'),
@@ -333,6 +346,63 @@ impl Storage for SqliteStorage {
             })
             .collect())
     }
+
+    async fn defillama_upsert(
+        &self,
+        category: &str,
+        key: &str,
+        payload: &serde_json::Value,
+        fetched_at: DateTime<Utc>,
+    ) -> Result<()> {
+        sqlx::query(
+            r#"INSERT INTO defillama_cache (category, key, payload, fetched_at)
+               VALUES (?, ?, ?, ?)
+               ON CONFLICT(category, key) DO UPDATE SET
+                  payload = excluded.payload,
+                  fetched_at = excluded.fetched_at"#,
+        )
+        .bind(category)
+        .bind(key)
+        .bind(serde_json::to_string(payload)?)
+        .bind(fetched_at.to_rfc3339())
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    async fn defillama_list(&self, category: &str) -> Result<Vec<DefiLlamaRecord>> {
+        let rows = sqlx::query(
+            r#"SELECT category, key, payload, fetched_at FROM defillama_cache
+               WHERE category = ? ORDER BY fetched_at DESC"#,
+        )
+        .bind(category)
+        .fetch_all(&self.pool)
+        .await?;
+        rows.into_iter().map(row_to_defillama).collect()
+    }
+
+    async fn defillama_get(&self, category: &str, key: &str) -> Result<Option<DefiLlamaRecord>> {
+        let row = sqlx::query(
+            r#"SELECT category, key, payload, fetched_at FROM defillama_cache
+               WHERE category = ? AND key = ?"#,
+        )
+        .bind(category)
+        .bind(key)
+        .fetch_optional(&self.pool)
+        .await?;
+        row.map(row_to_defillama).transpose()
+    }
+}
+
+fn row_to_defillama(row: sqlx::sqlite::SqliteRow) -> Result<DefiLlamaRecord> {
+    let fetched_at_str: String = row.try_get("fetched_at")?;
+    let payload_str: String = row.try_get("payload")?;
+    Ok(DefiLlamaRecord {
+        category: row.try_get("category")?,
+        key: row.try_get("key")?,
+        payload: serde_json::from_str(&payload_str)?,
+        fetched_at: parse_rfc3339(&fetched_at_str)?,
+    })
 }
 
 fn row_to_score(row: sqlx::sqlite::SqliteRow) -> Result<HealthScore> {
