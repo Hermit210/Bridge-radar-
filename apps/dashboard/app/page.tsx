@@ -1,6 +1,19 @@
 import Link from "next/link";
+import { apiUrls } from "@/lib/api";
 
-export default function LandingPage() {
+async function implementedBridgeCount(): Promise<number | null> {
+  try {
+    const r = await fetch(`${apiUrls.base}/v1/registry`, { cache: "no-store" });
+    if (!r.ok) return null;
+    const data = (await r.json()) as { summary?: { implemented?: number } };
+    return data.summary?.implemented ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export default async function LandingPage() {
+  const bridgeCount = await implementedBridgeCount();
   const features = [
     { title: "Lock vs Mint Parity", desc: "Detects asset imbalances across origin chain and Solana in real-time." },
     { title: "Outflow Anomaly", desc: "Z-score analysis over a rolling 30-day baseline flags unusual withdrawals." },
@@ -52,8 +65,8 @@ export default function LandingPage() {
       {/* Stats */}
       <section className="grid grid-cols-1 sm:grid-cols-3 gap-5 text-center stagger-children">
         {[
-          { value: "7", label: "Bridges Monitored" },
-          { value: "$2.8B+", label: "Lost to Bridge Exploits" },
+          { value: bridgeCount !== null ? String(bridgeCount) : "—", label: "Bridges Monitored" },
+          { value: "$2.8B+", label: "Lost to Bridge Exploits (industry-wide, historical)" },
           { value: "100%", label: "Open Source" },
         ].map((s) => (
           <div

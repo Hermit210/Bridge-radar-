@@ -6,7 +6,7 @@
 //! names, same row shapes — so swapping `DATABASE_URL` from `sqlite://...`
 //! to `postgres://...` requires no code changes.
 
-use super::{BridgeRow, ParityState, Result, Storage, StorageError};
+use super::{BridgeRow, DefiLlamaRecord, ParityState, Result, Storage, StorageError};
 use crate::chain::ChainId;
 use crate::event::{BridgeEvent, BridgeEventKind, EventFilter};
 use crate::health::{HealthComponents, HealthScore};
@@ -252,6 +252,61 @@ impl Storage for PostgresStorage {
             .map(|r| r.get::<i64, _>("c") as u32)
             .collect())
     }
+
+    async fn defillama_upsert(
+        &self,
+        category: &str,
+        key: &str,
+        payload: &serde_json::Value,
+        fetched_at: DateTime<Utc>,
+    ) -> Result<()> {
+        sqlx::query(
+            r#"INSERT INTO defillama_cache (category, key, payload, fetched_at)
+               VALUES ($1, $2, $3, $4)
+               ON CONFLICT (category, key) DO UPDATE SET
+                  payload = excluded.payload,
+                  fetched_at = excluded.fetched_at"#,
+        )
+        .bind(category)
+        .bind(key)
+        .bind(payload)
+        .bind(fetched_at)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    async fn defillama_list(&self, category: &str) -> Result<Vec<DefiLlamaRecord>> {
+        let rows = sqlx::query(
+            r#"SELECT category, key, payload, fetched_at FROM defillama_cache
+               WHERE category = $1 ORDER BY fetched_at DESC"#,
+        )
+        .bind(category)
+        .fetch_all(&self.pool)
+        .await?;
+        rows.into_iter().map(row_to_defillama).collect()
+    }
+
+    async fn defillama_get(&self, category: &str, key: &str) -> Result<Option<DefiLlamaRecord>> {
+        let row = sqlx::query(
+            r#"SELECT category, key, payload, fetched_at FROM defillama_cache
+               WHERE category = $1 AND key = $2"#,
+        )
+        .bind(category)
+        .bind(key)
+        .fetch_optional(&self.pool)
+        .await?;
+        row.map(row_to_defillama).transpose()
+    }
+}
+
+fn row_to_defillama(row: PgRow) -> Result<DefiLlamaRecord> {
+    Ok(DefiLlamaRecord {
+        category: row.try_get("category")?,
+        key: row.try_get("key")?,
+        payload: row.try_get("payload")?,
+        fetched_at: row.try_get("fetched_at")?,
+    })
 }
 
 fn row_to_score(row: PgRow) -> Result<HealthScore> {

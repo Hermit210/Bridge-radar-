@@ -1,12 +1,14 @@
 /**
  * Bridge Registry
- * 
- * Centralized registry of Solana-compatible bridges with metadata.
- * Data sources:
- * - DeFiLlama bridges (https://defillama.com/bridges)
- * - Solana ecosystem (https://solana.com/ecosystem)
- * - Bridge official websites
- * 
+ *
+ * Centralized registry of Solana-compatible bridges with metadata — identity
+ * and detection status only. This is NOT a data source for TVL/volume: those
+ * numbers must come from a live source (see defillama-store.ts, backed by
+ * the real DeFiLlama /protocols response) or be omitted entirely. A prior
+ * version of this file hardcoded a `tvl` field per bridge; those were
+ * invented numbers served as if live, which violated the project's
+ * no-fake-data rule and has been removed.
+ *
  * Each bridge includes:
  * - id: unique identifier
  * - name: display name
@@ -15,7 +17,6 @@
  * - hasSolana: whether bridge supports Solana
  * - status: "active" | "inactive" | "planned"
  * - detectionStatus: "implemented" | "not_yet_supported"
- * - tvl: approximate TVL (USD) when available
  */
 
 export interface BridgeRegistry {
@@ -26,12 +27,11 @@ export interface BridgeRegistry {
   hasSolana: boolean;
   status: "active" | "inactive" | "planned";
   detectionStatus: "implemented" | "not_yet_supported";
-  tvl?: number; // in USD millions
 }
 
 export const BRIDGE_REGISTRY: BridgeRegistry[] = [
-  // ─── TIER 1: Implemented & High TVL ───────────────────────────────────────
-  
+  // ─── TIER 1: Implemented ───────────────────────────────────────────────────
+
   {
     id: "wormhole",
     name: "Wormhole",
@@ -40,7 +40,6 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
     hasSolana: true,
     status: "active",
     detectionStatus: "implemented",
-    tvl: 850,
   },
   {
     id: "allbridge",
@@ -50,7 +49,6 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
     hasSolana: true,
     status: "active",
     detectionStatus: "implemented",
-    tvl: 120,
   },
   {
     id: "debridge",
@@ -60,7 +58,6 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
     hasSolana: true,
     status: "active",
     detectionStatus: "implemented",
-    tvl: 95,
   },
   {
     id: "layerzero",
@@ -70,7 +67,6 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
     hasSolana: true,
     status: "active",
     detectionStatus: "implemented",
-    tvl: 200,
   },
   {
     id: "mayan",
@@ -80,7 +76,6 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
     hasSolana: true,
     status: "active",
     detectionStatus: "implemented",
-    tvl: 45,
   },
   {
     id: "portal",
@@ -90,7 +85,6 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
     hasSolana: true,
     status: "active",
     detectionStatus: "implemented",
-    tvl: 320,
   },
   {
     id: "axelar",
@@ -100,11 +94,10 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
     hasSolana: true,
     status: "active",
     detectionStatus: "implemented",
-    tvl: 180,
   },
 
-  // ─── TIER 2: Planned - High Priority ──────────────────────────────────────
-  
+  // ─── TIER 2: Registered, detection not yet verified/implemented ──────────
+
   {
     id: "stargate",
     name: "Stargate",
@@ -113,7 +106,6 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
     hasSolana: true,
     status: "active",
     detectionStatus: "not_yet_supported",
-    tvl: 450,
   },
   {
     id: "hyperlane",
@@ -123,7 +115,6 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
     hasSolana: true,
     status: "active",
     detectionStatus: "not_yet_supported",
-    tvl: 75,
   },
   {
     id: "cctp",
@@ -133,7 +124,6 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
     hasSolana: true,
     status: "active",
     detectionStatus: "not_yet_supported",
-    tvl: 600,
   },
   {
     id: "orca",
@@ -143,11 +133,11 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
     hasSolana: true,
     status: "active",
     detectionStatus: "not_yet_supported",
-    tvl: 35,
   },
 
-  // ─── TIER 3: Emerging Bridges ─────────────────────────────────────────────
-  
+  // ─── TIER 3: Unverified — DeFiLlama may mislabel these as bridges; pending
+  // the Task 2 discovery/verification pass before any adapter is written ────
+
   {
     id: "marinade",
     name: "Marinade",
@@ -156,7 +146,6 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
     hasSolana: true,
     status: "active",
     detectionStatus: "not_yet_supported",
-    tvl: 280,
   },
   {
     id: "lido",
@@ -166,7 +155,6 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
     hasSolana: true,
     status: "active",
     detectionStatus: "not_yet_supported",
-    tvl: 15000,
   },
   {
     id: "jito",
@@ -176,7 +164,6 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
     hasSolana: true,
     status: "active",
     detectionStatus: "not_yet_supported",
-    tvl: 150,
   },
   {
     id: "magic-eden",
@@ -186,7 +173,6 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
     hasSolana: true,
     status: "active",
     detectionStatus: "not_yet_supported",
-    tvl: 25,
   },
   {
     id: "phantom",
@@ -196,11 +182,10 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
     hasSolana: true,
     status: "active",
     detectionStatus: "not_yet_supported",
-    tvl: 15,
   },
 
-  // ─── TIER 4: Inactive / Deprecated ────────────────────────────────────────
-  
+  // ─── TIER 4: Inactive / deprecated ────────────────────────────────────────
+
   {
     id: "gravity",
     name: "Gravity Bridge",
@@ -209,7 +194,6 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
     hasSolana: true,
     status: "inactive",
     detectionStatus: "not_yet_supported",
-    tvl: 5,
   },
 ];
 
@@ -235,29 +219,8 @@ export function getBridgeById(id: string): BridgeRegistry | undefined {
 }
 
 /**
- * Get bridges that need detection implementation (sorted by TVL)
+ * Get bridges that need detection implementation, registry order.
  */
 export function getPlannedBridges(): BridgeRegistry[] {
-  return BRIDGE_REGISTRY.filter((b) => b.detectionStatus === "not_yet_supported" && b.status === "active")
-    .sort((a, b) => (b.tvl ?? 0) - (a.tvl ?? 0));
-}
-
-/**
- * Get bridges by tier
- */
-export function getBridgesByTier(tier: 1 | 2 | 3 | 4): BridgeRegistry[] {
-  const tierMap = {
-    1: ["wormhole", "allbridge", "debridge", "layerzero", "mayan", "portal", "axelar"],
-    2: ["stargate", "hyperlane", "cctp", "orca"],
-    3: ["marinade", "lido", "jito", "magic-eden", "phantom"],
-    4: ["gravity"],
-  };
-  return BRIDGE_REGISTRY.filter((b) => tierMap[tier].includes(b.id));
-}
-
-/**
- * Get total TVL across all bridges
- */
-export function getTotalTVL(): number {
-  return BRIDGE_REGISTRY.reduce((sum, b) => sum + (b.tvl ?? 0), 0);
+  return BRIDGE_REGISTRY.filter((b) => b.detectionStatus === "not_yet_supported" && b.status === "active");
 }
