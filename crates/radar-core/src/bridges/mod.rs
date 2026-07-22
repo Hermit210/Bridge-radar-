@@ -7,6 +7,7 @@ pub mod allbridge;
 pub mod axelar;
 pub mod cctp;
 pub mod debridge;
+pub mod garden;
 pub mod hyperlane;
 pub mod layerzero;
 pub mod mayan;
@@ -33,5 +34,6 @@ pub fn registry() -> Vec<Arc<dyn BridgeAdapter>> {
         Arc::new(stargate::StargateAdapter),
         Arc::new(relay::RelayAdapter),
         Arc::new(across::AcrossAdapter),
+        Arc::new(garden::GardenAdapter),
     ]
 }

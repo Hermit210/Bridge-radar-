@@ -86,7 +86,8 @@ INSERT OR IGNORE INTO bridges (id, display_name, homepage) VALUES
     ('portal',    'Portal',    'https://portalbridge.com'),
     ('axelar',    'Axelar',    'https://axelar.network'),
     ('relay',     'Relay',     'https://relay.link'),
-    ('across',    'Across Protocol', 'https://across.to');
+    ('across',    'Across Protocol', 'https://across.to'),
+    ('garden',    'Garden Finance', 'https://garden.finance');
 "#;
 
 #[derive(Clone)]
@@ -465,10 +466,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn nine_bridges_seeded() {
-        // Original 7 v0 adapters + relay + across (discovery/verification pass).
+    async fn ten_bridges_seeded() {
+        // Original 7 v0 adapters + relay + across + garden (discovery/verification pass).
         let store = SqliteStorage::connect("sqlite::memory:").await.unwrap();
         let bridges = store.list_bridges().await.unwrap();
-        assert_eq!(bridges.len(), 9);
+        assert_eq!(bridges.len(), 10);
     }
 }

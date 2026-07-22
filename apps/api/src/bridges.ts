@@ -113,6 +113,15 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
     status: "active",
     detectionStatus: "implemented",
   },
+  {
+    id: "garden",
+    name: "Garden Finance",
+    homepage: "https://garden.finance",
+    supportedChains: ["solana", "bitcoin", "ethereum", "arbitrum", "base", "starknet", "sui", "tron"],
+    hasSolana: true,
+    status: "active",
+    detectionStatus: "implemented",
+  },
 
   // ─── TIER 2: Registered, detection not yet verified/implemented ──────────
 
