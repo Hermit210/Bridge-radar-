@@ -105,7 +105,8 @@ export class RadarDb {
         ('lido','Lido','https://lido.fi'),
         ('magic-eden','Magic Eden Bridge','https://magiceden.io'),
         ('relay','Relay','https://relay.link'),
-        ('across','Across Protocol','https://across.to');
+        ('across','Across Protocol','https://across.to'),
+        ('garden','Garden Finance','https://garden.finance');
     `);
   }
 
