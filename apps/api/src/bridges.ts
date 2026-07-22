@@ -122,6 +122,15 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
     status: "active",
     detectionStatus: "implemented",
   },
+  {
+    id: "base-solana-bridge",
+    name: "Coinbase Bridge (Base-Solana)",
+    homepage: "https://docs.base.org/base-chain/quickstart/base-solana-bridge",
+    supportedChains: ["solana", "base"],
+    hasSolana: true,
+    status: "active",
+    detectionStatus: "implemented",
+  },
 
   // ─── TIER 2: Registered, detection not yet verified/implemented ──────────
 

@@ -87,7 +87,8 @@ INSERT OR IGNORE INTO bridges (id, display_name, homepage) VALUES
     ('axelar',    'Axelar',    'https://axelar.network'),
     ('relay',     'Relay',     'https://relay.link'),
     ('across',    'Across Protocol', 'https://across.to'),
-    ('garden',    'Garden Finance', 'https://garden.finance');
+    ('garden',    'Garden Finance', 'https://garden.finance'),
+    ('base-solana-bridge', 'Coinbase Bridge (Base-Solana)', 'https://docs.base.org/base-chain/quickstart/base-solana-bridge');
 "#;
 
 #[derive(Clone)]
@@ -466,10 +467,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn ten_bridges_seeded() {
-        // Original 7 v0 adapters + relay + across + garden (discovery/verification pass).
+    async fn eleven_bridges_seeded() {
+        // Original 7 v0 adapters + relay + across + garden + base-solana-bridge
+        // (discovery/verification pass).
         let store = SqliteStorage::connect("sqlite::memory:").await.unwrap();
         let bridges = store.list_bridges().await.unwrap();
-        assert_eq!(bridges.len(), 10);
+        assert_eq!(bridges.len(), 11);
     }
 }
