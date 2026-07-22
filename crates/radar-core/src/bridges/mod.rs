@@ -2,6 +2,7 @@
 //! placeholder modules for the other bridges so contributors have a
 //! clear "fill this in" surface.
 
+pub mod across;
 pub mod allbridge;
 pub mod axelar;
 pub mod cctp;
@@ -31,5 +32,6 @@ pub fn registry() -> Vec<Arc<dyn BridgeAdapter>> {
         Arc::new(hyperlane::HyperlaneAdapter),
         Arc::new(stargate::StargateAdapter),
         Arc::new(relay::RelayAdapter),
+        Arc::new(across::AcrossAdapter),
     ]
 }

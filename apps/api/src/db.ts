@@ -104,7 +104,8 @@ export class RadarDb {
         ('hyperlane','Hyperlane','https://hyperlane.xyz'),
         ('lido','Lido','https://lido.fi'),
         ('magic-eden','Magic Eden Bridge','https://magiceden.io'),
-        ('relay','Relay','https://relay.link');
+        ('relay','Relay','https://relay.link'),
+        ('across','Across Protocol','https://across.to');
     `);
   }
 
