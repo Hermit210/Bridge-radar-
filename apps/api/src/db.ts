@@ -99,15 +99,35 @@ export class RadarDb {
         ('mayan','Mayan','https://mayan.finance'),
         ('portal','Portal','https://portalbridge.com'),
         ('axelar','Axelar','https://axelar.network'),
-        ('stargate','Stargate','https://stargate.finance'),
-        ('cctp','Circle CCTP','https://www.circle.com/en/usdc/bridge'),
-        ('hyperlane','Hyperlane','https://hyperlane.xyz'),
-        ('lido','Lido','https://lido.fi'),
-        ('magic-eden','Magic Eden Bridge','https://magiceden.io'),
         ('relay','Relay','https://relay.link'),
         ('across','Across Protocol','https://across.to'),
         ('garden','Garden Finance','https://garden.finance'),
         ('base-solana-bridge','Coinbase Bridge (Base-Solana)','https://docs.base.org/base-chain/quickstart/base-solana-bridge');
+
+      -- cctp/hyperlane are real bridges but have no adapter watching a
+      -- verified Solana program yet (see crate::bridges::registry doc
+      -- comment in the Rust side). Seeded disabled so the scorer skips them
+      -- instead of writing a green 100 for "never monitored". Separate
+      -- statement: different column list (explicit enabled = 0).
+      INSERT OR IGNORE INTO bridges (id, display_name, homepage, enabled) VALUES
+        ('cctp','Circle CCTP','https://www.circle.com/en/usdc/bridge',0),
+        ('hyperlane','Hyperlane','https://hyperlane.xyz',0);
+
+      -- One-time reconciliation for local DBs seeded before this fix: lido
+      -- (liquid staking, not a bridge), magic-eden (NFT marketplace, not a
+      -- bridge), and stargate (confirmed not deployed on Solana) were
+      -- previously inserted here and picked up a false 100 health score
+      -- because the scorer scores every *enabled* row regardless of whether
+      -- a real adapter watches it. Idempotent no-op once cleaned.
+      DELETE FROM bridge_health_scores WHERE bridge_id IN ('lido','magic-eden','stargate');
+      DELETE FROM bridge_events WHERE bridge_id IN ('lido','magic-eden','stargate');
+      DELETE FROM bridges WHERE id IN ('lido','magic-eden','stargate');
+
+      -- cctp/hyperlane also get reconciled every startup in case an older
+      -- run left them enabled with a stale score.
+      DELETE FROM bridge_health_scores WHERE bridge_id IN ('cctp','hyperlane');
+      DELETE FROM bridge_events WHERE bridge_id IN ('cctp','hyperlane');
+      UPDATE bridges SET enabled = 0 WHERE id IN ('cctp','hyperlane');
     `);
   }
 

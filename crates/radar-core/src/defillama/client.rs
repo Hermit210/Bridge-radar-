@@ -58,7 +58,6 @@ pub const TRACKED_BRIDGE_SLUGS: &[(&str, &str)] = &[
     ("axelar", "axelar"),
     ("cctp", "circle-cctp"),
     ("hyperlane", "hyperlane"),
-    ("stargate", "stargate-v2"),
 ];
 
 #[derive(Clone)]

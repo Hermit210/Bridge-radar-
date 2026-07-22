@@ -2,8 +2,19 @@
 
 ## Current Status
 
-**Total Bridges:** 18 registered (8 implemented + 10 planned/unverified) — more added as the discovery/verification pass (see [BRIDGE_DISCOVERY.md](./BRIDGE_DISCOVERY.md)) turns up real, verifiable Solana program IDs.
+**Total Bridges:** 18 registered (11 with a real, verified Solana adapter + 7 planned/unverified) — more added as the discovery/verification pass (see [BRIDGE_DISCOVERY.md](./BRIDGE_DISCOVERY.md)) turns up real, verifiable Solana program IDs.
 **Solana Support:** 100% of tracked bridges
+
+**2026-07-23 data-integrity fix:** Lido, Magic Eden, and Stargate were
+removed from the registry entirely — Lido (liquid staking) and Magic Eden
+(NFT marketplace) were never genuine bridges, and Stargate is confirmed not
+deployed on Solana. All three had accumulated a false 100 health score
+because the scorer scores every *enabled* DB row regardless of whether a real
+adapter watches it — a quiet/unmonitored bridge and a genuinely healthy one
+looked identical. Circle CCTP and Hyperlane are real bridges but still have
+no verified Solana program ID, so they're now seeded `enabled = 0` and shown
+as a distinct grey "Not monitored" status on the dashboard instead of a green
+100. See `HEALTH_SCORE_STATUS.md` for the full writeup.
 
 The per-bridge TVL figures previously listed here (e.g. "Wormhole - $850M TVL")
 were hardcoded placeholder numbers, not live data — they have been removed
@@ -19,17 +30,24 @@ DeFiLlama's model (burn-and-mint, not locked liquidity) — correctly absent,
 not a bug. Check the live endpoint for current numbers; don't hardcode these
 back into source.
 
-### Tier 1: Implemented (7 bridges)
-Wormhole, Portal, LayerZero, Axelar, Allbridge, deBridge, Mayan.
+### Tier 1: Implemented (11 bridges)
+Wormhole, Portal, LayerZero, Axelar, Allbridge, deBridge, Mayan, Relay,
+Across Protocol, Garden Finance, Coinbase Bridge (Base-Solana).
 
-### Tier 2: Registered, detection not yet implemented (4 bridges)
-Stargate, Circle CCTP, Hyperlane, Orca.
+### Tier 2: Registered, detection not yet implemented (3 bridges)
+Circle CCTP, Hyperlane, Orca. CCTP and Hyperlane are seeded `enabled = 0` in
+the DB (no verified Solana program ID yet) and render as a grey "Not
+monitored" status on the dashboard — never a scored 100. (Stargate was also
+in this tier; removed 2026-07-23, confirmed not deployed on Solana.)
 
-### Tier 3: Unverified — pending discovery/verification pass (5 bridges)
-Lido, Marinade, Jito, Magic Eden Bridge, Phantom Bridge. These may be
-DeFiLlama-mislabeled non-bridges (LSTs, wallets, MEV infra) rather than
-genuine cross-chain bridges — do not write adapters for these without
-verifying a real Solana program ID from an authoritative source first.
+### Tier 3: Unverified — pending discovery/verification pass (3 bridges)
+Marinade, Jito, Phantom Bridge. These may be DeFiLlama-mislabeled non-bridges
+(LSTs, wallets, MEV infra) rather than genuine cross-chain bridges — do not
+write adapters for these without verifying a real Solana program ID from an
+authoritative source first. None of these three are seeded into the DB, so
+none can accumulate a false score. (Lido and Magic Eden were also in this
+tier; removed 2026-07-23 — liquid staking and an NFT marketplace, not
+bridges.)
 
 ### Tier 4: Inactive (1 bridge)
 Gravity Bridge — deprecated.
@@ -80,8 +98,8 @@ No `tvl` field — a hardcoded one used to live here and was removed (see
 {
   "summary": {
     "total": 18,
-    "implemented": 8,
-    "planned": 9
+    "implemented": 11,
+    "planned": 7
   },
   "implemented": [
     {
@@ -95,8 +113,8 @@ No `tvl` field — a hardcoded one used to live here and was removed (see
   ],
   "planned": [
     {
-      "id": "stargate",
-      "name": "Stargate",
+      "id": "cctp",
+      "name": "Circle CCTP",
       ...
     }
   ]
@@ -143,9 +161,8 @@ The API automatically seeds bridges from the registry on startup. No manual DB c
 
 **Priority Order (by TVL):**
 1. **Circle CCTP** ($600M) - USDC native bridge
-2. **Stargate** ($450M) - Stable swap bridge
-3. **Hyperlane** ($75M) - Interoperability
-4. **Orca** ($35M) - Solana DEX bridge
+2. **Hyperlane** ($75M) - Interoperability
+3. **Orca** ($35M) - Solana DEX bridge
 
 **For each bridge:**
 1. Identify contract addresses on Solana + EVM chains

@@ -1,33 +1,37 @@
 import Link from "next/link";
-import { bandOf, formatUsd, type BridgeWithHealth } from "@radar/shared";
+import { bandFor, formatUsd, type BridgeWithHealth } from "@radar/shared";
 
 const bandColor = {
   green: "text-green",
   yellow: "text-yellow",
   red: "text-red",
+  unmonitored: "text-muted-dark",
 } as const;
 
 const bandLabel = {
   green: "Healthy",
   yellow: "Watch",
   red: "Alert",
+  unmonitored: "Not monitored",
 } as const;
 
 const bandBarClass = {
   green: "health-bar-green",
   yellow: "health-bar-yellow",
   red: "health-bar-red",
+  unmonitored: "health-bar-muted",
 } as const;
 
 const bandDot = {
   green: "status-dot-green",
   yellow: "status-dot-yellow",
   red: "status-dot-red",
+  unmonitored: "status-dot-muted",
 } as const;
 
 export function HealthCard({ bridge }: { bridge: BridgeWithHealth }) {
-  const score = bridge.health?.score;
-  const band = score !== undefined ? bandOf(score) : "yellow";
+  const band = bandFor(bridge);
+  const score = band === "unmonitored" ? undefined : bridge.health?.score;
   const defillama = bridge.defillama;
 
   return (
@@ -65,9 +69,11 @@ export function HealthCard({ bridge }: { bridge: BridgeWithHealth }) {
           <span className={bandColor[band]}>{bandLabel[band]}</span>
         </span>
         <span className="text-muted-dark font-mono text-[11px]">
-          {bridge.health?.computed_at
-            ? new Date(bridge.health.computed_at).toLocaleTimeString()
-            : "no score yet"}
+          {band === "unmonitored"
+            ? "no adapter yet"
+            : bridge.health?.computed_at
+              ? new Date(bridge.health.computed_at).toLocaleTimeString()
+              : "no score yet"}
         </span>
       </div>
 
@@ -85,7 +91,9 @@ export function HealthCard({ bridge }: { bridge: BridgeWithHealth }) {
       )}
 
       <p className="mt-3 text-[10px] text-muted-dark opacity-50 group-hover:opacity-80 transition-opacity">
-        v0-naive &middot; parity + outflow only
+        {band === "unmonitored"
+          ? "real bridge, no Solana adapter watching it yet"
+          : "v0-naive · parity + outflow only"}
       </p>
     </Link>
   );

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { HealthCard } from "@/components/health-card";
 import { LiveFeed } from "@/components/live-feed";
 import { apiUrls, listBridges, listEvents } from "@/lib/api";
-import type { BridgeWithHealth, BridgeEvent } from "@radar/shared";
+import { bandFor, type BridgeWithHealth, type BridgeEvent } from "@radar/shared";
 
 export default function Home() {
   const [bridges, setBridges] = useState<BridgeWithHealth[]>([]);
@@ -40,13 +40,12 @@ export default function Home() {
     };
   }, []);
 
+  const bands = bridges.map(bandFor);
   const totals = {
-    green: bridges.filter((b) => (b.health?.score ?? 0) >= 80).length,
-    yellow: bridges.filter(
-      (b) => (b.health?.score ?? 0) >= 50 && (b.health?.score ?? 0) < 80,
-    ).length,
-    red: bridges.filter((b) => b.health && b.health.score < 50).length,
-    unknown: bridges.filter((b) => !b.health).length,
+    green: bands.filter((b) => b === "green").length,
+    yellow: bands.filter((b) => b === "yellow").length,
+    red: bands.filter((b) => b === "red").length,
+    unknown: bands.filter((b) => b === "unmonitored").length,
   };
 
   return (
@@ -75,7 +74,7 @@ export default function Home() {
           <Pill dotClass="status-dot-yellow" label="Watch" count={totals.yellow} />
           <Pill dotClass="status-dot-red" label="Alert" count={totals.red} />
           {totals.unknown > 0 ? (
-            <Pill dotClass="status-dot-muted" label="No score yet" count={totals.unknown} />
+            <Pill dotClass="status-dot-muted" label="Not monitored" count={totals.unknown} />
           ) : null}
         </div>
 
