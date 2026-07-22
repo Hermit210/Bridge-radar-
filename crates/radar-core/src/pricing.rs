@@ -72,6 +72,17 @@ impl PythHermesClient {
             base_url,
             http: reqwest::Client::builder()
                 .timeout(Duration::from_secs(15))
+                // Hermes sits behind Cloudflare, which closes idle keep-alive
+                // connections well under reqwest's 90s default pool_idle_timeout.
+                // Without this, a long-running poller (oracle watcher fires every
+                // 60s) can be handed a pooled connection the server already shut
+                // down, failing with "error sending request for url" on send —
+                // a one-off curl never hits this because it always dials fresh.
+                // Keeping idle connections well under any plausible server-side
+                // timeout means reqwest always redials instead of reusing a
+                // connection that's likely dead.
+                .pool_idle_timeout(Duration::from_secs(10))
+                .user_agent("bridge-radar/0.1")
                 .build()
                 .expect("reqwest client builder"),
             cache: Arc::new(RwLock::new(HashMap::new())),
@@ -122,12 +133,12 @@ impl PythHermesClient {
             .get(&url)
             .send()
             .await
-            .map_err(|e| PriceError::Http(e.to_string()))?
+            .map_err(|e| PriceError::Http(format!("GET {url}: {e:#}")))?
             .error_for_status()
-            .map_err(|e| PriceError::Http(e.to_string()))?
+            .map_err(|e| PriceError::Http(format!("GET {url}: {e:#}")))?
             .json()
             .await
-            .map_err(|e| PriceError::Http(e.to_string()))?;
+            .map_err(|e| PriceError::Http(format!("GET {url} (decoding response): {e:#}")))?;
         let parsed = resp
             .parsed
             .ok_or_else(|| PriceError::Missing(feed_id.to_string()))?;
