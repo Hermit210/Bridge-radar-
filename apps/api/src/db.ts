@@ -106,7 +106,8 @@ export class RadarDb {
         ('magic-eden','Magic Eden Bridge','https://magiceden.io'),
         ('relay','Relay','https://relay.link'),
         ('across','Across Protocol','https://across.to'),
-        ('garden','Garden Finance','https://garden.finance');
+        ('garden','Garden Finance','https://garden.finance'),
+        ('base-solana-bridge','Coinbase Bridge (Base-Solana)','https://docs.base.org/base-chain/quickstart/base-solana-bridge');
     `);
   }
 
