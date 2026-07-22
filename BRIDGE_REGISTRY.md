@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Total Bridges:** 17 registered (7 implemented + 10 planned/unverified)
+**Total Bridges:** 18 registered (8 implemented + 10 planned/unverified) — more added as the discovery/verification pass (see [BRIDGE_DISCOVERY.md](./BRIDGE_DISCOVERY.md)) turns up real, verifiable Solana program IDs.
 **Solana Support:** 100% of tracked bridges
 
 The per-bridge TVL figures previously listed here (e.g. "Wormhole - $850M TVL")
@@ -51,7 +51,7 @@ Gravity Bridge — deprecated.
   `GET /v1/defillama/{bridges,bridge-volume,oracles}` — never fake data.
 
 ---
-
+( soon gonna use all bridges api to be stay updated with it ) 
 ## Bridge Registry Structure
 
 Located in: `apps/api/src/bridges.ts`
@@ -63,23 +63,25 @@ interface BridgeRegistry {
   homepage?: string;             // official website
   supportedChains: string[];     // list of supported chains
   hasSolana: boolean;            // Solana support flag
-  status: "active" | "inactive"; // operational status
+  status: "active" | "inactive" | "planned"; // operational status
   detectionStatus: "implemented" | "not_yet_supported"; // detection readiness
-  tvl?: number;                  // TVL in USD millions
 }
 ```
 
+No `tvl` field — a hardcoded one used to live here and was removed (see
+"Current Status" above). Real TVL is served separately via
+`GET /v1/bridges` (`defillama` field, sourced from `crates/radar-defillama`).
+
 ### API Endpoint
 
-**GET /v1/registry** - Returns all bridges with metadata
+**GET /v1/registry** - Returns all bridges with metadata (identity + detection status only)
 
 ```json
 {
   "summary": {
-    "total": 17,
-    "implemented": 7,
-    "planned": 10,
-    "totalTVL": 19500
+    "total": 18,
+    "implemented": 8,
+    "planned": 9
   },
   "implemented": [
     {
@@ -88,8 +90,7 @@ interface BridgeRegistry {
       "homepage": "https://wormhole.com",
       "supportedChains": ["solana", "ethereum", ...],
       "hasSolana": true,
-      "status": "active",
-      "tvl": 850
+      "status": "active"
     }
   ],
   "planned": [
@@ -119,7 +120,6 @@ Edit `apps/api/src/bridges.ts`:
   hasSolana: true,
   status: "active",
   detectionStatus: "not_yet_supported",
-  tvl: 100, // optional
 }
 ```
 
@@ -282,10 +282,9 @@ Each bridge flows through this pipeline. New bridges are added to the registry f
 
 ## Maintenance
 
-### Update TVL Data
-- Check DeFiLlama monthly
-- Update `tvl` field in `bridges.ts`
-- Commit changes
+### TVL Data
+- No manual updates needed — `crates/radar-defillama` syncs real TVL from
+  DeFiLlama on its own schedule, served via `GET /v1/bridges`/`/v1/defillama/protocols`.
 
 ### Add New Bridges
 - Research bridge support for Solana
