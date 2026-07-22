@@ -104,6 +104,15 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
     status: "active",
     detectionStatus: "implemented",
   },
+  {
+    id: "across",
+    name: "Across Protocol",
+    homepage: "https://across.to",
+    supportedChains: ["solana", "ethereum", "arbitrum", "optimism", "base", "polygon"],
+    hasSolana: true,
+    status: "active",
+    detectionStatus: "implemented",
+  },
 
   // ─── TIER 2: Registered, detection not yet verified/implemented ──────────
 
