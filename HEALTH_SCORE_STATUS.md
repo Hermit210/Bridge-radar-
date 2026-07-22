@@ -2,11 +2,11 @@
 
 ## Current State
 
-Health scores are **not displaying real data** because the bridge adapters for CCTP and Hyperlane are missing their Solana program IDs.
+Health scores are **not  fully displaying real data / partially displaying soon gonna display all** because the bridge adapters for CCTP and Hyperlane are missing their Solana program IDs.
 
 ## Root Cause Analysis
 
-### Why Scores Aren't Showing
+## Why Scores Aren't Showing
 
 1. **Adapters have empty Solana program arrays**
    - `crates/radar-core/src/bridges/cctp.rs`: `const SOLANA_PROGRAMS: &[&str] = &[];`
@@ -131,7 +131,7 @@ curl http://localhost:3001/v1/events?bridge=wormhole
 
 curl http://localhost:3001/v1/events?bridge=hyperlane
 # Currently returns empty (no events indexed)
-```
+
 
 To verify health scores:
 ```bash
