@@ -133,7 +133,9 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
   },
 
   // ─── TIER 2: Registered, detection not yet verified/implemented ──────────
-  // (stargate removed — confirmed not deployed on Solana, see BRIDGE_DISCOVERY.md)
+  // (stargate removed — confirmed not deployed on Solana, see BRIDGE_DISCOVERY.md.
+  // orca removed 2026-07-23 — Orca is a Solana AMM/DEX, not a bridge; see the
+  // 2026-07-23 audit note below.)
 
   {
     id: "hyperlane",
@@ -153,60 +155,28 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
     status: "active",
     detectionStatus: "not_yet_supported",
   },
-  {
-    id: "orca",
-    name: "Orca",
-    homepage: "https://orca.so",
-    supportedChains: ["solana"],
-    hasSolana: true,
-    status: "active",
-    detectionStatus: "not_yet_supported",
-  },
 
-  // ─── TIER 3: Unverified — DeFiLlama may mislabel these as bridges; pending
-  // the Task 2 discovery/verification pass before any adapter is written.
-  // (lido removed — liquid staking, not a bridge. magic-eden removed — NFT
-  // marketplace, not a bridge. Neither is a genuine Solana-connected bridge.)
-
-  {
-    id: "marinade",
-    name: "Marinade",
-    homepage: "https://marinade.finance",
-    supportedChains: ["solana"],
-    hasSolana: true,
-    status: "active",
-    detectionStatus: "not_yet_supported",
-  },
-  {
-    id: "jito",
-    name: "Jito",
-    homepage: "https://jito.co",
-    supportedChains: ["solana"],
-    hasSolana: true,
-    status: "active",
-    detectionStatus: "not_yet_supported",
-  },
-  {
-    id: "phantom",
-    name: "Phantom Bridge",
-    homepage: "https://phantom.app",
-    supportedChains: ["solana", "ethereum", "polygon"],
-    hasSolana: true,
-    status: "active",
-    detectionStatus: "not_yet_supported",
-  },
-
-  // ─── TIER 4: Inactive / deprecated ────────────────────────────────────────
-
-  {
-    id: "gravity",
-    name: "Gravity Bridge",
-    homepage: "https://gravity.zone",
-    supportedChains: ["solana", "ethereum"],
-    hasSolana: true,
-    status: "inactive",
-    detectionStatus: "not_yet_supported",
-  },
+  // ─── 2026-07-23 audit: Orca, Marinade, Jito, Phantom Bridge, Gravity
+  // Bridge all removed — none is a genuine Solana-connected bridge:
+  //   - Orca: a Solana AMM/DEX (Whirlpools CLAMM). No cross-chain product.
+  //   - Marinade: Solana liquid staking (mSOL). No bridge of its own — mSOL
+  //     travels cross-chain via third-party bridges (e.g. Wormhole), not a
+  //     Marinade-operated one.
+  //   - Jito: Solana MEV infra + liquid staking (JitoSOL) + JTX trading.
+  //     No dedicated bridge product; cross-chain JitoSOL liquidity is via
+  //     partner bridges (e.g. Coinbase Bridge), not Jito's own contract.
+  //   - Phantom Bridge: Phantom's in-wallet "Cross-Chain Swapper" is a UI
+  //     aggregator powered by LI.FI, routing through Celer/Hop/Allbridge/
+  //     Stargate/Across/CCTP/Mayan — no dedicated Phantom bridge program of
+  //     its own. Same exclusion category as Interport Finance and
+  //     UniversalX in BRIDGE_DISCOVERY.md.
+  //   - Gravity Bridge: the real Gravity Bridge (cosmos/gravity-bridge,
+  //     gravitybridge.net) only ever bridged Ethereum <-> Cosmos via IBC —
+  //     it has never had a Solana leg. The homepage this registry had on
+  //     file ("https://gravity.zone") doesn't even resolve to that project;
+  //     it isn't a Solana bridge under any name. Same treatment as Stargate:
+  //     a real bridge elsewhere, just not one connected to Solana.
+  // See BRIDGE_REGISTRY.md for the full writeup.
 ];
 
 /**

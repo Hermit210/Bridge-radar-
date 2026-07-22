@@ -2,19 +2,37 @@
 
 ## Current Status
 
-**Total Bridges:** 18 registered (11 with a real, verified Solana adapter + 7 planned/unverified) — more added as the discovery/verification pass (see [BRIDGE_DISCOVERY.md](./BRIDGE_DISCOVERY.md)) turns up real, verifiable Solana program IDs.
-**Solana Support:** 100% of tracked bridges
+**Total Bridges:** 13 registered (11 with a real, verified Solana adapter + 2 real bridges pending an adapter) — more added as the discovery/verification pass (see [BRIDGE_DISCOVERY.md](./BRIDGE_DISCOVERY.md)) turns up real, verifiable Solana program IDs.
+**Solana Support:** 100% of tracked bridges — every remaining entry is either
+a genuine bridge with a real, verified Solana program watching it, or a
+genuine bridge honestly marked not yet monitored. Nothing non-genuine remains.
 
-**2026-07-23 data-integrity fix:** Lido, Magic Eden, and Stargate were
-removed from the registry entirely — Lido (liquid staking) and Magic Eden
-(NFT marketplace) were never genuine bridges, and Stargate is confirmed not
-deployed on Solana. All three had accumulated a false 100 health score
-because the scorer scores every *enabled* DB row regardless of whether a real
-adapter watches it — a quiet/unmonitored bridge and a genuinely healthy one
-looked identical. Circle CCTP and Hyperlane are real bridges but still have
-no verified Solana program ID, so they're now seeded `enabled = 0` and shown
-as a distinct grey "Not monitored" status on the dashboard instead of a green
-100. See `HEALTH_SCORE_STATUS.md` for the full writeup.
+**2026-07-23 data-integrity fix (first pass):** Lido, Magic Eden, and
+Stargate were removed from the registry entirely — Lido (liquid staking) and
+Magic Eden (NFT marketplace) were never genuine bridges, and Stargate is
+confirmed not deployed on Solana. All three had accumulated a false 100
+health score because the scorer scores every *enabled* DB row regardless of
+whether a real adapter watches it — a quiet/unmonitored bridge and a
+genuinely healthy one looked identical. Circle CCTP and Hyperlane are real
+bridges but still have no verified Solana program ID, so they're seeded
+`enabled = 0` and shown as a distinct grey "Not monitored" status on the
+dashboard instead of a green 100. See `HEALTH_SCORE_STATUS.md` for the full
+writeup.
+
+**2026-07-23 audit (second pass), full registry sweep:** Orca, Marinade,
+Jito, Phantom Bridge, and Gravity Bridge were also removed entirely — none is
+a genuine Solana-connected bridge. Orca is a Solana AMM/DEX; Marinade is
+Solana liquid staking (mSOL) with no bridge of its own; Jito is Solana MEV
+infra + liquid staking (JitoSOL) with no bridge of its own; Phantom Bridge is
+a wallet UI aggregator (LI.FI-powered, routing through Celer/Hop/Allbridge/
+Stargate/Across/CCTP/Mayan) with no dedicated bridge program of its own — the
+same exclusion category as Interport Finance/UniversalX in
+`BRIDGE_DISCOVERY.md`; Gravity Bridge is a real bridge (Ethereum ↔ Cosmos via
+IBC) that has never had a Solana leg — same treatment as Stargate. None of
+these five were ever seeded into the DB, so none had accumulated a false
+score; this pass is pure registry hygiene, not a scoring fix. After this
+pass, every remaining registry entry is genuine: 11 scored for real, 2
+(CCTP, Hyperlane) honestly unmonitored, 0 mislabeled.
 
 The per-bridge TVL figures previously listed here (e.g. "Wormhole - $850M TVL")
 were hardcoded placeholder numbers, not live data — they have been removed
@@ -34,23 +52,26 @@ back into source.
 Wormhole, Portal, LayerZero, Axelar, Allbridge, deBridge, Mayan, Relay,
 Across Protocol, Garden Finance, Coinbase Bridge (Base-Solana).
 
-### Tier 2: Registered, detection not yet implemented (3 bridges)
-Circle CCTP, Hyperlane, Orca. CCTP and Hyperlane are seeded `enabled = 0` in
-the DB (no verified Solana program ID yet) and render as a grey "Not
-monitored" status on the dashboard — never a scored 100. (Stargate was also
-in this tier; removed 2026-07-23, confirmed not deployed on Solana.)
+### Tier 2: Registered, detection not yet implemented (2 bridges)
+Circle CCTP, Hyperlane. Both are seeded `enabled = 0` in the DB (no verified
+Solana program ID yet) and render as a grey "Not monitored" status on the
+dashboard — never a scored 100.
 
-### Tier 3: Unverified — pending discovery/verification pass (3 bridges)
-Marinade, Jito, Phantom Bridge. These may be DeFiLlama-mislabeled non-bridges
-(LSTs, wallets, MEV infra) rather than genuine cross-chain bridges — do not
-write adapters for these without verifying a real Solana program ID from an
-authoritative source first. None of these three are seeded into the DB, so
-none can accumulate a false score. (Lido and Magic Eden were also in this
-tier; removed 2026-07-23 — liquid staking and an NFT marketplace, not
-bridges.)
+### Removed — not genuine Solana-connected bridges
+Stargate (confirmed not deployed on Solana), Lido (liquid staking, not a
+bridge), Magic Eden (NFT marketplace, not a bridge), Orca (Solana AMM/DEX,
+not a bridge), Marinade (Solana liquid staking, no bridge of its own), Jito
+(Solana MEV infra + liquid staking, no bridge of its own), Phantom Bridge
+(wallet UI aggregator over third-party bridges, no dedicated bridge program
+of its own), Gravity Bridge (real Ethereum↔Cosmos bridge, never had a Solana
+leg). See the audit notes above and `HEALTH_SCORE_STATUS.md` for detail on
+each.
 
-### Tier 4: Inactive (1 bridge)
-Gravity Bridge — deprecated.
+There is no more Tier 3 ("unverified, pending discovery") or Tier 4
+("inactive/deprecated") — every entry that was in either tier turned out to
+be a non-bridge or a non-Solana bridge, and has been removed rather than kept
+around in a hedge state. Anything discovered in the future goes through
+`BRIDGE_DISCOVERY.md`'s verification process before it's added back.
 
 ---
 
@@ -97,9 +118,9 @@ No `tvl` field — a hardcoded one used to live here and was removed (see
 ```json
 {
   "summary": {
-    "total": 18,
+    "total": 13,
     "implemented": 11,
-    "planned": 7
+    "planned": 2
   },
   "implemented": [
     {
@@ -162,7 +183,6 @@ The API automatically seeds bridges from the registry on startup. No manual DB c
 **Priority Order (by TVL):**
 1. **Circle CCTP** ($600M) - USDC native bridge
 2. **Hyperlane** ($75M) - Interoperability
-3. **Orca** ($35M) - Solana DEX bridge
 
 **For each bridge:**
 1. Identify contract addresses on Solana + EVM chains
