@@ -103,7 +103,8 @@ export class RadarDb {
         ('cctp','Circle CCTP','https://www.circle.com/en/usdc/bridge'),
         ('hyperlane','Hyperlane','https://hyperlane.xyz'),
         ('lido','Lido','https://lido.fi'),
-        ('magic-eden','Magic Eden Bridge','https://magiceden.io');
+        ('magic-eden','Magic Eden Bridge','https://magiceden.io'),
+        ('relay','Relay','https://relay.link');
     `);
   }
 
