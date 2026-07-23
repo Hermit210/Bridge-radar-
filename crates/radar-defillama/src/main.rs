@@ -13,7 +13,9 @@
 //! limit, timeout, upstream schema drift) never blocks the others.
 
 use chrono::Utc;
-use radar_core::defillama::{DefiLlamaClient, DefiLlamaError, TRACKED_BRIDGE_SLUGS};
+use radar_core::defillama::{
+    DefiLlamaClient, DefiLlamaError, MESSAGING_PROTOCOL_SLUGS, TRACKED_BRIDGE_SLUGS,
+};
 use radar_core::storage::{connect_any, Storage};
 use serde_json::json;
 use std::sync::Arc;
@@ -65,6 +67,7 @@ async fn main() -> anyhow::Result<()> {
         tokio::spawn(run_oracles(storage.clone(), client.clone())),
         tokio::spawn(run_dex_volume(storage.clone(), client.clone())),
         tokio::spawn(run_fees(storage.clone(), client.clone())),
+        tokio::spawn(run_messaging_protocols(storage.clone(), client.clone())),
     ];
 
     futures::future::join_all(jobs).await;
@@ -302,6 +305,50 @@ async fn run_dex_volume(storage: Arc<dyn Storage>, client: Arc<DefiLlamaClient>)
                 }
             }
             Err(e) => warn!(error = %e, "fetch dex volume"),
+        }
+    }
+}
+
+/// 10. Messaging protocols (CCIP, LayerZero) Solana context — free, kept
+/// separate from bridge protocol TVLs since these are shared infra, not
+/// dedicated bridges. Refreshed hourly (same cadence as protocol TVLs).
+async fn run_messaging_protocols(storage: Arc<dyn Storage>, client: Arc<DefiLlamaClient>) {
+    let mut tick = interval(Duration::from_secs(3600));
+    tick.set_missed_tick_behavior(MissedTickBehavior::Skip);
+    loop {
+        tick.tick().await;
+        match client.fetch_messaging_protocols_solana_context().await {
+            Ok(entries) => {
+                let now = Utc::now();
+                let found: std::collections::HashSet<&str> =
+                    entries.iter().map(|e| e.id.as_str()).collect();
+                let mut ok = 0usize;
+                for entry in &entries {
+                    let payload = match serde_json::to_value(entry) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            warn!(error = %e, "serialize messaging protocol context");
+                            continue;
+                        }
+                    };
+                    match storage
+                        .defillama_upsert("messaging_protocols", &entry.id, &payload, now)
+                        .await
+                    {
+                        Ok(()) => ok += 1,
+                        Err(e) => {
+                            warn!(id = %entry.id, error = %e, "persist messaging protocol context")
+                        }
+                    }
+                }
+                for (id, slug) in MESSAGING_PROTOCOL_SLUGS {
+                    if !found.contains(id) {
+                        warn!(id = %id, slug = %slug, "no messaging protocol match in DeFiLlama /protocols response");
+                    }
+                }
+                info!(count = ok, "messaging protocol context synced");
+            }
+            Err(e) => warn!(error = %e, "fetch messaging protocols"),
         }
     }
 }

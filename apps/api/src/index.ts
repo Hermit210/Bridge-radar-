@@ -38,6 +38,7 @@ app.get("/", (c) =>
       "GET /v1/defillama/tvl",
       "GET /v1/defillama/stablecoins",
       "GET /v1/defillama/protocols",
+      "GET /v1/defillama/messaging-protocols",
       "GET /v1/defillama/oracles",
       "GET /v1/defillama/dex-volume",
       "GET /v1/defillama/fees",
@@ -202,6 +203,18 @@ app.get("/v1/defillama/protocols", (c) => {
   return c.json({
     source: "defillama",
     category: "protocols",
+    available: rows.length > 0,
+    count: rows.length,
+    protocols: rows.map((r) => ({ ...JSON.parse(r.payload), fetched_at: r.fetched_at })),
+  });
+});
+
+app.get("/v1/defillama/messaging-protocols", (c) => {
+  const rows = defillama.list("messaging_protocols");
+  return c.json({
+    source: "defillama",
+    category: "messaging_protocols",
+    note: "shared cross-chain messaging infrastructure (CCIP, LayerZero) — not dedicated bridges themselves; several tracked bridges are built on top of one of these",
     available: rows.length > 0,
     count: rows.length,
     protocols: rows.map((r) => ({ ...JSON.parse(r.payload), fetched_at: r.fetched_at })),
