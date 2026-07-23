@@ -264,6 +264,30 @@ Lock/Unlock mapping was derived empirically from real mainnet transactions
 transaction links used. Adapter built, 5 unit tests from real transactions,
 registered in `bridges::registry()`, seeded enabled in both DB seed paths.
 
+### ✅ rhino.fi — verified, adapter built
+
+Real, non-custodial cross-chain bridge (formerly DeversiFi) moving assets
+between Solana and 35+ EVM/L2 chains. DeFiLlama independently categorizes it
+`Bridge` (confirmed live via `api.llama.fi/protocols`, slug `rhino.fi`,
+~$1.12M TVL at check time).
+
+Program ID from rhino.fi's own official docs
+(<https://docs.rhino.fi/general/contract-addresses>, "Solana" row —
+cross-checked with two independent fetches of the same page before being
+trusted, per this project's standing rule about not trusting a single
+AI-summarized fetch):
+
+| Program | Address |
+|---|---|
+| bridge program | `FCW1uBM3pZ7fQWvEL9sxTe4fNiH41bu9DWX4ErTZ6aMq` |
+
+Confirmed `executable: true` via direct `getAccountInfo`. Unlike Atomiq, the
+instruction set came through immediately and cleanly from real, very recent
+mainnet transactions: `DepositWithId` (Lock) and `Withdraw` (Unlock) — see
+`crates/radar-core/src/bridges/rhinofi.rs` doc comment for the two Solscan
+transaction links used. Adapter built, 4 unit tests from real transactions,
+registered in `bridges::registry()`, seeded enabled in both DB seed paths.
+
 ### ⚠️ Zeus Network — real programs confirmed, adapter blocked for now
 
 Real, actively-covered Bitcoin ↔ Solana bridge (Zeus Program Library / ZPL —
@@ -324,9 +348,6 @@ excluded:
 - **Chainflip** — confirmed real native Solana integration (a `SwapEndpoint`
   program using `x_swap_native`/`x_swap_token`, per `docs.chainflip.io`), but
   the specific program address wasn't in the page content fetched.
-- **RhinoFi (rhino.fi)** — confirmed real, dedicated Solana bridge support
-  (non-custodial, "bridge from Solana to 35+ chains"), program ID not yet
-  looked up.
 - **Router Nitro (Router Protocol)** — confirmed real, dedicated Solana
   support live since Feb 2025 (own announcement), program ID not yet looked
   up.

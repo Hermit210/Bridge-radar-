@@ -59,6 +59,7 @@ pub const TRACKED_BRIDGE_SLUGS: &[(&str, &str)] = &[
     ("cctp", "circle-cctp"),
     ("hyperlane", "hyperlane"),
     ("atomiq", "atomiq-exchange"),
+    ("rhinofi", "rhino.fi"),
 ];
 
 #[derive(Clone)]
