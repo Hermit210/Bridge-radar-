@@ -15,6 +15,7 @@ pub mod layerzero;
 pub mod mayan;
 pub mod portal;
 pub mod relay;
+pub mod rhinofi;
 pub mod wormhole;
 
 use crate::adapter::BridgeAdapter;
@@ -51,5 +52,6 @@ pub fn registry() -> Vec<Arc<dyn BridgeAdapter>> {
         Arc::new(garden::GardenAdapter),
         Arc::new(base_solana::BaseSolanaBridgeAdapter),
         Arc::new(atomiq::AtomiqAdapter),
+        Arc::new(rhinofi::RhinoFiAdapter),
     ]
 }

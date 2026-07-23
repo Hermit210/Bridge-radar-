@@ -140,6 +140,15 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
     status: "active",
     detectionStatus: "implemented",
   },
+  {
+    id: "rhinofi",
+    name: "rhino.fi",
+    homepage: "https://rhino.fi",
+    supportedChains: ["solana", "ethereum", "arbitrum", "base", "polygon", "optimism", "avalanche", "bnb"],
+    hasSolana: true,
+    status: "active",
+    detectionStatus: "implemented",
+  },
 
   // ─── TIER 2: Registered, detection not yet verified/implemented ──────────
   // (stargate removed — confirmed not deployed on Solana, see BRIDGE_DISCOVERY.md.
