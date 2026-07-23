@@ -89,7 +89,8 @@ INSERT OR IGNORE INTO bridges (id, display_name, homepage) VALUES
     ('across',    'Across Protocol', 'https://across.to'),
     ('garden',    'Garden Finance', 'https://garden.finance'),
     ('base-solana-bridge', 'Coinbase Bridge (Base-Solana)', 'https://docs.base.org/base-chain/quickstart/base-solana-bridge'),
-    ('atomiq',    'Atomiq Exchange', 'https://atomiq.exchange');
+    ('atomiq',    'Atomiq Exchange', 'https://atomiq.exchange'),
+    ('rhinofi',   'rhino.fi',       'https://rhino.fi');
 
 -- cctp/hyperlane are real bridges but have no adapter watching a verified
 -- Solana program yet (see crate::bridges::registry doc comment) — seeded
@@ -497,14 +498,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn fourteen_bridges_seeded() {
+    async fn fifteen_bridges_seeded() {
         // Original 7 v0 adapters + relay + across + garden + base-solana-bridge
-        // + atomiq (discovery/verification pass 2) + cctp + hyperlane (real
-        // bridges, seeded disabled since no verified Solana program watches
-        // them yet).
+        // + atomiq + rhinofi (discovery/verification pass 2) + cctp +
+        // hyperlane (real bridges, seeded disabled since no verified Solana
+        // program watches them yet).
         let store = SqliteStorage::connect("sqlite::memory:").await.unwrap();
         let bridges = store.list_bridges().await.unwrap();
-        assert_eq!(bridges.len(), 14);
+        assert_eq!(bridges.len(), 15);
     }
 
     #[tokio::test]
