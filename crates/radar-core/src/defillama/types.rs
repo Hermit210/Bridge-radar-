@@ -124,6 +124,34 @@ pub struct VolumeSummary {
     pub change_7d: Option<f64>,
 }
 
+// ─── 10. Messaging protocols (CCIP, LayerZero) — GET /protocols + ───────────
+// GET /protocol/{slug} (both free). These are shared cross-chain *messaging*
+// infrastructure, not dedicated bridges themselves — several bridges we
+// track (e.g. Base-Solana Bridge on CCIP) are built on top of one of these.
+// Kept in a separate category from `BridgeProtocolTvl` so a consumer can
+// never mistake "messaging layer TVL" for a bridge's own TVL.
+
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct ProtocolChainTvlsRaw {
+    #[serde(rename = "currentChainTvls", default)]
+    pub current_chain_tvls: HashMap<String, f64>,
+}
+
+/// Normalized: one messaging protocol's total TVL plus its Solana-specific
+/// slice, if DeFiLlama tracks one. `solana_tvl_usd: None` means DeFiLlama's
+/// `/protocol/{slug}` response has no "Solana" key in `currentChainTvls` at
+/// all (e.g. LayerZero V2 as of this writing) — reported honestly, never
+/// defaulted to a fabricated zero.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MessagingProtocolContext {
+    pub id: String,
+    pub defillama_slug: String,
+    pub defillama_name: String,
+    pub category: Option<String>,
+    pub total_tvl_usd: Option<f64>,
+    pub solana_tvl_usd: Option<f64>,
+}
+
 // ─── 1/2/7. Pro-only: bridges list, bridge volume, oracles TVS ──────────────
 // Shapes below are per DeFiLlama's own published docs (api-docs.defillama.com,
 // confirmed 2026-07-22) since these are behind a $300/mo Pro key we don't
