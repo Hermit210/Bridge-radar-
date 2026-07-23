@@ -7,20 +7,23 @@
 a genuine bridge with a real, verified Solana program watching it, or a
 genuine bridge honestly marked not yet monitored. Nothing non-genuine remains.
 
-**2026-07-23 discovery pass 2 (ongoing):** added **Atomiq Exchange** (formerly
+**2026-07-23 discovery pass 2 (complete):** exhaustive sweep against the
+Alchemy "39 web3 bridges on Solana" list plus what Jupiter/Rango/Phantom's
+LI.FI swapper route through. Added **Atomiq Exchange** (formerly
 SolLightning, a real, audited, trustless Bitcoin↔Solana swap protocol) and
 **rhino.fi** (a real, non-custodial bridge to 35+ EVM/L2 chains, DeFiLlama-
-categorized "Bridge"). Both verified via official GitHub/docs sources and
-confirmed executable via direct mainnet RPC. See `BRIDGE_DISCOVERY.md`'s
-"Pass 2" section for the full exhaustive-sweep writeup: what else was
-checked (Zeus Network — real, verified programs, adapter blocked pending
-readable event-log format), what's excluded (aggregators: Jupiter, Rango,
-LI.FI/Jumper, Squid Router, Bridgers.xyz, Houdini Swap, SwapKit; wrong-
-chain-only: Hop Protocol, Celer cBridge; custodial: SideShift.ai; no
-evidence: Mach Exchange, ValueRouter, Galaxy Exchange, LibertySwap, Maxbid
-Pro, HOT Protocol, Emblem Vault), and what's still open for future work
-(Chainflip, Router Nitro, Carrier, AllDomains Bridge — real bridges, program
-IDs not yet tracked down).
+categorized "Bridge") — both verified via official GitHub/docs sources and
+confirmed executable via direct mainnet RPC. Everything else in the
+candidate pool resolved to blocked-with-good-reason or excluded — see
+`BRIDGE_DISCOVERY.md`'s "Pass 2 summary" table: Zeus Network and Chainflip
+have real, RPC-verified programs but no adapter (unreachable docs / no
+readable event format for Zeus; a genuine architecture mismatch — most
+deposits bypass program instructions entirely — for Chainflip); Router
+Nitro is real and professionally audited but has no publicly disclosed
+program ID; Carrier and AllDomains Bridge resolve into bridges already
+tracked (Wormhole, Hyperlane respectively) rather than being separate
+bridges; the rest are aggregators, custodial services, or have no evidence
+of existing at all.
 
 **2026-07-23 data-integrity fix (first pass):** Lido, Magic Eden, and
 Stargate were removed from the registry entirely — Lido (liquid staking) and

@@ -339,26 +339,68 @@ own:
 
 - **SideShift.ai** — wallet-to-wallet instant-exchange service; briefly takes custody during the swap rather than running a verifiable on-chain lock-mint/HTLC program. Same caution-flag reasoning as BabyDoge Bridge in pass 1.
 
-### ⚠️ Genuine bridges, not yet verified (open for future work)
+### ⚠️ Chainflip — real, verified programs, adapter blocked (architecture mismatch)
 
-Real, dedicated (non-aggregator) bridges with plausible Solana legs, but a
-mainnet program ID wasn't tracked down this session — marked open, not
-excluded:
+Chainflip has genuine native Solana support. Both programs verified from
+official docs (<https://docs.chainflip.io/brokers/vault-swaps-api/solana>,
+cross-checked with two independent fetches) and confirmed `executable: true`
+via direct RPC:
 
-- **Chainflip** — confirmed real native Solana integration (a `SwapEndpoint`
-  program using `x_swap_native`/`x_swap_token`, per `docs.chainflip.io`), but
-  the specific program address wasn't in the page content fetched.
-- **Router Nitro (Router Protocol)** — confirmed real, dedicated Solana
-  support live since Feb 2025 (own announcement), program ID not yet looked
-  up.
-- **Carrier** (Automata Network) — a token/NFT bridge built on top of
-  Wormhole's guardian messaging layer. Real product, but likely shares
-  detection surface with Wormhole the same way CCIP-based bridges share
-  detection surface with each other (see the CCIP open question above) —
-  needs a design decision, not just a program ID, before building.
-- **AllDomains Bridge** — real cross-chain transfer product (Solana/Sonic
-  SVM/Eclipse SVM/Ethereum) from the AllDomains team; lower priority, not
-  yet investigated further.
+| Program | Address |
+|---|---|
+| SwapEndpoint | `4FVuGMuzuFAo5KWLnVNknDkNZ84er2wcrtJ79pfyoZqH` |
+| Vault | `AusZPVXPoUM8QJJ2SL4KwvRGCQ22cDg6Y4rg7EvFrxi7` |
+
+**Why no adapter:** scanning real transactions shows `SwapEndpoint` has had
+only 6 transactions *ever* since its January 2025 deployment — all IDL setup,
+zero swaps. `Vault` is genuinely active (`FetchTokens`/`TransferTokens`/
+`FetchNative`, very recent activity), but those are validator-side settlement
+operations, not user deposit events: Chainflip's actual "vault swap" deposit
+leg is a user sending a raw SOL/SPL transfer to a per-swap ephemeral deposit
+address, which never invokes either program directly. Our indexer watches
+*program IDs*, not arbitrary destination addresses, so we would only ever
+see the settlement half of each swap (`Fetch`/`Transfer`) and never the
+actual inbound deposit — producing a permanently one-sided, misleading
+parity picture rather than an honest one. Not building this rather than
+shipping a structurally-incomplete detector.
+
+### ⚠️ Router Nitro (Router Protocol) — real, audited, program ID not public
+
+Router Nitro's Solana integration (Gateway, Asset Forwarder, Asset Bridge
+contracts) is real and was professionally audited by Oak Security GmbH
+(audit report in `router-protocol/audit-reports` on GitHub, September 2024,
+7 critical findings all resolved). However:
+- The three contract repositories referenced in the audit
+  (`router-protocol/asset-bridge-contracts`, `asset-forwarder-contracts`,
+  `asset-gateway-contracts`) are **private** — the audit report links to them
+  but they 404 via the GitHub API.
+- Router's public `nitro-tokens` config repo only lists token *mint*
+  addresses (USDC/USDT), never the bridge program address itself.
+- No independent source (Solscan, block explorers, docs) surfaced a mainnet
+  program ID either.
+
+Confirmed real and audited, but there is no address to verify against RPC —
+marking blocked, not fabricating one.
+
+### ❌ Carrier (Automata Network) — deprioritized, likely discontinued
+
+A real token/NFT bridge product built on Wormhole's guardian messaging,
+historically. However, Automata Network's current GitHub org (146
+repositories) has nothing named "Carrier" or "bridge" — their org is now
+entirely TEE/attestation/ZK infrastructure, suggesting Carrier was sunset or
+spun out. No program ID findable; also would likely have shared detection
+surface with Wormhole even if found (same open question as CCIP above).
+Excluded for this pass.
+
+### ❌ AllDomains Bridge — not a separate bridge, built on Hyperlane
+
+Per AllDomains' own docs (<https://docs.alldomains.id/protocol/alldomains-bridge>):
+*"With Hyperlane as our trusted provider, you can bridge with confidence."*
+This is a Hyperlane-based application, not a dedicated bridge contract of its
+own — the same "shares infra with an already-tracked bridge" reasoning as
+Carrier/Wormhole and CCIP's downstream bridges. Once Hyperlane itself gets a
+verified adapter (see Tier 2 in `BRIDGE_REGISTRY.md`), AllDomains' traffic
+would already be visible through it. Excluded, not a new candidate.
 
 ### ❌ No evidence found — not fabricating, not building
 
@@ -368,3 +410,30 @@ project rebrand rather than a serious dedicated bridge), Hop Protocol
 (confirmed EVM-L2-only, no Solana leg at all), Celer cBridge (Solana support
 was announced for "cBridge 2.0" in 2021-2022 with no evidence it ever
 shipped).
+
+---
+
+## Pass 2 summary
+
+Candidate pool from the Alchemy "39 web3 bridges on Solana" list plus
+aggregator-revealed bridges, fully triaged:
+
+| Outcome | Bridges |
+|---|---|
+| **Adapter built, live on mainnet** | Atomiq Exchange, rhino.fi |
+| **Real, verified programs — blocked** (docs unreachable / no readable event format / architecture mismatch) | Zeus Network, Chainflip |
+| **Real, audited — blocked** (program ID not publicly disclosed) | Router Nitro |
+| **Excluded — aggregator/UI, not a dedicated bridge** | Jupiter, Rango Exchange, LI.FI, Jumper.Exchange, Squid Router, Bridgers.xyz, Houdini Swap, SwapKit, Sunrise DeFi, DEFIWAY |
+| **Excluded — custodial swap service** | SideShift.ai |
+| **Excluded — shares infra with an already-tracked bridge** | Carrier (Wormhole), AllDomains Bridge (Hyperlane) |
+| **Excluded — confirmed no Solana leg / never shipped** | Hop Protocol, Celer cBridge |
+| **No evidence found** | Mach Exchange, ValueRouter, Galaxy Exchange, LibertySwap, Maxbid Pro, HOT Protocol, Emblem Vault |
+
+This is a natural stopping point for this pass: every remaining unresolved
+candidate is either genuinely unverifiable from an authoritative source
+(Router Nitro), architecturally incompatible with our program-ID-based log
+detection (Chainflip), blocked on an unreachable docs site with no readable
+on-chain event format (Zeus Network), or resolves into a bridge already in
+the registry (Carrier/Wormhole, AllDomains/Hyperlane). Revisit Zeus Network
+and Chainflip if their docs situations change; revisit Router Nitro if a
+public program ID surfaces.
