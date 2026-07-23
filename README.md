@@ -55,6 +55,15 @@ Over $2.8B drained from bridges since 2022. Most exploits emitted detectable sig
 
 MIT (code), CC-BY 4.0 (docs). No token, no equity, no premine.
 Built by: Khan Saloni ([@Hermit210](https://github.com/Hermit210))
+
+## Network status
+
+- **Indexing (`radar-indexer-solana`, EVM indexers):** Solana **mainnet-beta**
+  (Helius RPC/WS) as of 2026-07-23 — all bridge health scores reflect real
+  mainnet activity, not devnet.
+- **On-chain oracle program + attester:** still **devnet** — see below. Not
+  redeployed to mainnet yet; that's a separate, deliberate step.
+
 ## Devnet Deployment
 - Program ID: `6148M4aXYbDsscWn14zCazPy9V4fQFGozdDQp4LFmqHM`
 
