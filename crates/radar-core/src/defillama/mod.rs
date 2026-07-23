@@ -6,5 +6,5 @@
 pub mod client;
 pub mod types;
 
-pub use client::{DefiLlamaClient, DefiLlamaError, TRACKED_BRIDGE_SLUGS};
+pub use client::{DefiLlamaClient, DefiLlamaError, MESSAGING_PROTOCOL_SLUGS, TRACKED_BRIDGE_SLUGS};
 pub use types::SOURCE;

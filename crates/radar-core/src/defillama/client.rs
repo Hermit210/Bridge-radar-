@@ -5,13 +5,13 @@
 //! Every normalized type in [`super::types`] is what actually gets persisted
 //! to `defillama_cache`; callers should treat all of it as advisory.
 //!
-//! Nine data categories, three of which (`bridges list`, `bridge volume`,
-//! `oracles TVS`) moved behind DeFiLlama's Pro API ($300/mo, confirmed via
-//! their own docs on 2026-07-22 — `bridges.llama.fi/*` and `api.llama.fi/oracles`
-//! now return `402 Payment Required` without a key). Those three read
-//! `DEFILLAMA_API_KEY` from the environment; with no key set they return
-//! [`DefiLlamaError::ProKeyRequired`] immediately — no network call, no fake
-//! data, ever.
+//! Ten data categories, three of which (`bridges list`, `bridge volume`,
+//! `oracles TVS`) are behind DeFiLlama's Pro API ($300/mo, confirmed via
+//! their own docs on 2026-07-22 and re-confirmed live on 2026-07-23 —
+//! `bridges.llama.fi/*` and `api.llama.fi/oracles` return `402 Payment
+//! Required` without a key). Those three read `DEFILLAMA_API_KEY` from the
+//! environment; with no key set they return [`DefiLlamaError::ProKeyRequired`]
+//! immediately — no network call, no fake data, ever.
 
 use super::types::*;
 use chrono::{DateTime, Utc};
@@ -61,6 +61,16 @@ pub const TRACKED_BRIDGE_SLUGS: &[(&str, &str)] = &[
     ("atomiq", "atomiq-exchange"),
     ("rhinofi", "rhino.fi"),
 ];
+
+/// (our id, verified DeFiLlama protocol slug) for shared messaging
+/// infrastructure — NOT dedicated bridges. Hand-verified against a live
+/// `/protocols` response on 2026-07-23: CCIP's slug is `ccip` (has a real
+/// Solana entry in `currentChainTvls`, ~$64.7M at verification time).
+/// LayerZero's generic messaging slug is `layerzero-v2` (the same slug
+/// `TRACKED_BRIDGE_SLUGS` uses for our own `layerzero` bridge id above — that
+/// reuse is intentional per DeFiLlama's own protocol model, not a bug) and
+/// currently has no Solana entry in `currentChainTvls` at all.
+pub const MESSAGING_PROTOCOL_SLUGS: &[(&str, &str)] = &[("ccip", "ccip"), ("layerzero", "layerzero-v2")];
 
 #[derive(Clone)]
 pub struct DefiLlamaClient {
@@ -188,6 +198,37 @@ impl DefiLlamaClient {
         self.get_json(&url).await
     }
 
+    // ── 10. Messaging protocols (CCIP, LayerZero) Solana context (free) ──
+    pub async fn fetch_messaging_protocols_solana_context(
+        &self,
+    ) -> Result<Vec<MessagingProtocolContext>, DefiLlamaError> {
+        let list_url = format!("{FREE_BASE}/protocols");
+        let list: Vec<ProtocolRaw> = self.get_json(&list_url).await?;
+        let by_slug: HashMap<&str, &ProtocolRaw> = list
+            .iter()
+            .filter_map(|p| p.slug.as_deref().map(|s| (s, p)))
+            .collect();
+
+        let mut out = Vec::with_capacity(MESSAGING_PROTOCOL_SLUGS.len());
+        for (id, slug) in MESSAGING_PROTOCOL_SLUGS {
+            let Some(summary) = by_slug.get(slug) else {
+                continue;
+            };
+            let detail_url = format!("{FREE_BASE}/protocol/{slug}");
+            let detail: ProtocolChainTvlsRaw = self.get_json(&detail_url).await?;
+            out.push(MessagingProtocolContext {
+                id: id.to_string(),
+                defillama_slug: slug.to_string(),
+                defillama_name: summary.name.clone(),
+                category: summary.category.clone(),
+                total_tvl_usd: summary.tvl,
+                solana_tvl_usd: detail.current_chain_tvls.get("Solana").copied(),
+            });
+        }
+        Ok(out)
+    }
+
+
     // ── 1. Bridges list (Pro-only) ────────────────────────────────────────
     pub async fn fetch_bridges_list(&self) -> Result<Vec<BridgeListEntry>, DefiLlamaError> {
         let url = self.pro_url("/bridges/bridges")?;
@@ -262,6 +303,19 @@ mod tests {
         sorted.sort();
         sorted.dedup();
         assert_eq!(ids.len(), sorted.len(), "duplicate bridge_id in TRACKED_BRIDGE_SLUGS");
+    }
+
+    #[test]
+    fn messaging_protocol_slugs_are_unique() {
+        let ids: Vec<&str> = MESSAGING_PROTOCOL_SLUGS.iter().map(|(id, _)| *id).collect();
+        let mut sorted = ids.clone();
+        sorted.sort();
+        sorted.dedup();
+        assert_eq!(
+            ids.len(),
+            sorted.len(),
+            "duplicate id in MESSAGING_PROTOCOL_SLUGS"
+        );
     }
 
     #[tokio::test]
