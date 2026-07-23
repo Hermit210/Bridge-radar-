@@ -8,13 +8,25 @@ use radar_core::{BridgeAdapter, Storage};
 use serde_json::{json, Value};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::time::sleep;
+use tokio::time::{sleep, timeout};
 use tokio_tungstenite::tungstenite::Message;
 use tracing::{debug, error, info, warn};
 use url::Url;
 
 const MAX_BACKOFF: Duration = Duration::from_secs(60);
 const MIN_BACKOFF: Duration = Duration::from_secs(1);
+
+/// A "zombie" connection — no close frame, no error, but the peer has
+/// stopped sending anything at all (data, ping, everything) — is
+/// indistinguishable from a healthy-but-quiet one unless we bound how long
+/// we're willing to wait on `socket.next()`. Without this, mainnet Helius
+/// dropping to a half-open state under load would hang this loop forever:
+/// no reconnect ever fires, no error is ever logged, and every bridge event
+/// during the stall is silently missed. 90s is generous enough that it
+/// should never trip during genuine quiet periods (several bridges share
+/// this one subscription; some real log line or a server ping is expected
+/// well within that window) while still catching a real stall promptly.
+const IDLE_TIMEOUT: Duration = Duration::from_secs(90);
 
 pub async fn run(
     ws_url: String,
@@ -67,8 +79,14 @@ async fn connect_and_drive(
             .context("send logsSubscribe")?;
     }
 
-    while let Some(msg) = socket.next().await {
-        let msg = msg.context("ws stream item")?;
+    loop {
+        let msg = match timeout(IDLE_TIMEOUT, socket.next()).await {
+            Ok(Some(msg)) => msg.context("ws stream item")?,
+            Ok(None) => break,
+            Err(_) => return Err(anyhow!(
+                "no message from {ws_url} in {IDLE_TIMEOUT:?} — treating as a stalled connection"
+            )),
+        };
         let text = match msg {
             Message::Text(t) => t,
             Message::Binary(b) => match std::str::from_utf8(&b) {
