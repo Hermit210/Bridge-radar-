@@ -104,7 +104,8 @@ export class RadarDb {
         ('garden','Garden Finance','https://garden.finance'),
         ('base-solana-bridge','Coinbase Bridge (Base-Solana)','https://docs.base.org/base-chain/quickstart/base-solana-bridge'),
         ('atomiq','Atomiq Exchange','https://atomiq.exchange'),
-        ('rhinofi','rhino.fi','https://rhino.fi');
+        ('rhinofi','rhino.fi','https://rhino.fi'),
+        ('orderly','Orderly Network','https://orderly.network');
 
       -- cctp/hyperlane are real bridges but have no adapter watching a
       -- verified Solana program yet (see crate::bridges::registry doc

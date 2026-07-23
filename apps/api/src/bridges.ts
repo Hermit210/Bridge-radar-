@@ -149,6 +149,15 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
     status: "active",
     detectionStatus: "implemented",
   },
+  {
+    id: "orderly",
+    name: "Orderly Network",
+    homepage: "https://orderly.network",
+    supportedChains: ["solana", "ethereum", "arbitrum", "base", "avalanche", "optimism", "polygon", "bnb"],
+    hasSolana: true,
+    status: "active",
+    detectionStatus: "implemented",
+  },
 
   // ─── TIER 2: Registered, detection not yet verified/implemented ──────────
   // (stargate removed — confirmed not deployed on Solana, see BRIDGE_DISCOVERY.md.
