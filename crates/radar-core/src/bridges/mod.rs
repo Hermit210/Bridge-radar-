@@ -4,6 +4,7 @@
 
 pub mod across;
 pub mod allbridge;
+pub mod atomiq;
 pub mod axelar;
 pub mod base_solana;
 pub mod cctp;
@@ -49,5 +50,6 @@ pub fn registry() -> Vec<Arc<dyn BridgeAdapter>> {
         Arc::new(across::AcrossAdapter),
         Arc::new(garden::GardenAdapter),
         Arc::new(base_solana::BaseSolanaBridgeAdapter),
+        Arc::new(atomiq::AtomiqAdapter),
     ]
 }
