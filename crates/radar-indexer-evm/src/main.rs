@@ -1,5 +1,7 @@
-//! EVM indexer. Polls `eth_getLogs` per (chain, contract) every `POLL_SECS`,
-//! decodes via the adapter registry, persists to the Storage trait.
+//! EVM indexer. Polls `eth_getLogs` once per chain every `POLL_SECS` (a
+//! single call covering every watched contract on that chain, not one call
+//! per contract — see the note on `main` below), decodes via the adapter
+//! registry, persists to the Storage trait.
 //!
 //! v0 uses raw JSON-RPC + reqwest rather than alloy/viem so we can boot
 //! against any public RPC without ABI files. The Wormhole adapter only needs
@@ -25,8 +27,17 @@ use tracing_subscriber::EnvFilter;
 
 const POLL_SECS: u64 = 12;
 const CONFIRMATION_BLOCKS: u64 = 12;
-const INITIAL_LOOKBACK: u64 = 200;
-const MAX_RANGE_PER_CALL: u64 = 1_000;
+// Free-tier public RPCs commonly cap eth_getLogs to a small recent-block
+// window and reject anything older as an "archive" request requiring a paid
+// key. Measured directly against ethereum-rpc.publicnode.com on 2026-07-23:
+// a 100-block range succeeded, a 150-block range failed with exactly that
+// error. 100 is a provider-agnostic safe default with headroom — other free
+// RPCs may cap lower, none observed so far cap this low. Since a failed
+// eth_getLogs call leaves `next_from` unchanged (see `scan_once`), a range
+// that permanently exceeds a provider's limit would otherwise retry the
+// same failing window forever and never make progress.
+const INITIAL_LOOKBACK: u64 = 100;
+const MAX_RANGE_PER_CALL: u64 = 100;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -56,7 +67,11 @@ async fn main() -> Result<()> {
     let chain_rpcs: HashMap<ChainId, String> = [
         (
             ChainId::Ethereum,
-            std::env::var("ETH_RPC_URL").unwrap_or_else(|_| "https://eth.llamarpc.com".into()),
+            // eth.llamarpc.com returned HTTP 521 (origin down) when checked
+            // live on 2026-07-23 — switched default to a verified-working
+            // free endpoint. See .env's comment for the full audit note.
+            std::env::var("ETH_RPC_URL")
+                .unwrap_or_else(|_| "https://ethereum-rpc.publicnode.com".into()),
         ),
         (
             ChainId::Arbitrum,
@@ -74,40 +89,56 @@ async fn main() -> Result<()> {
         ),
         (
             ChainId::Bnb,
+            // bsc-dataseed.binance.org's eth_getLogs hit a rate/range limit
+            // when checked live on 2026-07-23 — switched default.
             std::env::var("BNB_RPC_URL")
-                .unwrap_or_else(|_| "https://bsc-dataseed.binance.org".into()),
+                .unwrap_or_else(|_| "https://bsc-rpc.publicnode.com".into()),
         ),
         (
             ChainId::Polygon,
-            std::env::var("POLYGON_RPC_URL").unwrap_or_else(|_| "https://polygon-rpc.com".into()),
+            // polygon-rpc.com returned HTTP 401 ("API key disabled, tenant
+            // disabled") when checked live on 2026-07-23 — switched default.
+            std::env::var("POLYGON_RPC_URL")
+                .unwrap_or_else(|_| "https://polygon-bor-rpc.publicnode.com".into()),
         ),
     ]
     .into_iter()
     .collect();
 
-    // For each registered adapter, fan out a poller per (chain, contract).
+    // Group every registered adapter's contracts by chain so each chain gets
+    // exactly ONE poller making ONE eth_getLogs call per tick (address
+    // accepts an array per the JSON-RPC spec), instead of one poller *per
+    // contract*. Several bridges share the same chain (e.g. wormhole,
+    // allbridge, debridge, layerzero, axelar, mayan all have an Ethereum
+    // leg) — fanning out a separate poller per contract meant up to 6+
+    // independent pollers hammering the same free-tier RPC host every
+    // POLL_SECS, which trips rate limiting (HTTP 403, confirmed live on
+    // 2026-07-23 against publicnode) even with staggered start times. One
+    // batched call per chain is both more efficient and the actual fix.
     let adapters = bridges::registry();
-    let mut tasks = Vec::new();
+    let mut by_chain: HashMap<ChainId, Vec<(String, Arc<dyn BridgeAdapter>)>> = HashMap::new();
     for adapter in adapters {
         for (chain, contract) in adapter.evm_contracts() {
-            let Some(rpc) = chain_rpcs.get(chain).cloned() else {
-                debug!(chain = %chain, "no RPC configured; skipping");
-                continue;
-            };
-            let storage = storage.clone();
-            let adapter = adapter.clone();
-            let chain = chain.clone();
-            let contract = contract.to_string();
-            info!(
-                bridge = %adapter.id(),
-                chain = %chain,
-                contract = %contract,
-                "starting EVM poller"
-            );
-            tasks.push(tokio::spawn(async move {
-                poll_loop(rpc, chain, contract, adapter, storage).await
-            }));
+            by_chain
+                .entry(chain.clone())
+                .or_default()
+                .push((contract.to_string(), adapter.clone()));
         }
+    }
+
+    let mut tasks = Vec::new();
+    for (chain, contracts) in by_chain {
+        let Some(rpc) = chain_rpcs.get(&chain).cloned() else {
+            debug!(chain = %chain, "no RPC configured; skipping");
+            continue;
+        };
+        for (contract, adapter) in &contracts {
+            info!(bridge = %adapter.id(), chain = %chain, contract = %contract, "watching");
+        }
+        let storage = storage.clone();
+        tasks.push(tokio::spawn(async move {
+            poll_loop(rpc, chain, contracts, storage).await
+        }));
     }
 
     if tasks.is_empty() {
@@ -126,12 +157,22 @@ async fn main() -> Result<()> {
 async fn poll_loop(
     rpc_url: String,
     chain: ChainId,
-    contract: String,
-    adapter: Arc<dyn BridgeAdapter>,
+    contracts: Vec<(String, Arc<dyn BridgeAdapter>)>,
     storage: Arc<SqliteStorage>,
 ) -> Result<()> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
+        // Public EVM RPC endpoints (llamarpc, publicnode, base.org, etc.)
+        // commonly sit behind a CDN that closes idle keep-alive connections
+        // well under reqwest's 90s default pool_idle_timeout. This poller
+        // fires every 12s (POLL_SECS) — squarely in the window where reqwest
+        // would still think a pooled connection is good long after the
+        // server dropped it, failing the next send. Same root cause and fix
+        // as the Pyth Hermes client (crates/radar-core/src/pricing.rs): keep
+        // idle connections well under any plausible server-side timeout so
+        // reqwest always redials instead of reusing a likely-dead one.
+        .pool_idle_timeout(Duration::from_secs(10))
+        .user_agent("bridge-radar/0.1")
         .build()?;
 
     let mut tick = interval(Duration::from_secs(POLL_SECS));
@@ -141,17 +182,7 @@ async fn poll_loop(
 
     loop {
         tick.tick().await;
-        match scan_once(
-            &client,
-            &rpc_url,
-            &chain,
-            &contract,
-            &adapter,
-            &storage,
-            &mut next_from,
-        )
-        .await
-        {
+        match scan_once(&client, &rpc_url, &chain, &contracts, &storage, &mut next_from).await {
             Ok(0) => debug!(chain = %chain, "scanned — no new logs"),
             Ok(n) => info!(chain = %chain, count = n, "ingested"),
             Err(e) => warn!(chain = %chain, error = %e, "scan failed"),
@@ -163,8 +194,7 @@ async fn scan_once(
     client: &reqwest::Client,
     rpc_url: &str,
     chain: &ChainId,
-    contract: &str,
-    adapter: &Arc<dyn BridgeAdapter>,
+    contracts: &[(String, Arc<dyn BridgeAdapter>)],
     storage: &Arc<SqliteStorage>,
     next_from: &mut Option<u64>,
 ) -> Result<usize> {
@@ -176,7 +206,8 @@ async fn scan_once(
     }
     let to = (from + MAX_RANGE_PER_CALL - 1).min(safe_head);
 
-    let logs = get_logs(client, rpc_url, contract, from, to).await?;
+    let addresses: Vec<&str> = contracts.iter().map(|(c, _)| c.as_str()).collect();
+    let logs = get_logs(client, rpc_url, &addresses, from, to).await?;
     let mut count = 0;
     for log in logs {
         let topics: Vec<String> = log
@@ -217,9 +248,17 @@ async fn scan_once(
             topics: &topics,
             data: &data,
         };
-        if let Some(event) = adapter.decode_evm_log(&ctx) {
-            if storage.insert_event(&event).await.is_ok() {
-                count += 1;
+        // Match by address (case-insensitive — EVM addresses come back from
+        // RPCs in varying checksum casing) so each log only reaches the
+        // adapter(s) that actually registered that contract.
+        for (contract, adapter) in contracts {
+            if !contract.eq_ignore_ascii_case(&address) {
+                continue;
+            }
+            if let Some(event) = adapter.decode_evm_log(&ctx) {
+                if storage.insert_event(&event).await.is_ok() {
+                    count += 1;
+                }
             }
         }
     }
@@ -247,7 +286,7 @@ async fn get_block_number(client: &reqwest::Client, rpc_url: &str) -> Result<u64
 async fn get_logs(
     client: &reqwest::Client,
     rpc_url: &str,
-    address: &str,
+    addresses: &[&str],
     from: u64,
     to: u64,
 ) -> Result<Vec<Value>> {
@@ -256,7 +295,7 @@ async fn get_logs(
         "id": 1,
         "method": "eth_getLogs",
         "params": [{
-            "address": address,
+            "address": addresses,
             "fromBlock": format!("0x{:x}", from),
             "toBlock":   format!("0x{:x}", to),
         }]

@@ -24,6 +24,17 @@ pub async fn run(
 ) -> Result<()> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
+        // Mainnet RPC providers (Helius included) sit behind Cloudflare,
+        // which closes idle keep-alive connections well under reqwest's 90s
+        // default pool_idle_timeout. This poller fires every 60s (see
+        // POLL_INTERVAL) — squarely in the window where reqwest would still
+        // think a pooled connection is good long after the server dropped
+        // it, failing the next send. Same root cause and fix as the Pyth
+        // Hermes client (crates/radar-core/src/pricing.rs): keep idle
+        // connections well under any plausible server-side timeout so
+        // reqwest always redials instead of reusing a likely-dead one.
+        .pool_idle_timeout(Duration::from_secs(10))
+        .user_agent("bridge-radar/0.1")
         .build()?;
 
     let mut tick = interval(POLL_INTERVAL);
