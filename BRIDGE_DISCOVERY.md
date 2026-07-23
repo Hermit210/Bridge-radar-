@@ -436,4 +436,139 @@ detection (Chainflip), blocked on an unreachable docs site with no readable
 on-chain event format (Zeus Network), or resolves into a bridge already in
 the registry (Carrier/Wormhole, AllDomains/Hyperlane). Revisit Zeus Network
 and Chainflip if their docs situations change; revisit Router Nitro if a
+program ID surfaces.
+
+---
+
+## Pass 3 (2026-07-23) — Cashmere/InterSoon verification, retries, one new bridge
+
+Per the two names surfaced on `defillama.com/bridges/solana` that hadn't
+been checked yet, plus a retry pass on everything pass 2 left blocked.
+
+### ✅ Orderly Network — verified, adapter built (previously blocked in pass 1)
+
+Pass 1 blocked this on 2026-07-22 because `OrderlyNetwork/solana-vault`'s
+`Anchor.toml` only declared `[programs.devnet]`/`[programs.localnet]`, no
+mainnet section. Retried this session: Orderly has since shipped to Solana
+mainnet.
+
+Program verified from Orderly's own official docs
+(<https://orderly.network/docs/build-on-omnichain/addresses>, "Solana-Vault"
+row under the Mainnet table — cross-checked with two independent fetches,
+each returning the identical address):
+
+| Program | Address |
+|---|---|
+| Solana-Vault | `ErBmAD61mGFKvrFNaTJuxoPwqrS8GgtwtqJTJVjFWx9Q` |
+
+Confirmed `executable: true` via direct `getAccountInfo`, and genuinely
+live — real transactions land every 10-15 minutes. DeFiLlama independently
+tracks it as "Orderly Bridge" (slug `orderly-bridge`, category "Bridge",
+~$23.7M TVL, Solana among its chains).
+
+Instructions confirmed from real transactions: `DepositSol`/`Deposit` (user
+collateral locked into the vault) and `LzReceive` (inbound LayerZero
+message from Orderly Chain — one sampled `LzReceive` transaction shows a
+nested SPL Token transfer moving real funds out of the vault, confirming
+it's a genuine withdrawal path, not assumed from the name). Adapter built,
+5 unit tests from 3 real transactions, registered in `bridges::registry()`,
+seeded enabled. Live-verified: indexer subscribed and ingested a real
+`kind="lock"` event within 2 minutes of restart.
+
+### ❌ Cashmere — real program, but a thin CCTP wrapper
+
+`defillama.com/bridges/solana` lists "Cashmere." DeFiLlama's own
+`/protocols` entry: category "Bridge", but `tvl: null`, `chains: []` — no
+live tracked data. Official docs
+(<https://docs.cashmere.exchange/developers/contract-addresses>) give a
+"Cashmere CCTP" main program:
+
+| Program | Address |
+|---|---|
+| Cashmere CCTP (main) | `5RsvKL6LFq6yEFiAXEwgYHAN3aLFypeB4AaafdeDnHqM` |
+
+Confirmed `executable: true`, and has real (if infrequent) activity. But
+every one of 3 sampled real transactions shows the same pattern: Cashmere's
+own `TransferV2` instruction immediately invokes Circle's actual CCTP
+programs — `CCTPV2vPZJS2u2BBsUoscuikbYjnpFmbFsvVuJdgUMQe`'s `DepositForBurn`
+then `CCTPV2Sm4AdWt5296sk4P66VBZ7bEhcARwFaaS9YPbeC`'s `SendMessage` — the
+exact real CCTP burn-and-mint flow, not Cashmere's own lock/mint logic.
+Example: <https://solscan.io/tx/48fpikZdjEQSzjEBvxuRXG1iKcZwE6nRypaoQu9U5JY5kJ6SFzfkC4UY2ovdC9BvVNeYHJMxvquwYj7DteDHxK8G>.
+Building a separate "cashmere" adapter watching Cashmere's wrapper program
+would double-count every transfer once "cctp" gets a real adapter (both
+would fire on the same underlying CCTP burn). Excluded — shares infra with
+CCTP, same reasoning as Carrier/Wormhole and AllDomains/Hyperlane.
+
+### ❌ InterSoon — not a separate bridge, built on Hyperlane
+
+InterSOON (SOON Network's TON↔Solana bridge) per its own official docs
+(<https://docs.soo.network/introduction/intersoon>): *"InterSOON's
+underlying cross-chain messaging is supported by Hyperlane."* Same
+exclusion reasoning as AllDomains Bridge — no dedicated program of its own,
+resolves into Hyperlane once that bridge gets a verified adapter. No
+GitHub org found with a dedicated "intersoon" bridge repo either
+(`soonlabs`'s public `soon-bridge-tool` is for the SOON L1↔L2 rollup
+bridge, a different product). Excluded.
+
+### Retries on pass-2/pass-1 blocked candidates
+
+- **Zeus Network** — found the official `@zeus-network/zpl-sdk` npm
+  package (v0.11.6), which exposes real instruction names on the
+  `TwoWayPeg` program not previously seen: `CreateHotReserveBucket`,
+  `ReactivateHotReserveBucket`, `AddWithdrawalRequest`,
+  `AddWithdrawalRequestWithAddressType`, `CreateEntityDerivedReserveAddress`,
+  `MigrateHotReserveBucketToEntityDerivedReserveAddress` — a genuine step
+  forward on understanding the program's real interface. However, these use
+  raw Borsh instruction discriminators (sequential integers via
+  `@solana/buffer-layout`), not Anchor's typical human-readable
+  `msg!("Instruction: X")` logging our decoders rely on — a scan of the
+  most recent transactions for these specific instruction names timed out
+  against public RPC rate limits this session before finding a real sample
+  of any of them (only administrative `UpdateMinerFeeRate` calls were
+  confirmed with readable log text in earlier sampling). Still blocked —
+  real programs, better-understood interface, but no confirmed readable
+  deposit/withdrawal transaction sample yet. Revisit with a paid RPC
+  provider (higher rate limits) to properly scan for one.
+- **Chainflip** — scanned 600 real transactions against the Vault program
+  (up from a handful previously). Confirmed the full instruction set is
+  exactly `FetchTokens`, `FetchNative`, `TransferTokens`, `RotateAggKey` —
+  no settlement/execution/finalization instruction exists anywhere in that
+  set. This closes the question raised this session ("does a
+  settlement/finalization instruction exist"): it doesn't. Confirms the
+  pass-2 conclusion with much stronger evidence — still blocked,
+  architecture mismatch (swap execution happens off-chain in Chainflip's
+  validator network; the Vault only does custody operations).
+- **Router Nitro** — checked GitHub deployment configs
+  (`nitro-tokens/src/mainnet/tokens/*.json` — token mint addresses only,
+  no bridge program address), the Router-Nitro-Cookbook's educational
+  content (no addresses, and its one dApp example is EVM-only, using an
+  ABI not an IDL), and npm (no `@routerprotocol` Solana SDK package found).
+  Still blocked — the three contract repos named in Router's own Oak
+  Security audit remain private.
+- **Wan Bridge, WavesBridge, BabyDoge Bridge** — fresh searches this
+  session surfaced no new information beyond pass 1's findings. Wan Bridge
+  and WavesBridge: still no disclosed program address from any source.
+  BabyDoge: still only the SPL token mint (`7dUKUopcNWW6CcU4eRxCHh1uiMh32zDrmGf6ufqhxann`)
+  and a Raydium liquidity pool address are disclosed — no bridge *program*.
+  All three remain not-found, unchanged.
+
+### Pass 3 summary
+
+| Outcome | Bridges |
+|---|---|
+| **Adapter built, live on mainnet** | Orderly Network |
+| **Excluded — shares infra with an already-tracked bridge** | Cashmere (CCTP), InterSoon (Hyperlane) |
+| **Still blocked, re-confirmed with stronger evidence** | Zeus Network, Chainflip, Router Nitro |
+| **Still not-found, unchanged** | Wan Bridge, WavesBridge, BabyDoge Bridge |
+
+After three passes, the registry holds 14 bridges with real, live adapters
+and 2 (CCTP, Hyperlane) honestly marked unmonitored. Every candidate this
+project's discovery process has touched is accounted for in this document
+— built, blocked-with-a-documented-reason, excluded-with-a-documented-
+reason, or not-found-and-not-guessed. Continuing further would mean
+re-trying the same blocked/not-found candidates without new information
+sources, or searching for increasingly obscure projects with no
+verification path — a reasonable stopping point until new leads surface
+(a working RPC provider with higher rate limits, a docs site coming back
+online, or a project publicly disclosing a program address it hasn't yet).
 public program ID surfaces.

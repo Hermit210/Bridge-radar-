@@ -13,6 +13,7 @@ pub mod garden;
 pub mod hyperlane;
 pub mod layerzero;
 pub mod mayan;
+pub mod orderly;
 pub mod portal;
 pub mod relay;
 pub mod rhinofi;
@@ -53,5 +54,6 @@ pub fn registry() -> Vec<Arc<dyn BridgeAdapter>> {
         Arc::new(base_solana::BaseSolanaBridgeAdapter),
         Arc::new(atomiq::AtomiqAdapter),
         Arc::new(rhinofi::RhinoFiAdapter),
+        Arc::new(orderly::OrderlyAdapter),
     ]
 }

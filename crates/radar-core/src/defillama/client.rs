@@ -68,6 +68,7 @@ pub const TRACKED_BRIDGE_SLUGS: &[(&str, &str)] = &[
     ("hyperlane", "hyperlane"),
     ("atomiq", "atomiq-exchange"),
     ("rhinofi", "rhino.fi"),
+    ("orderly", "orderly-bridge"),
 ];
 
 /// (our id, verified DeFiLlama protocol slug) for shared messaging

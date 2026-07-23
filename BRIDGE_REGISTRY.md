@@ -2,10 +2,25 @@
 
 ## Current Status
 
-**Total Bridges:** 15 registered (13 with a real, verified Solana adapter + 2 real bridges pending an adapter) — more added as the discovery/verification pass (see [BRIDGE_DISCOVERY.md](./BRIDGE_DISCOVERY.md)) turns up real, verifiable Solana program IDs.
+**Total Bridges:** 16 registered (14 with a real, verified Solana adapter + 2 real bridges pending an adapter) — more added as the discovery/verification pass (see [BRIDGE_DISCOVERY.md](./BRIDGE_DISCOVERY.md)) turns up real, verifiable Solana program IDs.
 **Solana Support:** 100% of tracked bridges — every remaining entry is either
 a genuine bridge with a real, verified Solana program watching it, or a
 genuine bridge honestly marked not yet monitored. Nothing non-genuine remains.
+
+**2026-07-23 discovery pass 3:** added **Orderly Network** (`Solana-Vault`
+program, previously blocked in pass 1 for having no mainnet deployment —
+Orderly has since shipped). Verified Cashmere and InterSoon from
+`defillama.com/bridges/solana` — both excluded: Cashmere is a thin wrapper
+that immediately forwards into Circle's real CCTP burn instructions
+(building a separate adapter would double-count with a future CCTP
+adapter); InterSoon is built on Hyperlane per its own docs, not a separate
+bridge. Retried every bridge pass 2 left blocked (Zeus Network, Chainflip,
+Router Nitro) and pass 1 left not-found (Wan Bridge, WavesBridge, BabyDoge
+Bridge) — Chainflip's conclusion is now backed by a 600-transaction scan
+confirming no settlement instruction exists on-chain at all; the rest
+remain blocked/not-found for the same documented reasons, no new
+information surfaced. Full writeup in `BRIDGE_DISCOVERY.md`'s "Pass 3"
+section.
 
 **2026-07-23 discovery pass 2 (complete):** exhaustive sweep against the
 Alchemy "39 web3 bridges on Solana" list plus what Jupiter/Rango/Phantom's
@@ -66,10 +81,10 @@ DeFiLlama's model (burn-and-mint, not locked liquidity) — correctly absent,
 not a bug. Check the live endpoint for current numbers; don't hardcode these
 back into source.
 
-### Tier 1: Implemented (13 bridges)
+### Tier 1: Implemented (14 bridges)
 Wormhole, Portal, LayerZero, Axelar, Allbridge, deBridge, Mayan, Relay,
 Across Protocol, Garden Finance, Coinbase Bridge (Base-Solana), Atomiq
-Exchange, rhino.fi.
+Exchange, rhino.fi, Orderly Network.
 
 ### Tier 2: Registered, detection not yet implemented (2 bridges)
 Circle CCTP, Hyperlane. Both are seeded `enabled = 0` in the DB (no verified
@@ -137,8 +152,8 @@ No `tvl` field — a hardcoded one used to live here and was removed (see
 ```json
 {
   "summary": {
-    "total": 15,
-    "implemented": 13,
+    "total": 16,
+    "implemented": 14,
     "planned": 2
   },
   "implemented": [
