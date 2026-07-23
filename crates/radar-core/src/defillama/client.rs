@@ -5,7 +5,7 @@
 //! Every normalized type in [`super::types`] is what actually gets persisted
 //! to `defillama_cache`; callers should treat all of it as advisory.
 //!
-//! Ten data categories, three of which (`bridges list`, `bridge volume`,
+//! Twelve data categories, three of which (`bridges list`, `bridge volume`,
 //! `oracles TVS`) are behind DeFiLlama's Pro API ($300/mo, confirmed via
 //! their own docs on 2026-07-22 and re-confirmed live on 2026-07-23 —
 //! `bridges.llama.fi/*` and `api.llama.fi/oracles` return `402 Payment
@@ -27,6 +27,14 @@ const COINS_BASE: &str = "https://coins.llama.fi";
 const PRO_BASE: &str = "https://pro-api.llama.fi";
 
 const PRICE_CACHE_TTL_SECS: i64 = 300;
+
+/// Timeout override for free-tier endpoints known to return large payloads
+/// (`/protocols`, `yields.llama.fi/pools`). Measured directly via repeated
+/// curl on 2026-07-23: 5 back-to-back real requests to yields.llama.fi/pools
+/// took 8-30.5s each for the same ~11MB payload — legitimately slow, not an
+/// error. The client's default 30s timeout was occasionally clipping the
+/// slow end of that range.
+const LARGE_PAYLOAD_TIMEOUT: Duration = Duration::from_secs(60);
 
 #[derive(Debug, thiserror::Error)]
 pub enum DefiLlamaError {
@@ -71,6 +79,10 @@ pub const TRACKED_BRIDGE_SLUGS: &[(&str, &str)] = &[
 /// reuse is intentional per DeFiLlama's own protocol model, not a bug) and
 /// currently has no Solana entry in `currentChainTvls` at all.
 pub const MESSAGING_PROTOCOL_SLUGS: &[(&str, &str)] = &[("ccip", "ccip"), ("layerzero", "layerzero-v2")];
+
+/// How many Solana yield pools (sorted by APY descending) to keep from
+/// `yields.llama.fi/pools`, which returns 2,800+ Solana pools unfiltered.
+const YIELDS_TOP_N: usize = 20;
 
 #[derive(Clone)]
 pub struct DefiLlamaClient {
@@ -166,7 +178,9 @@ impl DefiLlamaClient {
         &self,
     ) -> Result<Vec<BridgeProtocolTvl>, DefiLlamaError> {
         let url = format!("{FREE_BASE}/protocols");
-        let raw: Vec<ProtocolRaw> = self.get_json(&url).await?;
+        let raw: Vec<ProtocolRaw> = self
+            .get_json_with_timeout(&url, Some(LARGE_PAYLOAD_TIMEOUT))
+            .await?;
         let by_slug: HashMap<&str, &ProtocolRaw> = raw
             .iter()
             .filter_map(|p| p.slug.as_deref().map(|s| (s, p)))
@@ -203,7 +217,9 @@ impl DefiLlamaClient {
         &self,
     ) -> Result<Vec<MessagingProtocolContext>, DefiLlamaError> {
         let list_url = format!("{FREE_BASE}/protocols");
-        let list: Vec<ProtocolRaw> = self.get_json(&list_url).await?;
+        let list: Vec<ProtocolRaw> = self
+            .get_json_with_timeout(&list_url, Some(LARGE_PAYLOAD_TIMEOUT))
+            .await?;
         let by_slug: HashMap<&str, &ProtocolRaw> = list
             .iter()
             .filter_map(|p| p.slug.as_deref().map(|s| (s, p)))
@@ -259,18 +275,66 @@ impl DefiLlamaClient {
         self.get_json(&url).await
     }
 
+    // ── 12. Solana yields, top pools by APY (free, dashboard context only) ──
+    pub async fn fetch_yields_solana(&self) -> Result<Vec<SolanaYieldPool>, DefiLlamaError> {
+        let url = "https://yields.llama.fi/pools".to_string();
+        let raw: YieldsPoolsResponseRaw = self
+            .get_json_with_timeout(&url, Some(LARGE_PAYLOAD_TIMEOUT))
+            .await?;
+        let mut pools: Vec<SolanaYieldPool> = raw
+            .data
+            .into_iter()
+            .filter(|p| p.chain == "Solana")
+            .map(|p| SolanaYieldPool {
+                pool_id: p.pool,
+                project: p.project,
+                symbol: p.symbol,
+                tvl_usd: p.tvl_usd,
+                apy: p.apy,
+                apy_base: p.apy_base,
+                apy_reward: p.apy_reward,
+                stablecoin: p.stablecoin.unwrap_or(false),
+            })
+            .collect();
+        pools.sort_by(|a, b| {
+            b.apy
+                .unwrap_or(f64::NEG_INFINITY)
+                .partial_cmp(&a.apy.unwrap_or(f64::NEG_INFINITY))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        pools.truncate(YIELDS_TOP_N);
+        Ok(pools)
+    }
+
     fn pro_url(&self, path: &str) -> Result<String, DefiLlamaError> {
         let key = self.pro_api_key.as_ref().ok_or(DefiLlamaError::ProKeyRequired)?;
         Ok(format!("{PRO_BASE}/{key}{path}"))
     }
 
     async fn get_json<T: DeserializeOwned>(&self, url: &str) -> Result<T, DefiLlamaError> {
-        let resp = self
-            .http
-            .get(url)
-            .send()
-            .await
-            .map_err(|e| DefiLlamaError::Http(e.to_string()))?;
+        self.get_json_with_timeout(url, None).await
+    }
+
+    /// Like [`Self::get_json`], but lets a caller override the client's
+    /// default 30s timeout. Some free DeFiLlama endpoints return multi-MB
+    /// payloads (`/protocols` lists thousands of protocols; `yields.llama.fi/
+    /// pools` returns 16,000+ pools, ~11MB) that DeFiLlama's free tier can
+    /// take 20-30s to fully transfer under load — observed directly via
+    /// repeated curl timing (22-30s per request) on 2026-07-23, not a bug in
+    /// our request, just a slow/throttled free-tier response. Treating a
+    /// legitimately-slow-but-real response as a hard error would mean this
+    /// data silently and permanently fails to sync from a machine on a slow
+    /// path to DeFiLlama, which is worse than waiting a bit longer for it.
+    async fn get_json_with_timeout<T: DeserializeOwned>(
+        &self,
+        url: &str,
+        timeout: Option<Duration>,
+    ) -> Result<T, DefiLlamaError> {
+        let mut req = self.http.get(url);
+        if let Some(t) = timeout {
+            req = req.timeout(t);
+        }
+        let resp = req.send().await.map_err(|e| DefiLlamaError::Http(e.to_string()))?;
         let status = resp.status();
         if !status.is_success() {
             return Err(DefiLlamaError::Status {
