@@ -39,6 +39,7 @@ app.get("/", (c) =>
       "GET /v1/defillama/stablecoins",
       "GET /v1/defillama/protocols",
       "GET /v1/defillama/messaging-protocols",
+      "GET /v1/defillama/yields",
       "GET /v1/defillama/oracles",
       "GET /v1/defillama/dex-volume",
       "GET /v1/defillama/fees",
@@ -218,6 +219,27 @@ app.get("/v1/defillama/messaging-protocols", (c) => {
     available: rows.length > 0,
     count: rows.length,
     protocols: rows.map((r) => ({ ...JSON.parse(r.payload), fetched_at: r.fetched_at })),
+  });
+});
+
+app.get("/v1/defillama/yields", (c) => {
+  const row = defillama.get("yields", "solana");
+  if (!row) {
+    return c.json({
+      source: "defillama",
+      category: "yields",
+      note: "dashboard context only — never used in scoring",
+      available: false,
+      reason: "not synced yet",
+    });
+  }
+  return c.json({
+    source: "defillama",
+    category: "yields",
+    note: "dashboard context only — never used in scoring",
+    available: true,
+    fetched_at: row.fetched_at,
+    ...JSON.parse(row.payload),
   });
 });
 

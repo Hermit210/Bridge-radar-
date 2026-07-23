@@ -58,17 +58,33 @@ async fn main() -> anyhow::Result<()> {
         );
     }
 
-    let jobs: Vec<tokio::task::JoinHandle<()>> = vec![
-        tokio::spawn(run_bridges_list(storage.clone(), client.clone())),
-        tokio::spawn(run_bridge_volume(storage.clone(), client.clone())),
-        tokio::spawn(run_chain_tvl(storage.clone(), client.clone())),
-        tokio::spawn(run_stablecoins(storage.clone(), client.clone())),
-        tokio::spawn(run_protocols(storage.clone(), client.clone())),
-        tokio::spawn(run_oracles(storage.clone(), client.clone())),
-        tokio::spawn(run_dex_volume(storage.clone(), client.clone())),
-        tokio::spawn(run_fees(storage.clone(), client.clone())),
-        tokio::spawn(run_messaging_protocols(storage.clone(), client.clone())),
+    // Each job's `interval()` fires its first tick immediately, so spawning
+    // all ten at once means ten concurrent requests hit DeFiLlama's free API
+    // in the same instant on every startup — this was tripping intermittent
+    // connection resets ("error decoding response body") under that burst,
+    // observed 2026-07-23 once yields/messaging-protocols brought the count
+    // from 8 to 10. Staggering spawns spreads the initial burst out; each
+    // job still runs on its own independent interval afterward.
+    const STARTUP_STAGGER: Duration = Duration::from_millis(800);
+    let job_fns: Vec<
+        Box<dyn FnOnce(Arc<dyn Storage>, Arc<DefiLlamaClient>) -> tokio::task::JoinHandle<()>>,
+    > = vec![
+        Box::new(|s, c| tokio::spawn(run_bridges_list(s, c))),
+        Box::new(|s, c| tokio::spawn(run_bridge_volume(s, c))),
+        Box::new(|s, c| tokio::spawn(run_chain_tvl(s, c))),
+        Box::new(|s, c| tokio::spawn(run_stablecoins(s, c))),
+        Box::new(|s, c| tokio::spawn(run_protocols(s, c))),
+        Box::new(|s, c| tokio::spawn(run_oracles(s, c))),
+        Box::new(|s, c| tokio::spawn(run_dex_volume(s, c))),
+        Box::new(|s, c| tokio::spawn(run_fees(s, c))),
+        Box::new(|s, c| tokio::spawn(run_messaging_protocols(s, c))),
+        Box::new(|s, c| tokio::spawn(run_yields(s, c))),
     ];
+    let mut jobs = Vec::with_capacity(job_fns.len());
+    for job_fn in job_fns {
+        jobs.push(job_fn(storage.clone(), client.clone()));
+        tokio::time::sleep(STARTUP_STAGGER).await;
+    }
 
     futures::future::join_all(jobs).await;
     Ok(())
@@ -349,6 +365,31 @@ async fn run_messaging_protocols(storage: Arc<dyn Storage>, client: Arc<DefiLlam
                 info!(count = ok, "messaging protocol context synced");
             }
             Err(e) => warn!(error = %e, "fetch messaging protocols"),
+        }
+    }
+}
+
+/// 12. Solana yields, top pools by APY — free, dashboard context only, never
+/// used in scoring. Refreshed hourly (the underlying dataset itself doesn't
+/// publish a refresh cadence, hourly is a reasonable default for APY drift).
+async fn run_yields(storage: Arc<dyn Storage>, client: Arc<DefiLlamaClient>) {
+    let mut tick = interval(Duration::from_secs(3600));
+    tick.set_missed_tick_behavior(MissedTickBehavior::Skip);
+    loop {
+        tick.tick().await;
+        match client.fetch_yields_solana().await {
+            Ok(pools) => {
+                let payload = json!({ "available": true, "pools": pools });
+                if let Err(e) = storage
+                    .defillama_upsert("yields", KEY_SOLANA, &payload, Utc::now())
+                    .await
+                {
+                    warn!(error = %e, "persist yields");
+                } else {
+                    info!(count = pools.len(), "yields synced");
+                }
+            }
+            Err(e) => warn!(error = %e, "fetch yields"),
         }
     }
 }

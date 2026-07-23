@@ -152,6 +152,43 @@ pub struct MessagingProtocolContext {
     pub solana_tvl_usd: Option<f64>,
 }
 
+// ─── 11. Solana yields — GET yields.llama.fi/pools (free) ───────────────────
+// Dashboard context only — never used in scoring or health computation.
+
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct YieldsPoolsResponseRaw {
+    pub data: Vec<YieldPoolRaw>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct YieldPoolRaw {
+    pub pool: String,
+    pub project: String,
+    pub symbol: String,
+    pub chain: String,
+    #[serde(rename = "tvlUsd")]
+    pub tvl_usd: Option<f64>,
+    pub apy: Option<f64>,
+    #[serde(rename = "apyBase")]
+    pub apy_base: Option<f64>,
+    #[serde(rename = "apyReward")]
+    pub apy_reward: Option<f64>,
+    pub stablecoin: Option<bool>,
+}
+
+/// Normalized: one Solana liquidity pool from DeFiLlama's yields dataset.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SolanaYieldPool {
+    pub pool_id: String,
+    pub project: String,
+    pub symbol: String,
+    pub tvl_usd: Option<f64>,
+    pub apy: Option<f64>,
+    pub apy_base: Option<f64>,
+    pub apy_reward: Option<f64>,
+    pub stablecoin: bool,
+}
+
 // ─── 1/2/7. Pro-only: bridges list, bridge volume, oracles TVS ──────────────
 // Shapes below are per DeFiLlama's own published docs (api-docs.defillama.com,
 // confirmed 2026-07-22) since these are behind a $300/mo Pro key we don't
