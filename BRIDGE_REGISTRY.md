@@ -2,10 +2,23 @@
 
 ## Current Status
 
-**Total Bridges:** 13 registered (11 with a real, verified Solana adapter + 2 real bridges pending an adapter) — more added as the discovery/verification pass (see [BRIDGE_DISCOVERY.md](./BRIDGE_DISCOVERY.md)) turns up real, verifiable Solana program IDs.
+**Total Bridges:** 14 registered (12 with a real, verified Solana adapter + 2 real bridges pending an adapter) — more added as the discovery/verification pass (see [BRIDGE_DISCOVERY.md](./BRIDGE_DISCOVERY.md)) turns up real, verifiable Solana program IDs.
 **Solana Support:** 100% of tracked bridges — every remaining entry is either
 a genuine bridge with a real, verified Solana program watching it, or a
 genuine bridge honestly marked not yet monitored. Nothing non-genuine remains.
+
+**2026-07-23 discovery pass 2 (ongoing):** added **Atomiq Exchange**
+(formerly SolLightning) — a real, audited, trustless Bitcoin↔Solana swap
+protocol, verified via its own GitHub `Anchor.toml` and confirmed executable
+via direct mainnet RPC. See `BRIDGE_DISCOVERY.md`'s "Pass 2" section for the
+full exhaustive-sweep writeup: what else was checked (Zeus Network — real,
+verified programs, adapter blocked pending readable event-log format),
+what's excluded (aggregators: Jupiter, Rango, LI.FI/Jumper, Squid Router,
+Bridgers.xyz, Houdini Swap, SwapKit; wrong-chain-only: Hop Protocol, Celer
+cBridge; custodial: SideShift.ai; no evidence: Mach Exchange, ValueRouter,
+Galaxy Exchange, LibertySwap, Maxbid Pro, HOT Protocol, Emblem Vault), and
+what's still open for future work (Chainflip, RhinoFi, Router Nitro, Carrier,
+AllDomains Bridge — real bridges, program IDs not yet tracked down).
 
 **2026-07-23 data-integrity fix (first pass):** Lido, Magic Eden, and
 Stargate were removed from the registry entirely — Lido (liquid staking) and
@@ -48,9 +61,10 @@ DeFiLlama's model (burn-and-mint, not locked liquidity) — correctly absent,
 not a bug. Check the live endpoint for current numbers; don't hardcode these
 back into source.
 
-### Tier 1: Implemented (11 bridges)
+### Tier 1: Implemented (12 bridges)
 Wormhole, Portal, LayerZero, Axelar, Allbridge, deBridge, Mayan, Relay,
-Across Protocol, Garden Finance, Coinbase Bridge (Base-Solana).
+Across Protocol, Garden Finance, Coinbase Bridge (Base-Solana), Atomiq
+Exchange.
 
 ### Tier 2: Registered, detection not yet implemented (2 bridges)
 Circle CCTP, Hyperlane. Both are seeded `enabled = 0` in the DB (no verified
@@ -118,8 +132,8 @@ No `tvl` field — a hardcoded one used to live here and was removed (see
 ```json
 {
   "summary": {
-    "total": 13,
-    "implemented": 11,
+    "total": 14,
+    "implemented": 12,
     "planned": 2
   },
   "implemented": [

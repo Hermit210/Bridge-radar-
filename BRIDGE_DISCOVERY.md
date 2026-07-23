@@ -228,3 +228,122 @@ CCIP — track it as its own bridge (risking overlap with Base-Solana Bridge
 and any other CCIP-based bridge we add later), or only track downstream
 bridges' own token-pool programs and treat CCIP Router traffic as
 supporting context, not a primary detection target.
+
+---
+
+## Pass 2 — exhaustive ecosystem sweep (2026-07-23)
+
+Wider search per the user's request: Solana Foundation ecosystem coverage,
+Alchemy's "39 web3 bridges on Solana" list, and what Jupiter/Rango/Phantom's
+LI.FI-powered swapper route through. Same rules as pass 1: no guessed
+program IDs, official source + direct mainnet RPC confirmation before
+anything is trusted, aggregators/DEXs/LSTs excluded the same way Orca/
+Marinade/Jito/Phantom Bridge were in the registry audit.
+
+### ✅ Atomiq Exchange (formerly SolLightning) — verified, adapter built
+
+Real, audited (Ackee Blockchain & CSC), immutably-deployed (no upgrade
+authority) trustless Bitcoin ↔ Solana swap protocol using submarine swaps +
+an on-chain Bitcoin SPV light client. DeFiLlama itself categorizes it
+`Cross Chain Bridge` (confirmed live via `api.llama.fi/protocols`, slug
+`atomiq-exchange`, ~$364K TVL at check time).
+
+Program ID from the project's own GitHub (`adambor/SolLightning-program`,
+`Anchor.toml`, `[programs.mainnet]`):
+
+| Program | Address |
+|---|---|
+| `swap_program` | `4hfUykhqmD7ZRvNh1HuzVKEY7ToENixtdUKZspNDCrEM` |
+
+Confirmed `executable: true` via direct `getAccountInfo`. The official docs
+site doesn't publish the program ID or a clean instruction reference, so the
+Lock/Unlock mapping was derived empirically from real mainnet transactions
+(`OffererInitialize(PayIn)` = Lock, `ClaimerClaim(PayOut)` = Unlock,
+`OffererRefund`/`WriteData`/`InitData` = not transfers, ignored) — see
+`crates/radar-core/src/bridges/atomiq.rs` doc comment for the four Solscan
+transaction links used. Adapter built, 5 unit tests from real transactions,
+registered in `bridges::registry()`, seeded enabled in both DB seed paths.
+
+### ⚠️ Zeus Network — real programs confirmed, adapter blocked for now
+
+Real, actively-covered Bitcoin ↔ Solana bridge (Zeus Program Library / ZPL —
+a "Layer 1.5" letting BTC be programmable on Solana via a Guardian-signed
+two-way peg). Six ZPL program addresses were surfaced by search
+(Bootstrapper, BitcoinSPV, LayerCA, Delegator, LiquidityManagement,
+TwoWayPeg) and **all six independently confirmed** `executable: true` via
+direct `getAccountInfo`, all owned by the upgradeable BPF loader, all
+sharing a consistent "ZPL" vanity-address prefix. `TwoWayPeg`
+(`ZPLzxjNk1zUAgJmm3Jkmrhvb4UaLwzvY2MotpfovF5K`) is genuinely live — real
+transactions land every few seconds — and a real fetched transaction's own
+log text ("Updated Two-way Peg Configuration") independently corroborates
+the name↔address mapping.
+
+**Why no adapter yet:** the official docs site
+(`docs.zeusnetwork.xyz` / `zeus-network.gitbook.io`) returned HTTP 522
+errors and an auth-walled GitBook redirect throughout this session — never
+successfully loaded, so the real IDL/instruction reference couldn't be
+read first-party. Scanning 40 recent `TwoWayPeg` transactions found only
+`UpdateMinerFeeRate` (a config/admin operation) in readable
+`Program log: Instruction: X` text — no plain-text deposit/withdraw
+instruction name turned up in the sample, meaning the actual peg-in/peg-out
+event format likely needs IDL-based (Anchor discriminator) decoding rather
+than the plain-text pattern our other adapters use. Building a decoder
+without confirming the real event format first would risk exactly the kind
+of guessed/undertested code this project explicitly forbids. **Marking
+blocked, not not-found** — the programs are real and verified; revisit once
+the docs site is reachable or a deposit/withdraw transaction with readable
+instruction text turns up.
+
+### ❌ Excluded — aggregators/UI layers, not dedicated bridges
+
+Same exclusion class as Interport Finance/UniversalX/Jupiter/Phantom Bridge
+in the registry audit — each of these computes routes across *other*
+bridges rather than operating a dedicated lock-mint or HTLC contract of its
+own:
+
+- **Jupiter** — Solana's DEX aggregator; cross-chain feature routes through Wormhole/Mayan/deBridge.
+- **Rango Exchange** — aggregator, "170+ DEX/Bridge Protocols" under one UI.
+- **LI.FI** / **Jumper.Exchange** (LI.FI's own frontend) — aggregator; explicitly powers Phantom's Cross-Chain Swapper.
+- **Squid Router** — aggregator built on Axelar's messaging (already tracked directly).
+- **Bridgers.xyz** — "non-custodial cross-chain liquidity aggregator... across DEXs and bridges."
+- **Houdini Swap** — "non-custodial liquidity aggregator" adding privacy on top of other bridges/exchanges.
+- **SwapKit** — THORChain-ecosystem swap aggregator UI.
+- **Sunrise DeFi** — built by Wormhole Labs on Wormhole's own NTT framework; would double-count with Wormhole/Portal.
+- **DEFIWAY** — reads as a bridge-comparison/directory site rather than an operator of its own dedicated bridge contract.
+
+### ❌ Excluded — custodial swap services, not on-chain bridge programs
+
+- **SideShift.ai** — wallet-to-wallet instant-exchange service; briefly takes custody during the swap rather than running a verifiable on-chain lock-mint/HTLC program. Same caution-flag reasoning as BabyDoge Bridge in pass 1.
+
+### ⚠️ Genuine bridges, not yet verified (open for future work)
+
+Real, dedicated (non-aggregator) bridges with plausible Solana legs, but a
+mainnet program ID wasn't tracked down this session — marked open, not
+excluded:
+
+- **Chainflip** — confirmed real native Solana integration (a `SwapEndpoint`
+  program using `x_swap_native`/`x_swap_token`, per `docs.chainflip.io`), but
+  the specific program address wasn't in the page content fetched.
+- **RhinoFi (rhino.fi)** — confirmed real, dedicated Solana bridge support
+  (non-custodial, "bridge from Solana to 35+ chains"), program ID not yet
+  looked up.
+- **Router Nitro (Router Protocol)** — confirmed real, dedicated Solana
+  support live since Feb 2025 (own announcement), program ID not yet looked
+  up.
+- **Carrier** (Automata Network) — a token/NFT bridge built on top of
+  Wormhole's guardian messaging layer. Real product, but likely shares
+  detection surface with Wormhole the same way CCIP-based bridges share
+  detection surface with each other (see the CCIP open question above) —
+  needs a design decision, not just a program ID, before building.
+- **AllDomains Bridge** — real cross-chain transfer product (Solana/Sonic
+  SVM/Eclipse SVM/Ethereum) from the AllDomains team; lower priority, not
+  yet investigated further.
+
+### ❌ No evidence found — not fabricating, not building
+
+Mach Exchange, ValueRouter, Galaxy Exchange, LibertySwap, Maxbid Pro, HOT
+Protocol, Emblem Vault (reads as a low-evidence AI-trading-terminal/token
+project rebrand rather than a serious dedicated bridge), Hop Protocol
+(confirmed EVM-L2-only, no Solana leg at all), Celer cBridge (Solana support
+was announced for "cBridge 2.0" in 2021-2022 with no evidence it ever
+shipped).

@@ -131,6 +131,15 @@ export const BRIDGE_REGISTRY: BridgeRegistry[] = [
     status: "active",
     detectionStatus: "implemented",
   },
+  {
+    id: "atomiq",
+    name: "Atomiq Exchange",
+    homepage: "https://atomiq.exchange",
+    supportedChains: ["solana", "bitcoin", "starknet"],
+    hasSolana: true,
+    status: "active",
+    detectionStatus: "implemented",
+  },
 
   // ─── TIER 2: Registered, detection not yet verified/implemented ──────────
   // (stargate removed — confirmed not deployed on Solana, see BRIDGE_DISCOVERY.md.
