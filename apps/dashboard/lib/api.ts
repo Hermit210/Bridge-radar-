@@ -1,7 +1,7 @@
 // Server-side fetcher. The API URL is read on the server so the dashboard
 // can be deployed on a different host than the API.
 
-import type { BridgeEvent, BridgeWithHealth, HealthScore } from "@radar/shared";
+import type { BridgeEvent, BridgeRow, BridgeWithHealth, DefiLlamaProtocolTvl, HealthScore } from "@radar/shared";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -15,8 +15,13 @@ export async function listBridges() {
   return fetchJson<{ bridges: BridgeWithHealth[] }>("/v1/bridges");
 }
 
+/** GET /v1/bridges/:id returns `bridge`, `health`, and `defillama` as three
+ * sibling top-level fields — `bridge` itself is just the flat row (id,
+ * display_name, homepage, enabled), never nested health/defillama. Callers
+ * that need a single merged BridgeWithHealth must combine all three (see
+ * bridges/[id]/page.tsx). */
 export async function getBridge(id: string) {
-  return fetchJson<{ bridge: BridgeWithHealth; health?: HealthScore }>(
+  return fetchJson<{ bridge: BridgeRow; health?: HealthScore; defillama?: DefiLlamaProtocolTvl }>(
     `/v1/bridges/${encodeURIComponent(id)}`,
   );
 }

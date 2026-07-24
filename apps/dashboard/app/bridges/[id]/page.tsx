@@ -82,7 +82,14 @@ export default function BridgePage({
         ]);
 
         if (!cancelled) {
-          setDetail(bridgeData?.bridge ?? null);
+          // getBridge() returns bridge/health/defillama as sibling fields —
+          // merge them into one BridgeWithHealth here rather than dropping
+          // health/defillama on the floor (see the comment on getBridge()).
+          setDetail(
+            bridgeData
+              ? { ...bridgeData.bridge, health: bridgeData.health, defillama: bridgeData.defillama }
+              : null,
+          );
           setHistory(historyData.history);
           setEvents(eventsData.events);
           setRegistryEntry(
