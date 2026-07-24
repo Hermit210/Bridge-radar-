@@ -93,17 +93,17 @@ export function LiveStatusStrip() {
         <span className="status-dot status-dot-green"></span>
         {snap ? `Live · updated ${ageSec}s ago` : "Connecting…"}
       </div>
-      <div className="flex overflow-x-auto divide-x divide-border-subtle rounded-2xl border border-border-subtle bg-surface-0/70 backdrop-blur-sm">
+      <div className="flex overflow-x-auto divide-x divide-border-subtle rounded-3xl border border-border-subtle bg-surface-0/70 shadow-card backdrop-blur-sm">
         {segments.map((s) => (
-          <div key={s.label} className="min-w-[124px] flex-1 px-5 py-5 text-center sm:px-6">
+          <div key={s.label} className="min-w-[128px] flex-1 px-6 py-6 text-center transition-colors sm:px-8">
             <div
-              className={`font-mono text-2xl font-semibold tabular-nums sm:text-3xl ${
+              className={`font-mono text-3xl font-semibold tabular-nums transition-colors duration-300 sm:text-4xl ${
                 s.tone === "green" ? "text-green" : "text-text"
               }`}
             >
               {s.value}
             </div>
-            <div className="mt-1.5 text-[10px] font-medium uppercase tracking-[0.1em] text-muted">
+            <div className="mt-2 text-[10px] font-medium uppercase tracking-[0.12em] text-muted">
               {s.label}
             </div>
           </div>
