@@ -1,3 +1,5 @@
+import "./load-env.js"; // must run before any process.env read below
+
 import { serve } from "@hono/node-server";
 import { createNodeWebSocket } from "@hono/node-ws";
 import { Connection } from "@solana/web3.js";
@@ -20,6 +22,23 @@ const host = process.env.API_HOST ?? "0.0.0.0";
 const corsOrigin = process.env.API_CORS_ORIGIN ?? "http://localhost:3000";
 const dbUrl = process.env.DATABASE_URL ?? "sqlite://./data/radar.db";
 const solanaRpcUrl = process.env.SOLANA_RPC_URL ?? "https://api.mainnet-beta.solana.com";
+
+// Log which RPC host is actually in use at boot — host only, never the
+// query string, so an API key embedded in the URL (Helius et al.) never
+// lands in logs. This is the direct answer to "which endpoint is this
+// process really hitting": read it once here instead of guessing from
+// .env content, which this process doesn't necessarily see the same way.
+function redactedRpcHost(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return "<invalid SOLANA_RPC_URL>";
+  }
+}
+console.log(
+  `[radar-api] Solana RPC endpoint: ${redactedRpcHost(solanaRpcUrl)} ` +
+    `(${process.env.SOLANA_RPC_URL ? "from SOLANA_RPC_URL" : "default fallback — SOLANA_RPC_URL not set"})`,
+);
 
 const db = new RadarDb(dbUrl);
 const defillama = new DefiLlamaStore(db.raw());
