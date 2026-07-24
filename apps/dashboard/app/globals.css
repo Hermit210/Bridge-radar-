@@ -208,6 +208,62 @@ button, a {
   animation: none;
 }
 
+/* ===== Heartbeat Dot — bridges page, reacts to real event recency ======= */
+/* animation-duration is set inline per-card from real event timestamps
+   (see components/heartbeat-dot.tsx) — the keyframes below only define the
+   pulse *shape*, never its speed. */
+.heartbeat-dot {
+  position: relative;
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #2d9a77;
+  flex-shrink: 0;
+  animation-name: heartbeat-pulse;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+.heartbeat-dot-static {
+  background: #3a4356;
+  opacity: 0.55;
+  animation: none;
+}
+.heartbeat-dot-flash {
+  animation: heartbeat-flash 0.65s ease-out;
+}
+
+@keyframes heartbeat-pulse {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(45, 154, 119, 0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.25);
+    box-shadow: 0 0 6px 1px rgba(45, 154, 119, 0.35);
+  }
+}
+
+@keyframes heartbeat-flash {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(45, 154, 119, 0.6);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.9);
+    box-shadow: 0 0 10px 3px rgba(45, 154, 119, 0.55);
+  }
+  100% {
+    opacity: 0.5;
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(45, 154, 119, 0);
+  }
+}
+
 /* ===== Gradient Text — used ONLY on hero headline ===== */
 .text-gradient {
   background: linear-gradient(135deg, #e6bc91 0%, #d4a574 50%, #c9935f 100%);
