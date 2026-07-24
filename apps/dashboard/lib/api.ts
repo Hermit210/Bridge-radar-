@@ -59,6 +59,33 @@ export async function listRegistry() {
   }>("/v1/registry");
 }
 
+export interface WalletActivityMatch {
+  signature: string;
+  slot: number;
+  blockTime: string | null;
+  bridges: {
+    bridge_id: string;
+    display_name: string;
+    program_id: string;
+    historicalScore: { score: number; computed_at: string; minutesFromTx: number } | null;
+  }[];
+}
+
+export interface WalletActivityResult {
+  address: string;
+  scanned: { signatureCount: number; oldest: string | null; newest: string | null };
+  matches: WalletActivityMatch[];
+  hasActivity: boolean;
+}
+
+/** Real, read-only on-chain lookup for the connected wallet — see
+ * apps/api/src/wallet-activity.ts for what "real" means here (no
+ * fabricated scores, no estimated matches). */
+export async function getWalletActivity(address: string, limit?: number) {
+  const q = limit ? `?limit=${limit}` : "";
+  return fetchJson<WalletActivityResult>(`/v1/wallet-activity/${encodeURIComponent(address)}${q}`);
+}
+
 export const apiUrls = {
   base: API_URL,
   ws: process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:3001/v1/ws",

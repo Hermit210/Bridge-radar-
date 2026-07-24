@@ -1,5 +1,6 @@
 import { serve } from "@hono/node-server";
 import { createNodeWebSocket } from "@hono/node-ws";
+import { Connection } from "@solana/web3.js";
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
@@ -7,14 +8,21 @@ import type { BridgeEventKind, BridgeWithHealth, WsMessage } from "@radar/shared
 import { RadarDb } from "./db.js";
 import { getImplementedBridges, getPlannedBridges, BRIDGE_REGISTRY } from "./bridges.js";
 import { DefiLlamaStore, fetchDefiLlamaPrice } from "./defillama-store.js";
+import {
+  fetchWalletBridgeActivity,
+  isValidSolanaAddress,
+  WALLET_ACTIVITY_DEFAULT_LIMIT,
+} from "./wallet-activity.js";
 
 const port = Number(process.env.API_PORT ?? 3001);
 const host = process.env.API_HOST ?? "0.0.0.0";
 const corsOrigin = process.env.API_CORS_ORIGIN ?? "http://localhost:3000";
 const dbUrl = process.env.DATABASE_URL ?? "sqlite://./data/radar.db";
+const solanaRpcUrl = process.env.SOLANA_RPC_URL ?? "https://api.mainnet-beta.solana.com";
 
 const db = new RadarDb(dbUrl);
 const defillama = new DefiLlamaStore(db.raw());
+const solanaConnection = new Connection(solanaRpcUrl, "confirmed");
 const app = new Hono();
 const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 
@@ -32,6 +40,7 @@ app.get("/", (c) =>
       "GET /v1/bridges/:id/health",
       "GET /v1/bridges/:id/history",
       "GET /v1/events",
+      "GET /v1/wallet-activity/:address",
       "GET /v1/registry",
       "GET /v1/defillama/bridges",
       "GET /v1/defillama/bridge-volume",
@@ -279,6 +288,35 @@ app.get("/v1/bridges/:id/history", (c) => {
   const sinceParam = c.req.query("since");
   const since = sinceParam ?? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   return c.json({ bridge_id: id, since, history: db.scoreHistory(id, since) });
+});
+
+// ── Wallet activity — real on-chain history for a connected wallet ────────
+//
+// Read-only: queries Solana mainnet via SOLANA_RPC_URL for the address's own
+// recent signatures, keeps only ones that touch one of our 14 monitored
+// bridge programs, and cross-references each match against our own
+// bridge_health_scores history. Never fabricates a score for a moment we
+// didn't actually record.
+app.get("/v1/wallet-activity/:address", async (c) => {
+  const address = c.req.param("address");
+  if (!isValidSolanaAddress(address)) {
+    return c.json({ error: "invalid Solana address" }, 400);
+  }
+  const limitParam = c.req.query("limit");
+  const limit = limitParam ? Number(limitParam) : WALLET_ACTIVITY_DEFAULT_LIMIT;
+  if (Number.isNaN(limit)) {
+    return c.json({ error: "limit must be a number" }, 400);
+  }
+
+  try {
+    const result = await fetchWalletBridgeActivity(solanaConnection, db, address, limit);
+    return c.json(result);
+  } catch (err) {
+    return c.json(
+      { error: "failed to fetch wallet activity", detail: err instanceof Error ? err.message : String(err) },
+      502,
+    );
+  }
 });
 
 app.get("/v1/events", (c) => {
