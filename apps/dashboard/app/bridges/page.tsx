@@ -1,10 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { HealthCard } from "@/components/health-card";
+import { useEffect, useMemo, useState } from "react";
+import { HealthCard, type HeartbeatInfo } from "@/components/health-card";
 import { LiveFeed } from "@/components/live-feed";
 import { apiUrls, listBridges, listEvents } from "@/lib/api";
 import { bandFor, type BridgeWithHealth, type BridgeEvent } from "@radar/shared";
+
+// Window for "recent" activity used only to pick a faster heartbeat pulse
+// for busier bridges — not a data-freshness cutoff for anything else.
+const RECENT_WINDOW_MS = 60_000;
+
+/** Per-bridge last-event-time + recent-activity count, derived entirely
+ * from the same polled event feed the live feed table already renders —
+ * no separate fetch, no synthetic data. */
+function buildHeartbeats(events: BridgeEvent[]): Record<string, HeartbeatInfo> {
+  const now = Date.now();
+  const map: Record<string, HeartbeatInfo> = {};
+  for (const e of events) {
+    const t = new Date(e.event_time).getTime();
+    if (Number.isNaN(t)) continue;
+    const existing = map[e.bridge_id];
+    if (!existing || t > new Date(existing.lastEventAt ?? 0).getTime()) {
+      map[e.bridge_id] = { lastEventAt: e.event_time, recentCount: existing?.recentCount ?? 0 };
+    }
+    if (now - t <= RECENT_WINDOW_MS) {
+      map[e.bridge_id].recentCount = (map[e.bridge_id]?.recentCount ?? 0) + 1;
+    }
+  }
+  return map;
+}
 
 export default function Home() {
   const [bridges, setBridges] = useState<BridgeWithHealth[]>([]);
@@ -47,6 +71,8 @@ export default function Home() {
     red: bands.filter((b) => b === "red").length,
     unknown: bands.filter((b) => b === "unmonitored").length,
   };
+
+  const heartbeats = useMemo(() => buildHeartbeats(events), [events]);
 
   return (
     <div className="space-y-10 animate-fade-in">
@@ -106,7 +132,9 @@ export default function Home() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 stagger-children">
-            {bridges.map((b) => <HealthCard key={b.id} bridge={b} />)}
+            {bridges.map((b) => (
+              <HealthCard key={b.id} bridge={b} heartbeat={heartbeats[b.id]} />
+            ))}
           </div>
         )}
       </section>
