@@ -10,6 +10,7 @@ import { getImplementedBridges, getPlannedBridges, BRIDGE_REGISTRY } from "./bri
 import { DefiLlamaStore, fetchDefiLlamaPrice } from "./defillama-store.js";
 import {
   fetchWalletBridgeActivity,
+  isRateLimitError,
   isValidSolanaAddress,
   WALLET_ACTIVITY_DEFAULT_LIMIT,
 } from "./wallet-activity.js";
@@ -312,6 +313,22 @@ app.get("/v1/wallet-activity/:address", async (c) => {
     const result = await fetchWalletBridgeActivity(solanaConnection, db, address, limit);
     return c.json(result);
   } catch (err) {
+    // Full error object, not just .message — a bare 502 with nothing in the
+    // server log is exactly how a silently-swallowed RPC failure (rate
+    // limit, bad response, etc.) went undiagnosed last time.
+    console.error(`[wallet-activity] request failed for address=${address} limit=${limit}:`, err);
+    if (isRateLimitError(err)) {
+      return c.json(
+        {
+          error: "Solana RPC rate-limited this request",
+          detail:
+            "getSignaturesForAddress was rate-limited even after retries. If SOLANA_RPC_URL is still the " +
+            "default public endpoint (https://api.mainnet-beta.solana.com), that's expected under load — " +
+            "set SOLANA_RPC_URL to a paid provider (e.g. https://helius.dev) in .env for reliable results.",
+        },
+        503,
+      );
+    }
     return c.json(
       { error: "failed to fetch wallet activity", detail: err instanceof Error ? err.message : String(err) },
       502,

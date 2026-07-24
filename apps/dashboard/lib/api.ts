@@ -73,7 +73,7 @@ export interface WalletActivityMatch {
 
 export interface WalletActivityResult {
   address: string;
-  scanned: { signatureCount: number; oldest: string | null; newest: string | null };
+  scanned: { signatureCount: number; oldest: string | null; newest: string | null; unreachableCount: number };
   matches: WalletActivityMatch[];
   hasActivity: boolean;
 }

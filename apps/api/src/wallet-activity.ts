@@ -15,10 +15,46 @@ import { BRIDGE_REGISTRY } from "./bridges.js";
 
 export const WALLET_ACTIVITY_DEFAULT_LIMIT = 50;
 export const WALLET_ACTIVITY_MAX_LIMIT = 200;
-const CONCURRENCY = 5;
+// Public RPC endpoints (the SOLANA_RPC_URL default, and what most people run
+// with locally) rate-limit hard — 5 concurrent getParsedTransaction calls
+// against api.mainnet-beta.solana.com reliably 429s about half of them in
+// testing. 3 is gentler; withRetry below is what actually keeps this
+// working, concurrency is just how often we need to lean on it.
+const CONCURRENCY = 3;
 
 function displayNameFor(bridgeId: string): string {
   return BRIDGE_REGISTRY.find((b) => b.id === bridgeId)?.name ?? bridgeId;
+}
+
+export function isRateLimitError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /429|too many requests|rate.?limit/i.test(message);
+}
+
+/** Retries only on rate-limit errors (429), with exponential backoff + jitter.
+ * Every attempt — success or failure — is logged with the full error object
+ * (not just `.message`) so a failure is never silent in server logs, even
+ * when the caller ultimately swallows it (e.g. one bad transaction in a
+ * larger batch). Non-rate-limit errors are logged once and rethrown
+ * immediately — no point retrying a genuine bad-request or network error. */
+async function withRetry<T>(label: string, fn: () => Promise<T>, attempts = 4): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      const rateLimited = isRateLimitError(err);
+      console.error(
+        `[wallet-activity] ${label} failed (attempt ${attempt}/${attempts}, rateLimited=${rateLimited}):`,
+        err,
+      );
+      if (!rateLimited || attempt === attempts) break;
+      const backoffMs = 400 * 2 ** (attempt - 1) + Math.random() * 200;
+      await new Promise((resolve) => setTimeout(resolve, backoffMs));
+    }
+  }
+  throw lastErr;
 }
 
 export interface WalletActivityMatch {
@@ -35,8 +71,23 @@ export interface WalletActivityMatch {
 
 export interface WalletActivityResult {
   address: string;
-  scanned: { signatureCount: number; oldest: string | null; newest: string | null };
+  scanned: {
+    signatureCount: number;
+    oldest: string | null;
+    newest: string | null;
+    /** Signatures the RPC confirmed for this wallet but whose transaction
+     * details we could not fetch (rate-limited even after retries, or a
+     * transient RPC error) — NOT included in `matches` one way or the
+     * other, because we genuinely don't know. When this is nonzero, an
+     * empty `matches` does NOT mean "no bridge activity"; it means the
+     * scan was incomplete, and callers must say so. */
+    unreachableCount: number;
+  };
   matches: WalletActivityMatch[];
+  /** `matches.length > 0` — real activity was found. When this is false,
+   * check `scanned.unreachableCount` before treating it as "no activity":
+   * a nonzero count means the scan didn't fully complete, not that we
+   * confirmed a clean history. */
   hasActivity: boolean;
 }
 
@@ -89,18 +140,26 @@ export async function fetchWalletBridgeActivity(
   const capped = Math.min(Math.max(limit, 1), WALLET_ACTIVITY_MAX_LIMIT);
   const pubkey = new PublicKey(address);
 
-  const signatures = await connection.getSignaturesForAddress(pubkey, { limit: capped });
+  const signatures = await withRetry("getSignaturesForAddress", () =>
+    connection.getSignaturesForAddress(pubkey, { limit: capped }),
+  );
   const successful = signatures.filter((s) => s.err === null);
 
   const pairs = await mapWithConcurrency(successful, CONCURRENCY, async (sigInfo) => {
-    const tx = await connection
-      .getParsedTransaction(sigInfo.signature, { maxSupportedTransactionVersion: 0 })
-      .catch(() => null);
-    return { sigInfo, tx };
+    let unreachable = false;
+    const tx = await withRetry(`getParsedTransaction(${sigInfo.signature})`, () =>
+      connection.getParsedTransaction(sigInfo.signature, { maxSupportedTransactionVersion: 0 }),
+    ).catch(() => {
+      unreachable = true; // one bad transaction shouldn't fail the whole wallet scan — already logged by withRetry
+      return null;
+    });
+    return { sigInfo, tx, unreachable };
   });
 
   const matches: WalletActivityMatch[] = [];
-  for (const { sigInfo, tx } of pairs) {
+  let unreachableCount = 0;
+  for (const { sigInfo, tx, unreachable } of pairs) {
+    if (unreachable) unreachableCount++;
     if (!tx) continue;
     const programIds = programIdsInTransaction(tx);
 
@@ -140,12 +199,21 @@ export async function fetchWalletBridgeActivity(
   }
 
   const times = successful.map((s) => s.blockTime).filter((t): t is number => t != null);
+  if (unreachableCount > 0) {
+    console.error(
+      `[wallet-activity] ${unreachableCount}/${successful.length} transactions unreachable for address=${address} ` +
+        `after retries — scan is incomplete. If SOLANA_RPC_URL is still the default public endpoint, this is` +
+        ` expected under load; configure a paid RPC (e.g. Helius) for reliable results.`,
+    );
+  }
+
   return {
     address,
     scanned: {
       signatureCount: successful.length,
       oldest: times.length ? new Date(Math.min(...times) * 1000).toISOString() : null,
       newest: times.length ? new Date(Math.max(...times) * 1000).toISOString() : null,
+      unreachableCount,
     },
     matches,
     hasActivity: matches.length > 0,
