@@ -3,6 +3,9 @@ import { apiUrls } from "@/lib/api";
 import { LiveStatusStrip } from "@/components/live-status-strip";
 import { Reveal } from "@/components/reveal";
 
+const heroCtaClass =
+  "cta-glow inline-flex items-center justify-center rounded-lg bg-accent px-8 py-4 font-display text-sm font-semibold tracking-[-0.01em] text-bg transition-all duration-200 hover:scale-[1.03] hover:bg-accent-bright hover:shadow-glow-md active:scale-[0.98]";
+
 interface ScoringWeights {
   parity: number;
   outflow: number;
@@ -118,7 +121,7 @@ export default async function LandingPage() {
       <section className="relative overflow-hidden py-6 text-center">
         <div className="hero-grid pointer-events-none absolute inset-0 animate-grid-fade" />
 
-        <div className="relative z-10 space-y-8">
+        <div className="stagger-children relative z-10 space-y-8">
           <span className="badge inline-flex items-center gap-2">
             <span className="status-dot status-dot-green"></span>
             Monitoring Solana Mainnet
@@ -137,15 +140,15 @@ export default async function LandingPage() {
           </p>
 
           <div className="flex items-center justify-center pt-2">
-            <Link href="/bridges" className={ctaClass}>
+            <Link href="/bridges" className={heroCtaClass}>
               View Live Dashboard
             </Link>
           </div>
         </div>
 
-        <div className="relative z-10 pt-12 sm:pt-16">
+        <Reveal delayMs={280} className="relative z-10 pt-12 sm:pt-16">
           <LiveStatusStrip />
-        </div>
+        </Reveal>
       </section>
 
       {/* Why it matters */}
