@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { bandFor, formatUsd, type BridgeWithHealth } from "@radar/shared";
+import { HeartbeatDot } from "./heartbeat-dot";
 
 const bandColor = {
   green: "text-green",
@@ -29,7 +30,18 @@ const bandDot = {
   unmonitored: "status-dot-muted",
 } as const;
 
-export function HealthCard({ bridge }: { bridge: BridgeWithHealth }) {
+export interface HeartbeatInfo {
+  lastEventAt?: string;
+  recentCount: number;
+}
+
+export function HealthCard({
+  bridge,
+  heartbeat,
+}: {
+  bridge: BridgeWithHealth;
+  heartbeat?: HeartbeatInfo;
+}) {
   const band = bandFor(bridge);
   const score = band === "unmonitored" ? undefined : bridge.health?.score;
   const defillama = bridge.defillama;
@@ -41,8 +53,13 @@ export function HealthCard({ bridge }: { bridge: BridgeWithHealth }) {
     >
       <div className="flex items-baseline justify-between">
         <div>
-          <h3 className="text-base font-semibold group-hover:text-accent-bright transition-colors duration-150">
+          <h3 className="flex items-center gap-2 text-base font-semibold group-hover:text-accent-bright transition-colors duration-150">
             {bridge.display_name}
+            <HeartbeatDot
+              lastEventAt={heartbeat?.lastEventAt}
+              recentCount={heartbeat?.recentCount ?? 0}
+              monitored={bridge.enabled}
+            />
           </h3>
           <p className="text-[11px] text-muted-dark font-mono mt-0.5">{bridge.id}</p>
         </div>
