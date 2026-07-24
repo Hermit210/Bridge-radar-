@@ -265,6 +265,47 @@ const bandLabel = {
   unmonitored: "Not monitored",
 } as const;
 
+const bandBarClass = {
+  green: "health-bar-green",
+  yellow: "health-bar-yellow",
+  red: "health-bar-red",
+  unmonitored: "health-bar-muted",
+} as const;
+
+type SortKey = "score" | "tvl";
+type SortDir = "desc" | "asc";
+
+function SortHeader({
+  label,
+  sortKey,
+  active,
+  dir,
+  onClick,
+}: {
+  label: string;
+  sortKey: SortKey;
+  active: boolean;
+  dir: SortDir;
+  onClick: (key: SortKey) => void;
+}) {
+  return (
+    <th className="px-2 py-2.5">
+      <button
+        type="button"
+        onClick={() => onClick(sortKey)}
+        className={`inline-flex items-center gap-1 transition-colors hover:text-text-secondary ${
+          active ? "text-text-secondary" : ""
+        }`}
+      >
+        {label}
+        <span className={`font-mono text-[9px] ${active ? "text-accent" : "text-muted-dark/50"}`}>
+          {active ? (dir === "desc" ? "▼" : "▲") : "▼"}
+        </span>
+      </button>
+    </th>
+  );
+}
+
 function BridgeTable({
   bridges,
   heartbeats,
@@ -273,6 +314,35 @@ function BridgeTable({
   heartbeats: Record<string, HeartbeatInfo>;
 }) {
   const router = useRouter();
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  function toggleSort(key: SortKey) {
+    if (sortKey !== key) {
+      setSortKey(key);
+      setSortDir("desc");
+      return;
+    }
+    if (sortDir === "desc") {
+      setSortDir("asc");
+    } else {
+      setSortKey(null);
+    }
+  }
+
+  const rows = useMemo(() => {
+    if (!sortKey) return bridges;
+    const withValue = bridges.map((b) => {
+      const band = bandFor(b);
+      const value =
+        sortKey === "score"
+          ? (band === "unmonitored" ? undefined : b.health?.score) ?? -1
+          : b.defillama?.tvl_usd ?? -1;
+      return { b, value };
+    });
+    withValue.sort((x, y) => (sortDir === "desc" ? y.value - x.value : x.value - y.value));
+    return withValue.map((w) => w.b);
+  }, [bridges, sortKey, sortDir]);
 
   return (
     <section className="glass-card-elevated overflow-hidden">
@@ -282,14 +352,14 @@ function BridgeTable({
             <tr>
               <th className="px-5 py-2.5">Bridge</th>
               <th className="px-2 py-2.5">Status</th>
-              <th className="px-2 py-2.5">Score</th>
+              <SortHeader label="Score" sortKey="score" active={sortKey === "score"} dir={sortDir} onClick={toggleSort} />
               <th className="px-2 py-2.5">Activity</th>
-              <th className="px-2 py-2.5">TVL</th>
+              <SortHeader label="TVL" sortKey="tvl" active={sortKey === "tvl"} dir={sortDir} onClick={toggleSort} />
               <th className="px-2 py-2.5">Adapter</th>
             </tr>
           </thead>
           <tbody>
-            {bridges.map((b) => {
+            {rows.map((b) => {
               const band = bandFor(b);
               const score = band === "unmonitored" ? undefined : b.health?.score;
               const hb = heartbeats[b.id];
@@ -310,9 +380,14 @@ function BridgeTable({
                     </span>
                   </td>
                   <td className="px-2 py-3">
-                    <span className={`font-mono text-sm font-semibold tabular-nums ${bandColor[band]}`}>
-                      {score ?? "—"}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`font-mono text-sm font-semibold tabular-nums ${bandColor[band]}`}>
+                        {score ?? "—"}
+                      </span>
+                      <div className="health-bar w-12">
+                        <div className={`health-bar-fill ${bandBarClass[band]}`} style={{ width: `${score ?? 0}%` }} />
+                      </div>
+                    </div>
                   </td>
                   <td className="px-2 py-3">
                     <HeartbeatDot
