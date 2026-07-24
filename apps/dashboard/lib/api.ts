@@ -28,12 +28,30 @@ export async function getBridgeHistory(id: string, since?: string) {
   );
 }
 
-export async function listEvents(opts: { bridge?: string; limit?: number }) {
+export async function listEvents(opts: { bridge?: string; limit?: number; since?: string }) {
   const params = new URLSearchParams();
   if (opts.bridge) params.set("bridge", opts.bridge);
   if (opts.limit) params.set("limit", String(opts.limit));
+  if (opts.since) params.set("since", opts.since);
   const q = params.toString() ? `?${params.toString()}` : "";
   return fetchJson<{ events: BridgeEvent[] }>(`/v1/events${q}`);
+}
+
+export interface RegistryEntry {
+  id: string;
+  name: string;
+  homepage?: string;
+  supportedChains: string[];
+  hasSolana: boolean;
+  status: "active" | "inactive" | "planned";
+}
+
+export async function listRegistry() {
+  return fetchJson<{
+    summary: { total: number; implemented: number; planned: number };
+    implemented: RegistryEntry[];
+    planned: RegistryEntry[];
+  }>("/v1/registry");
 }
 
 export const apiUrls = {

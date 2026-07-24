@@ -41,6 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </Link>
             <nav className="flex items-center gap-7 text-[13px] font-medium text-text-secondary">
               <Link href="/bridges" className="transition-colors duration-150 hover:text-text">Bridges</Link>
+              <Link href="/bridges/compare" className="transition-colors duration-150 hover:text-text">Compare</Link>
               <Link href="/events" className="transition-colors duration-150 hover:text-text">Events</Link>
               <Link href="/about" className="transition-colors duration-150 hover:text-text">About</Link>
             </nav>
@@ -64,6 +65,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <p className="text-[11px] font-display font-semibold uppercase tracking-[0.1em] text-muted">Links</p>
                 <div className="flex flex-col gap-1.5 text-xs text-muted-dark font-medium">
                   <Link href="/bridges" className="hover:text-text transition-colors">Dashboard</Link>
+                  <Link href="/bridges/compare" className="hover:text-text transition-colors">Compare bridges</Link>
                   <Link href="/events" className="hover:text-text transition-colors">Events</Link>
                   <Link href="/about" className="hover:text-text transition-colors">About</Link>
                 </div>
