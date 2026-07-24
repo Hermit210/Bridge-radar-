@@ -126,13 +126,12 @@ export default function ComparePage() {
         <Link href="/bridges" className="text-xs text-muted hover:text-text transition-colors inline-flex items-center gap-1">
           ← All bridges
         </Link>
-        <div className="mt-3 flex items-baseline justify-between gap-3">
+        <div className="mt-3 flex flex-wrap items-baseline justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Bridge Battle</h1>
-            <p className="mt-1.5 text-sm text-text-secondary max-w-2xl leading-relaxed">
-              Head-to-head comparison of two bridges, all fields sourced live from the
-              registry, scorer, and DeFiLlama cache. The health score reflects current
-              detector state, not a permanent quality ranking.
+            <h1 className="font-display text-2xl font-bold tracking-[-0.02em]">Bridge Battle</h1>
+            <p className="mt-1.5 text-sm text-text-secondary max-w-xl leading-relaxed">
+              Pick two bridges to compare side by side. Health score reflects current
+              detector state, not a permanent ranking.
             </p>
           </div>
           <button onClick={handleShare} className="badge hover:text-text transition-colors text-xs shrink-0">
@@ -141,7 +140,7 @@ export default function ComparePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+      <div className="relative grid grid-cols-1 gap-5 md:grid-cols-2">
         <BridgeSlot
           bridges={bridges}
           selected={idA}
@@ -150,6 +149,11 @@ export default function ComparePage() {
           registryEntry={bridgeA ? registry[bridgeA.id] : undefined}
           opponent={bridgeB}
         />
+        <div className="pointer-events-none absolute inset-0 hidden items-center justify-center md:flex">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-surface-3 font-display text-[11px] font-bold text-muted-dark shadow-card">
+            VS
+          </span>
+        </div>
         <BridgeSlot
           bridges={bridges}
           selected={idB}
@@ -208,12 +212,12 @@ function BridgeSlot({
   const isHigher = score !== undefined && oppScore !== undefined && score > oppScore;
 
   return (
-    <div className={`glass-card-elevated p-6 space-y-5 ${isHigher ? "ring-1 ring-accent/40" : ""}`}>
-      <div className="flex items-start justify-between gap-3">
+    <div className={`glass-card-elevated p-6 space-y-5 ${isHigher ? "ring-1 ring-green/40" : ""}`}>
+      <div className="relative">
         <select
           value={selected}
           onChange={(e) => onSelect(e.target.value)}
-          className="w-full bg-surface-2 border border-border/60 rounded-md px-3 py-2 text-sm text-text font-medium focus:outline-none focus:border-accent/50"
+          className="w-full appearance-none rounded-md border border-border/60 bg-surface-2 px-3 py-2 pr-8 text-sm font-medium text-text focus:border-accent/50 focus:outline-none"
         >
           {bridges.map((b) => (
             <option key={b.id} value={b.id}>
@@ -221,10 +225,11 @@ function BridgeSlot({
             </option>
           ))}
         </select>
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-dark">▾</span>
       </div>
 
       {isHigher && (
-        <div className="flex items-center gap-1.5 text-[11px] text-accent-bright">
+        <div className="flex items-center gap-1.5 text-[11px] text-muted">
           <span className="status-dot status-dot-green"></span>
           Currently higher health score
         </div>
