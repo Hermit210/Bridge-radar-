@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { bandFor, formatUsd, type BridgeWithHealth } from "@radar/shared";
 import { listBridges, listEvents, listRegistry, type RegistryEntry } from "@/lib/api";
+import { useCountUp } from "@/lib/use-count-up";
 
 const bandColor = {
   green: "text-green",
@@ -149,8 +150,17 @@ export default function ComparePage() {
           registryEntry={bridgeA ? registry[bridgeA.id] : undefined}
           opponent={bridgeB}
         />
+
+        {/* Mobile: an inline divider since the two cards stack vertically
+            and the absolutely-positioned circle below is desktop-only. */}
+        <div className="flex items-center gap-3 md:hidden">
+          <span className="h-px flex-1 bg-border/40" />
+          <span className="font-display text-xs font-bold text-muted-dark">VS</span>
+          <span className="h-px flex-1 bg-border/40" />
+        </div>
+
         <div className="pointer-events-none absolute inset-0 hidden items-center justify-center md:flex">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-surface-3 font-display text-[11px] font-bold text-muted-dark shadow-card">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full border border-accent/30 bg-surface-3 font-display text-[11px] font-bold text-muted-dark shadow-glow-sm">
             VS
           </span>
         </div>
@@ -183,6 +193,8 @@ function BridgeSlot({
   opponent?: BridgeWithHealth;
 }) {
   const [count24h, setCount24h] = useState<{ count: number; capped: boolean } | null>(null);
+  const preHookBand = bridge ? bandFor(bridge) : "unmonitored";
+  const animatedScore = useCountUp((preHookBand === "unmonitored" ? undefined : bridge?.health?.score) ?? 0);
 
   useEffect(() => {
     if (!bridge) return;
@@ -211,6 +223,10 @@ function BridgeSlot({
   const oppScore = oppBand === "unmonitored" ? undefined : opponent?.health?.score;
   const isHigher = score !== undefined && oppScore !== undefined && score > oppScore;
 
+  const tvl = bridge.defillama?.tvl_usd;
+  const oppTvl = opponent?.defillama?.tvl_usd;
+  const tvlHigher = tvl !== undefined && oppTvl !== undefined && tvl > oppTvl;
+
   return (
     <div className={`glass-card-elevated p-6 space-y-5 ${isHigher ? "ring-1 ring-green/40" : ""}`}>
       <div className="relative">
@@ -237,7 +253,9 @@ function BridgeSlot({
 
       <div className="flex items-center justify-between">
         <span className="text-xs uppercase tracking-widest text-muted font-medium">Health Score</span>
-        <span className={`text-2xl font-bold font-mono tabular-nums ${bandColor[band]}`}>{score ?? "—"}</span>
+        <span className={`text-2xl font-bold font-mono tabular-nums ${bandColor[band]}`}>
+          {score !== undefined ? animatedScore : "—"}
+        </span>
       </div>
       <div className="flex items-center gap-1.5 text-xs">
         <span className={`status-dot ${bandDot[band]}`}></span>
@@ -248,7 +266,7 @@ function BridgeSlot({
         {count24h === null ? "…" : `${count24h.count}${count24h.capped ? "+" : ""}`}
       </Row>
 
-      <Row label="Protocol TVL">
+      <Row label="Protocol TVL" winning={tvlHigher}>
         {bridge.defillama ? (
           <span className="font-mono">{formatUsd(bridge.defillama.tvl_usd)}</span>
         ) : (
@@ -278,11 +296,22 @@ function BridgeSlot({
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({
+  label,
+  winning,
+  children,
+}: {
+  label: string;
+  winning?: boolean;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex items-center justify-between text-sm border-t border-border/30 pt-3">
       <span className="text-muted">{label}</span>
-      <span className="text-text-secondary font-medium">{children}</span>
+      <span className={`inline-flex items-center gap-1.5 font-medium ${winning ? "text-green" : "text-text-secondary"}`}>
+        {winning && <span className="text-[10px]">▲</span>}
+        {children}
+      </span>
     </div>
   );
 }
