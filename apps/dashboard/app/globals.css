@@ -337,6 +337,91 @@ button, a {
   background: rgba(212, 165, 116, 0.08);
 }
 
+/* ===== Solana Wallet Connect — reskin @solana/wallet-adapter-react-ui's
+   default (purple) theme to match our navy/gold palette. Class names come
+   from that package's styles.css; behavior (connect/disconnect/modal) is
+   entirely theirs — this only overrides appearance. ===== */
+.wallet-adapter-button {
+  font-family: var(--font-outfit), "Outfit", system-ui, sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  height: 2.5rem;
+  padding: 0 1.1rem;
+  border-radius: 0.5rem;
+  background-color: #d4a574;
+  color: #0a0e1a;
+  line-height: 1;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+.wallet-adapter-button:not([disabled]):hover {
+  background-color: #e6bc91;
+  transform: scale(1.02);
+}
+.wallet-adapter-button:not([disabled]):active {
+  transform: scale(0.98);
+}
+.wallet-adapter-button[disabled] {
+  background-color: #283244;
+  color: #5f6678;
+  cursor: not-allowed;
+}
+
+.wallet-adapter-dropdown-list {
+  background: #141a28;
+  border: 1px solid #2a3544;
+  border-radius: 0.75rem;
+  padding: 0.4rem;
+  box-shadow: 0 4px 28px rgba(0, 0, 0, 0.4);
+  gap: 2px;
+}
+.wallet-adapter-dropdown-list-item {
+  font-family: var(--font-outfit), "Outfit", system-ui, sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border-radius: 0.5rem;
+  color: #b8bcc9;
+  background: transparent;
+  height: 2.25rem;
+}
+.wallet-adapter-dropdown-list-item:not([disabled]):hover {
+  background: rgba(212, 165, 116, 0.1);
+  color: #eff1f3;
+}
+
+.wallet-adapter-modal-wrapper {
+  background: #0f141f;
+  border: 1px solid #2a3544;
+  border-radius: 1.25rem;
+  box-shadow: 0 4px 28px rgba(0, 0, 0, 0.5);
+}
+.wallet-adapter-modal-title {
+  font-family: var(--font-outfit), "Outfit", system-ui, sans-serif;
+  color: #eff1f3;
+}
+.wallet-adapter-modal-list .wallet-adapter-button {
+  background: transparent;
+  color: #eff1f3;
+  font-weight: 500;
+}
+.wallet-adapter-modal-list .wallet-adapter-button:not([disabled]):hover {
+  background: rgba(212, 165, 116, 0.08);
+  transform: none;
+}
+.wallet-adapter-modal-list-more {
+  color: #7f8799;
+}
+.wallet-adapter-modal-overlay {
+  background: rgba(10, 14, 26, 0.7);
+  backdrop-filter: blur(4px);
+}
+.wallet-adapter-modal-button-close {
+  background: #1a2030;
+}
+.wallet-adapter-modal-button-close:hover {
+  background: #202938;
+}
+
 /* ===== Hero Grid Background ===== */
 .hero-grid {
   background-image:
