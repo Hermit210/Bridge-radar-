@@ -150,10 +150,20 @@ export default function MyActivityPage() {
             .
           </p>
 
+          {result.scanned.unreachableCount > 0 && (
+            <div className="rounded-xl border border-yellow/30 bg-yellow-glow/40 px-4 py-3 text-xs text-yellow">
+              Couldn't fetch {result.scanned.unreachableCount} of {result.scanned.signatureCount} scanned
+              transactions (the Solana RPC rate-limited those requests even after retries) — results below may
+              be incomplete, not necessarily a clean history.
+            </div>
+          )}
+
           {!result.hasActivity ? (
             <div className="glass-card-elevated p-10 text-center">
               <p className="text-sm text-muted">
-                No bridge activity found for this wallet among the transactions scanned.
+                {result.scanned.unreachableCount > 0
+                  ? "No bridge activity found among the transactions we could check — but the scan above was incomplete, so this isn't a confirmed clean history."
+                  : "No bridge activity found for this wallet among the transactions scanned."}
               </p>
             </div>
           ) : (
