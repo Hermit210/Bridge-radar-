@@ -46,6 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Link href="/bridges" className="transition-colors duration-150 hover:text-text">Bridges</Link>
                 <Link href="/bridges/compare" className="transition-colors duration-150 hover:text-text">Compare</Link>
                 <Link href="/events" className="transition-colors duration-150 hover:text-text">Events</Link>
+                <Link href="/my-activity" className="transition-colors duration-150 hover:text-text">My Activity</Link>
                 <Link href="/about" className="transition-colors duration-150 hover:text-text">About</Link>
               </nav>
               <div className="ml-auto flex items-center gap-3">

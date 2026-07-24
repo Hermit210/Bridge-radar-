@@ -177,6 +177,27 @@ export class RadarDb {
     return rows.map(rowToScore);
   }
 
+  /** The single `bridge_health_scores` row closest in time to `atIso`, for
+   * either bridge_id. Used to answer "what was this bridge's score around
+   * the time of this transaction" honestly — returns null (not a guess)
+   * when the bridge has no score history at all. Callers must still check
+   * how far `computed_at` actually is from `atIso`; this never interpolates
+   * a value, it only finds the real recorded point nearest that moment. */
+  nearestScore(bridgeId: string, atIso: string): HealthScore | null {
+    const row = this.db
+      .prepare(
+        `SELECT bridge_id, computed_at, score,
+                parity_severity, outflow_severity, signer_recency,
+                frontend_recency, oracle_staleness
+           FROM bridge_health_scores
+           WHERE bridge_id = ?
+           ORDER BY ABS(julianday(computed_at) - julianday(?)) ASC
+           LIMIT 1`,
+      )
+      .get(bridgeId, atIso) as DbScoreRow | undefined;
+    return row ? rowToScore(row) : null;
+  }
+
   listEvents(opts: {
     bridgeId?: string;
     kind?: BridgeEventKind;
