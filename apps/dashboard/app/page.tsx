@@ -189,17 +189,27 @@ export default async function LandingPage() {
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {DETECTORS.map((d, i) => (
             <Reveal key={d.key} delayMs={i * 90}>
-              <div className="group h-full space-y-4 rounded-3xl border border-border-subtle bg-surface/60 p-7 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-accent/30 hover:shadow-glow-sm">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent/10 text-accent transition-colors duration-300 group-hover:bg-accent/15">
+              <div className="group relative h-full space-y-4 overflow-hidden rounded-3xl border border-border-subtle bg-surface/60 p-7 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-accent/30 hover:shadow-glow-sm">
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute right-5 top-4 font-display text-4xl font-bold text-text-secondary/[0.05] transition-colors duration-300 group-hover:text-accent/10"
+                >
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute -left-8 -top-8 h-28 w-28 rounded-full bg-accent/0 blur-2xl transition-colors duration-500 group-hover:bg-accent/[0.12]"
+                />
+                <div className="relative flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-accent/15 to-accent/5 text-accent transition-colors duration-300 group-hover:from-accent/25 group-hover:to-accent/10">
                   <span className="h-5 w-5">{d.icon}</span>
                 </div>
-                <div>
+                <div className="relative">
                   <h3 className="font-display text-base font-semibold tracking-[-0.01em] text-text">
                     {d.title}
                   </h3>
                   <p className="mt-1.5 text-sm leading-relaxed text-muted">{d.desc}</p>
                 </div>
-                <div className="font-mono text-xs tabular-nums text-muted-dark">
+                <div className="relative font-mono text-xs tabular-nums text-muted-dark">
                   {weights ? `${weights[d.key]}% weight` : "— weight"}
                 </div>
               </div>
