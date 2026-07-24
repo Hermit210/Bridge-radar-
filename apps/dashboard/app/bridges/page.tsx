@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { HealthCard, type HeartbeatInfo } from "@/components/health-card";
-import { LiveFeed } from "@/components/live-feed";
+import { HeartbeatDot } from "@/components/heartbeat-dot";
+import { StatBar, type StatBarSegment } from "@/components/stat-bar";
 import { apiUrls, listBridges, listEvents } from "@/lib/api";
-import { bandFor, type BridgeWithHealth, type BridgeEvent } from "@radar/shared";
+import { bandFor, formatUsd, type BridgeWithHealth, type BridgeEvent, type HealthBand } from "@radar/shared";
 
 // Window for "recent" activity used only to pick a faster heartbeat pulse
 // for busier bridges — not a data-freshness cutoff for anything else.
@@ -35,6 +37,9 @@ export default function Home() {
   const [bridges, setBridges] = useState<BridgeWithHealth[]>([]);
   const [events, setEvents] = useState<BridgeEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [bandFilter, setBandFilter] = useState<HealthBand | "all">("all");
+  const [view, setView] = useState<"cards" | "list">("cards");
 
   useEffect(() => {
     let cancelled = false;
@@ -75,95 +80,263 @@ export default function Home() {
 
   const heartbeats = useMemo(() => buildHeartbeats(events), [events]);
 
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return bridges.filter((b) => {
+      if (bandFilter !== "all" && bandFor(b) !== bandFilter) return false;
+      if (!q) return true;
+      return b.display_name.toLowerCase().includes(q) || b.id.toLowerCase().includes(q);
+    });
+  }, [bridges, bandFilter, query]);
+
+  function toggleFilter(band: HealthBand) {
+    setBandFilter((f) => (f === band ? "all" : band));
+  }
+
+  const segments: StatBarSegment[] = [
+    { key: "all", label: "All", value: bridges.length, active: bandFilter === "all", onClick: () => setBandFilter("all") },
+    {
+      key: "green",
+      label: "Healthy",
+      value: totals.green,
+      tone: "green",
+      dotClass: "status-dot-green",
+      active: bandFilter === "green",
+      onClick: () => toggleFilter("green"),
+    },
+    {
+      key: "yellow",
+      label: "Watch",
+      value: totals.yellow,
+      tone: "yellow",
+      dotClass: "status-dot-yellow",
+      active: bandFilter === "yellow",
+      onClick: () => toggleFilter("yellow"),
+    },
+    {
+      key: "red",
+      label: "Alert",
+      value: totals.red,
+      tone: "red",
+      dotClass: "status-dot-red",
+      active: bandFilter === "red",
+      onClick: () => toggleFilter("red"),
+    },
+  ];
+  if (totals.unknown > 0) {
+    segments.push({
+      key: "unmonitored",
+      label: "Not monitored",
+      value: totals.unknown,
+      dotClass: "status-dot-muted",
+      active: bandFilter === "unmonitored",
+      onClick: () => toggleFilter("unmonitored"),
+    });
+  }
+
   return (
-    <div className="space-y-10 animate-fade-in">
-      <section>
-        <div className="mb-5 flex items-end justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Bridges</h1>
-            <p className="mt-1.5 text-sm text-text-secondary max-w-2xl leading-relaxed">
-              Real-time bridge-health intelligence layer for Solana. Health
-              Score composes parity, outflow z-score, signer-set drift,
-              frontend hash, and oracle staleness; greater is healthier.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link href="/bridges/compare" className="badge hover:text-text transition-colors text-xs">
-              Compare bridges ⇄
-            </Link>
-            <a
-              href={`${apiUrls.base}/v1/bridges`}
-              target="_blank"
-              rel="noreferrer"
-              className="badge hover:text-text transition-colors text-xs"
-            >
-              JSON ↗
-            </a>
-          </div>
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="font-display text-2xl font-bold tracking-[-0.02em]">Bridges</h1>
+          <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-text-secondary">
+            Health Score composes parity, outflow z-score, signer-set drift, frontend
+            hash, and oracle staleness — greater is healthier.
+          </p>
         </div>
-        <div className="mb-5 flex flex-wrap gap-2 text-xs">
-          <Pill dotClass="status-dot-green" label="Healthy" count={totals.green} />
-          <Pill dotClass="status-dot-yellow" label="Watch" count={totals.yellow} />
-          <Pill dotClass="status-dot-red" label="Alert" count={totals.red} />
-          {totals.unknown > 0 ? (
-            <Pill dotClass="status-dot-muted" label="Not monitored" count={totals.unknown} />
-          ) : null}
+        <div className="flex items-center gap-2">
+          <Link href="/bridges/compare" className="badge text-xs transition-colors hover:text-text">
+            Compare bridges ⇄
+          </Link>
+          <a
+            href={`${apiUrls.base}/v1/bridges`}
+            target="_blank"
+            rel="noreferrer"
+            className="badge text-xs transition-colors hover:text-text"
+          >
+            JSON ↗
+          </a>
         </div>
+      </div>
 
-        {loading && bridges.length === 0 ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="glass-card p-5 space-y-4">
-                <div className="flex justify-between">
-                  <div className="space-y-2">
-                    <div className="skeleton h-5 w-32"></div>
-                    <div className="skeleton h-3 w-20"></div>
-                  </div>
-                  <div className="skeleton h-8 w-12"></div>
+      <StatBar segments={segments} />
+
+      <div className="flex flex-wrap items-center gap-3">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search bridges…"
+          className="w-full max-w-xs rounded-md border border-border/60 bg-surface-2 px-3 py-2 text-sm text-text placeholder:text-muted-dark focus:border-accent/50 focus:outline-none"
+        />
+        <div className="ml-auto inline-flex rounded-md border border-border/60 bg-surface-2 p-0.5 text-xs">
+          <ViewButton active={view === "cards"} onClick={() => setView("cards")}>
+            Cards
+          </ViewButton>
+          <ViewButton active={view === "list"} onClick={() => setView("list")}>
+            List
+          </ViewButton>
+        </div>
+      </div>
+
+      {loading && bridges.length === 0 ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="glass-card space-y-4 p-5">
+              <div className="flex justify-between">
+                <div className="space-y-2">
+                  <div className="skeleton h-5 w-32"></div>
+                  <div className="skeleton h-3 w-20"></div>
                 </div>
-                <div className="skeleton h-1.5 w-full rounded-full"></div>
-                <div className="flex justify-between">
-                  <div className="skeleton h-3 w-16"></div>
-                  <div className="skeleton h-3 w-24"></div>
-                </div>
+                <div className="skeleton h-8 w-12"></div>
               </div>
-            ))}
-          </div>
-        ) : bridges.length === 0 ? (
-          <div className="glass-card-elevated p-10 text-center">
-            <p className="text-sm text-muted">
-              API unreachable. Start it with{" "}
-              <code className="font-mono bg-surface-2 px-1.5 py-0.5 rounded text-accent text-xs">make dev-api</code>.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 stagger-children">
-            {bridges.map((b) => (
-              <HealthCard key={b.id} bridge={b} heartbeat={heartbeats[b.id]} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      <LiveFeed initial={events} />
+              <div className="skeleton h-1.5 w-full rounded-full"></div>
+              <div className="flex justify-between">
+                <div className="skeleton h-3 w-16"></div>
+                <div className="skeleton h-3 w-24"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : bridges.length === 0 ? (
+        <div className="glass-card-elevated p-10 text-center">
+          <p className="text-sm text-muted">
+            API unreachable. Start it with{" "}
+            <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-accent">make dev-api</code>.
+          </p>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="glass-card p-10 text-center">
+          <p className="text-sm text-muted">No bridges match “{query}”.</p>
+        </div>
+      ) : view === "cards" ? (
+        <div className="stagger-children grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {filtered.map((b) => (
+            <HealthCard key={b.id} bridge={b} heartbeat={heartbeats[b.id]} />
+          ))}
+        </div>
+      ) : (
+        <BridgeTable bridges={filtered} heartbeats={heartbeats} />
+      )}
     </div>
   );
 }
 
-function Pill({
-  dotClass,
-  label,
-  count,
+function ViewButton({
+  active,
+  onClick,
+  children,
 }: {
-  dotClass: string;
-  label: string;
-  count: number;
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
 }) {
   return (
-    <span className="badge">
-      <span className={`status-dot ${dotClass}`}></span>
-      <span className="text-muted">{label}</span>
-      <span className="font-mono font-semibold tabular-nums text-text">{count}</span>
-    </span>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded px-3 py-1.5 font-medium transition-colors ${
+        active ? "bg-surface-4 text-text" : "text-muted hover:text-text-secondary"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+const bandColor = {
+  green: "text-green",
+  yellow: "text-yellow",
+  red: "text-red",
+  unmonitored: "text-muted-dark",
+} as const;
+
+const bandDot = {
+  green: "status-dot-green",
+  yellow: "status-dot-yellow",
+  red: "status-dot-red",
+  unmonitored: "status-dot-muted",
+} as const;
+
+const bandLabel = {
+  green: "Healthy",
+  yellow: "Watch",
+  red: "Alert",
+  unmonitored: "Not monitored",
+} as const;
+
+function BridgeTable({
+  bridges,
+  heartbeats,
+}: {
+  bridges: BridgeWithHealth[];
+  heartbeats: Record<string, HeartbeatInfo>;
+}) {
+  const router = useRouter();
+
+  return (
+    <section className="glass-card-elevated overflow-hidden">
+      <div className="max-h-[36rem] overflow-auto">
+        <table className="premium-table w-full text-left">
+          <thead className="text-xs font-medium uppercase tracking-widest text-muted-dark">
+            <tr>
+              <th className="px-5 py-2.5">Bridge</th>
+              <th className="px-2 py-2.5">Status</th>
+              <th className="px-2 py-2.5">Score</th>
+              <th className="px-2 py-2.5">Activity</th>
+              <th className="px-2 py-2.5">TVL</th>
+              <th className="px-2 py-2.5">Adapter</th>
+            </tr>
+          </thead>
+          <tbody>
+            {bridges.map((b) => {
+              const band = bandFor(b);
+              const score = band === "unmonitored" ? undefined : b.health?.score;
+              const hb = heartbeats[b.id];
+              return (
+                <tr
+                  key={b.id}
+                  onClick={() => router.push(`/bridges/${b.id}`)}
+                  className="cursor-pointer"
+                >
+                  <td className="px-5 py-3">
+                    <div className="font-medium text-text">{b.display_name}</div>
+                    <div className="font-mono text-[11px] text-muted-dark">{b.id}</div>
+                  </td>
+                  <td className="px-2 py-3">
+                    <span className="inline-flex items-center gap-1.5 text-xs">
+                      <span className={`status-dot ${bandDot[band]}`}></span>
+                      <span className={bandColor[band]}>{bandLabel[band]}</span>
+                    </span>
+                  </td>
+                  <td className="px-2 py-3">
+                    <span className={`font-mono text-sm font-semibold tabular-nums ${bandColor[band]}`}>
+                      {score ?? "—"}
+                    </span>
+                  </td>
+                  <td className="px-2 py-3">
+                    <HeartbeatDot
+                      lastEventAt={hb?.lastEventAt}
+                      recentCount={hb?.recentCount ?? 0}
+                      monitored={b.enabled}
+                    />
+                  </td>
+                  <td className="px-2 py-3 font-mono text-xs text-text-secondary">
+                    {b.defillama ? formatUsd(b.defillama.tvl_usd) : <span className="text-muted-dark">—</span>}
+                  </td>
+                  <td className="px-2 py-3 text-xs">
+                    {b.enabled ? (
+                      <span className="text-green">live-monitored</span>
+                    ) : (
+                      <span className="text-muted-dark">not monitored</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
