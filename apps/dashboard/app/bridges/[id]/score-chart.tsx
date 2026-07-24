@@ -11,7 +11,17 @@ import {
 } from "recharts";
 import type { HealthScore } from "@radar/shared";
 
-export function ScoreChart({ history }: { history: HealthScore[] }) {
+export function ScoreChart({
+  history,
+  color = "#d4a574",
+  height = "h-56",
+}: {
+  history: HealthScore[];
+  /** Line/fill color — pass the current band's color so the centerpiece
+   * chart reflects real status, not a fixed brand tint regardless of health. */
+  color?: string;
+  height?: string;
+}) {
   if (history.length === 0) {
     return (
       <div className="glass-card p-8 text-center text-sm text-muted">
@@ -23,14 +33,15 @@ export function ScoreChart({ history }: { history: HealthScore[] }) {
     t: new Date(h.computed_at).getTime(),
     score: h.score,
   }));
+  const gradientId = `scoreGradient-${color.replace("#", "")}`;
   return (
-    <div className="h-56 w-full">
+    <div className={`${height} w-full`}>
       <ResponsiveContainer>
         <AreaChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
           <defs>
-            <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#d4a574" stopOpacity={0.22} />
-              <stop offset="100%" stopColor="#d4a574" stopOpacity={0} />
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity={0.22} />
+              <stop offset="100%" stopColor={color} stopOpacity={0} />
             </linearGradient>
           </defs>
           <CartesianGrid
@@ -66,12 +77,12 @@ export function ScoreChart({ history }: { history: HealthScore[] }) {
           <Area
             type="monotone"
             dataKey="score"
-            stroke="#d4a574"
+            stroke={color}
             strokeWidth={2}
-            fill="url(#scoreGradient)"
+            fill={`url(#${gradientId})`}
             fillOpacity={1}
             dot={false}
-            activeDot={{ r: 4, stroke: "#d4a574", strokeWidth: 2, fill: "#141a28" }}
+            activeDot={{ r: 4, stroke: color, strokeWidth: 2, fill: "#141a28" }}
           />
         </AreaChart>
       </ResponsiveContainer>
