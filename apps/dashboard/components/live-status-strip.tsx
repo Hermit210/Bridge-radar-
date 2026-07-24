@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { bandFor } from "@radar/shared";
 import { listBridges, listEvents } from "@/lib/api";
+import { useCountUp } from "@/lib/use-count-up";
 
 const ONE_HOUR_AGO = () => new Date(Date.now() - 60 * 60 * 1000).toISOString();
 const POLL_MS = 5000;
@@ -70,20 +71,27 @@ export function LiveStatusStrip() {
     return () => clearInterval(tick);
   }, [snap?.updatedAt]);
 
+  // Hooks run unconditionally (real value or 0) so the count-up still works
+  // once `snap` arrives; the "—" placeholder is what actually renders until then.
+  const monitored = useCountUp(snap?.monitored ?? 0);
+  const healthy = useCountUp(snap?.healthy ?? 0);
+  const eventsLastHour = useCountUp(snap?.eventsLastHour ?? 0);
+  const avgScore = useCountUp(snap?.avgScore ?? 0);
+
   const segments: { label: string; value: string; tone?: "green" }[] = [
-    { label: "Monitored", value: snap ? String(snap.monitored) : "—" },
+    { label: "Monitored", value: snap ? String(monitored) : "—" },
     {
       label: "Healthy",
-      value: snap ? `${snap.healthy}/${snap.monitored}` : "—",
+      value: snap ? `${healthy}/${monitored}` : "—",
       tone: "green",
     },
     {
       label: "Events (1h)",
-      value: snap ? `${snap.eventsLastHour}${snap.eventsCapped ? "+" : ""}` : "—",
+      value: snap ? `${eventsLastHour}${snap.eventsCapped ? "+" : ""}` : "—",
     },
     {
       label: "Avg score",
-      value: snap && snap.avgScore !== null ? String(snap.avgScore) : "—",
+      value: snap && snap.avgScore !== null ? String(avgScore) : "—",
     },
   ];
 
