@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { HealthCard, type HeartbeatInfo } from "@/components/health-card";
 import { LiveFeed } from "@/components/live-feed";
 import { apiUrls, listBridges, listEvents } from "@/lib/api";
@@ -86,14 +87,19 @@ export default function Home() {
               frontend hash, and oracle staleness; greater is healthier.
             </p>
           </div>
-          <a
-            href={`${apiUrls.base}/v1/bridges`}
-            target="_blank"
-            rel="noreferrer"
-            className="badge hover:text-text transition-colors text-xs"
-          >
-            JSON ↗
-          </a>
+          <div className="flex items-center gap-2">
+            <Link href="/bridges/compare" className="badge hover:text-text transition-colors text-xs">
+              Compare bridges ⇄
+            </Link>
+            <a
+              href={`${apiUrls.base}/v1/bridges`}
+              target="_blank"
+              rel="noreferrer"
+              className="badge hover:text-text transition-colors text-xs"
+            >
+              JSON ↗
+            </a>
+          </div>
         </div>
         <div className="mb-5 flex flex-wrap gap-2 text-xs">
           <Pill dotClass="status-dot-green" label="Healthy" count={totals.green} />
