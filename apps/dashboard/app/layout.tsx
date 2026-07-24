@@ -2,6 +2,8 @@ import "./globals.css";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Inter, JetBrains_Mono, Outfit } from "next/font/google";
+import { WalletProviders } from "@/components/wallet-providers";
+import { WalletConnectButton } from "@/components/wallet-connect-button";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -33,23 +35,27 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${outfit.variable} ${inter.variable} ${jetbrainsMono.variable}`}>
       <body className="min-h-screen font-sans antialiased">
-        <header className="sticky top-0 z-50 bg-bg/85 backdrop-blur-xl border-b border-border/40">
-          <div className="mx-auto flex max-w-7xl items-center gap-8 px-6 py-4">
-            <Link href="/" className="flex items-center gap-2.5 text-[15px] font-display font-semibold tracking-[-0.01em] text-text">
-              <span className="status-dot status-dot-green"></span>
-              Bridge Radar
-            </Link>
-            <nav className="flex items-center gap-7 text-[13px] font-medium text-text-secondary">
-              <Link href="/bridges" className="transition-colors duration-150 hover:text-text">Bridges</Link>
-              <Link href="/bridges/compare" className="transition-colors duration-150 hover:text-text">Compare</Link>
-              <Link href="/events" className="transition-colors duration-150 hover:text-text">Events</Link>
-              <Link href="/about" className="transition-colors duration-150 hover:text-text">About</Link>
-            </nav>
-            <div className="ml-auto badge text-[11px] font-medium">v0-preview</div>
-          </div>
-        </header>
-        <main className="mx-auto max-w-7xl px-6 py-10">{children}</main>
-        <footer className="mt-20 border-t border-border/30">
+        <WalletProviders>
+          <header className="sticky top-0 z-50 bg-bg/85 backdrop-blur-xl border-b border-border/40">
+            <div className="mx-auto flex max-w-7xl items-center gap-8 px-6 py-4">
+              <Link href="/" className="flex items-center gap-2.5 text-[15px] font-display font-semibold tracking-[-0.01em] text-text">
+                <span className="status-dot status-dot-green"></span>
+                Bridge Radar
+              </Link>
+              <nav className="flex items-center gap-7 text-[13px] font-medium text-text-secondary">
+                <Link href="/bridges" className="transition-colors duration-150 hover:text-text">Bridges</Link>
+                <Link href="/bridges/compare" className="transition-colors duration-150 hover:text-text">Compare</Link>
+                <Link href="/events" className="transition-colors duration-150 hover:text-text">Events</Link>
+                <Link href="/about" className="transition-colors duration-150 hover:text-text">About</Link>
+              </nav>
+              <div className="ml-auto flex items-center gap-3">
+                <div className="badge text-[11px] font-medium">v0-preview</div>
+                <WalletConnectButton />
+              </div>
+            </div>
+          </header>
+          <main className="mx-auto max-w-7xl px-6 py-10">{children}</main>
+          <footer className="mt-20 border-t border-border/30">
           <div className="mx-auto max-w-7xl px-6 py-10">
             <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
               <div className="space-y-3">
@@ -81,7 +87,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </div>
             </div>
           </div>
-        </footer>
+          </footer>
+        </WalletProviders>
       </body>
     </html>
   );
