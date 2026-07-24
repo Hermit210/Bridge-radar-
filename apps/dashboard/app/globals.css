@@ -266,10 +266,37 @@ button, a {
 
 /* ===== Gradient Text — used ONLY on hero headline ===== */
 .text-gradient {
-  background: linear-gradient(135deg, #e6bc91 0%, #d4a574 50%, #c9935f 100%);
+  background: linear-gradient(135deg, #e6bc91 0%, #d4a574 40%, #c9935f 60%, #e6bc91 100%);
+  background-size: 250% 250%;
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
+  animation: gradient-shift 7s ease-in-out infinite;
+}
+
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .text-gradient { animation: none; }
+}
+
+/* ===== CTA idle glow — draws the eye to the hero's primary action,
+   pauses on hover so it doesn't fight the hover shadow/scale ===== */
+.cta-glow {
+  animation: cta-glow-pulse 3.2s ease-in-out infinite;
+}
+.cta-glow:hover {
+  animation-play-state: paused;
+}
+@keyframes cta-glow-pulse {
+  0%, 100% { box-shadow: 0 0 20px -5px rgba(212,165,116,0.16); }
+  50% { box-shadow: 0 0 34px -6px rgba(212,165,116,0.36); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cta-glow { animation: none; }
 }
 
 /* ===== Score Ring ===== */
