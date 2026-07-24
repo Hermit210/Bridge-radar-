@@ -1,123 +1,162 @@
 import Link from "next/link";
 import { apiUrls } from "@/lib/api";
+import { LiveStatusStrip } from "@/components/live-status-strip";
 
-async function implementedBridgeCount(): Promise<number | null> {
+interface ScoringWeights {
+  parity: number;
+  outflow: number;
+  signer: number;
+  frontend: number;
+  oracle: number;
+}
+
+/** Reads the real weighting the scorer actually uses (SCORING_META, served
+ * on /v1/bridges) so the numbers below can never drift from what the
+ * detectors are really doing — no hardcoded duplicate of that config. */
+async function fetchScoringWeights(): Promise<ScoringWeights | null> {
   try {
-    const r = await fetch(`${apiUrls.base}/v1/registry`, { cache: "no-store" });
+    const r = await fetch(`${apiUrls.base}/v1/bridges`, { cache: "no-store" });
     if (!r.ok) return null;
-    const data = (await r.json()) as { summary?: { implemented?: number } };
-    return data.summary?.implemented ?? null;
+    const data = (await r.json()) as { scoring?: { weights?: ScoringWeights } };
+    return data.scoring?.weights ?? null;
   } catch {
     return null;
   }
 }
 
+const DETECTORS = [
+  {
+    key: "parity",
+    title: "Lock / mint parity",
+    desc: "Flags imbalance between origin-chain locks and Solana-side mints.",
+  },
+  {
+    key: "outflow",
+    title: "Outflow anomaly",
+    desc: "Z-score over a rolling 30-day baseline catches unusual withdrawal volume.",
+  },
+  {
+    key: "signer",
+    title: "Signer set drift",
+    desc: "Watches guardian / DVN signer sets for unexpected rotations.",
+  },
+  {
+    key: "frontend",
+    title: "Frontend integrity",
+    desc: "Hashes the live bundle to catch a hijacked front end before users do.",
+  },
+  {
+    key: "oracle",
+    title: "Oracle staleness",
+    desc: "Checks that the price feeds a bridge depends on are still fresh.",
+  },
+] as const;
+
 export default async function LandingPage() {
-  const bridgeCount = await implementedBridgeCount();
-  const features = [
-    { title: "Lock vs Mint Parity", desc: "Detects asset imbalances across origin chain and Solana in real-time." },
-    { title: "Outflow Anomaly", desc: "Z-score analysis over a rolling 30-day baseline flags unusual withdrawals." },
-    { title: "Signer Set Changes", desc: "Watches Guardian, DVN, and signer rotations across all supported bridges." },
-    { title: "Frontend Hijack Detection", desc: "Monitors bundle hashes to catch frontend attacks." },
-    { title: "Oracle Staleness", desc: "Checks price feed freshness that bridges depend on." },
-    { title: "On-chain Health Oracle", desc: "dApps can gate withdrawals based on live bridge health scores." },
-  ];
+  const weights = await fetchScoringWeights();
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-16 space-y-20 animate-fade-in">
+    <div className="mx-auto max-w-4xl space-y-24 px-6 py-16 sm:py-20">
       {/* Hero */}
-      <section className="relative text-center space-y-8 py-16 overflow-hidden">
-        <div className="absolute inset-0 hero-grid animate-grid-fade pointer-events-none" />
-        <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-accent/[0.04] blur-[100px] pointer-events-none animate-float" />
-        <div className="absolute -bottom-32 -left-32 w-80 h-80 rounded-full bg-green/[0.03] blur-[100px] pointer-events-none animate-float" style={{ animationDelay: "4s" }} />
+      <section className="relative space-y-9 overflow-hidden py-6 text-center">
+        <div className="hero-grid pointer-events-none absolute inset-0 animate-grid-fade" />
 
         <div className="relative z-10 space-y-7">
-          <div className="inline-flex items-center gap-2">
-            <span className="badge">
-              <span className="status-dot status-dot-green"></span>
-              Live on Solana Devnet
-            </span>
-          </div>
+          <span className="badge inline-flex items-center gap-2">
+            <span className="status-dot status-dot-green"></span>
+            Monitoring Solana Mainnet
+            <span className="text-muted-dark">· Oracle on Devnet</span>
+          </span>
 
-          <h1 className="text-5xl sm:text-7xl font-display font-bold tracking-[-0.04em] leading-[1.08]">
-            Real-time{" "}
-            <span className="text-gradient">Bridge Health</span>
+          <h1 className="font-display text-5xl font-bold leading-[1.08] tracking-[-0.04em] sm:text-6xl">
+            Real-time <span className="text-gradient">Bridge Health</span>
             <br />
             for Solana
           </h1>
 
-          <p className="text-lg text-text-secondary max-w-2xl mx-auto leading-[1.7] font-medium">
-            Bridge Radar monitors every bridge with a Solana leg and gives you a single answer:{" "}
-            <strong className="text-text font-semibold">is this bridge safe right now?</strong>
+          <p className="mx-auto max-w-xl text-[15px] font-medium leading-[1.7] text-text-secondary sm:text-lg">
+            Bridge Radar watches every bridge with a Solana leg and answers one
+            question: <strong className="font-semibold text-text">is it safe right now?</strong>
           </p>
 
-          <div className="flex items-center justify-center pt-2">
+          <div className="flex items-center justify-center pt-1">
             <Link
               href="/bridges"
-              className="rounded-lg bg-accent px-7 py-3.5 text-[13px] font-display font-semibold tracking-[-0.01em] text-bg shadow-glow-sm hover:bg-accent-bright hover:shadow-glow-md transition-all duration-200"
+              className="rounded-lg bg-accent px-7 py-3.5 font-display text-[13px] font-semibold tracking-[-0.01em] text-bg shadow-glow-sm transition-all duration-200 hover:bg-accent-bright hover:shadow-glow-md"
             >
               View Live Dashboard
             </Link>
           </div>
         </div>
-      </section>
 
-      {/* Stats */}
-      <section className="grid grid-cols-1 sm:grid-cols-3 gap-5 text-center stagger-children">
-        {[
-          { value: bridgeCount !== null ? String(bridgeCount) : "—", label: "Bridges Monitored" },
-          { value: "$2.8B+", label: "Lost to Bridge Exploits (industry-wide, historical)" },
-          { value: "100%", label: "Open Source" },
-        ].map((s) => (
-          <div
-            key={s.label}
-            className="glass-card p-8 space-y-2 transition-all duration-200 hover:border-border-glow"
-          >
-            <div className="text-3xl font-display font-bold text-accent">{s.value}</div>
-            <div className="text-xs text-muted tracking-[0.08em] uppercase font-medium">{s.label}</div>
-          </div>
-        ))}
-      </section>
-
-      {/* What it detects */}
-      <section className="space-y-6">
-        <div>
-          <h2 className="text-3xl font-display font-bold tracking-[-0.02em]">What it detects</h2>
-          <p className="mt-2 text-sm text-muted font-medium">Six independent risk signals, scored and composed in real-time.</p>
+        <div className="relative z-10 pt-4">
+          <LiveStatusStrip />
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 stagger-children">
-          {features.map((f, i) => (
-            <div
-              key={f.title}
-              className="glass-card-interactive p-6 space-y-2 group"
-            >
-              <div className="flex items-center gap-2.5">
-                <span className="text-xs font-mono text-muted-dark font-medium">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <span className="text-[13px] font-display font-semibold tracking-[-0.01em] text-text group-hover:text-accent-bright transition-colors">
-                  {f.title}
-                </span>
+      </section>
+
+      {/* Why it matters */}
+      <section className="space-y-4">
+        <h2 className="font-display text-2xl font-bold tracking-[-0.02em] text-text">
+          Why bridges are the weak point
+        </h2>
+        <p className="max-w-2xl text-[15px] leading-[1.75] text-text-secondary">
+          Cross-chain bridges concentrate enormous value behind a small number of
+          trust assumptions — a multisig, an oracle feed, a front-end bundle. When
+          one of those breaks, funds move before anyone notices.{" "}
+          <span className="font-medium text-text">
+            Over $2.8B has been lost to bridge exploits industry-wide since 2020
+          </span>{" "}
+          <span className="text-muted-dark">
+            (a historical, industry-wide figure — not something Bridge Radar
+            measured itself)
+          </span>
+          . Bridge Radar exists to surface the early signals before a hack
+          completes, not after.
+        </p>
+      </section>
+
+      {/* How it works */}
+      <section className="space-y-5">
+        <div>
+          <h2 className="font-display text-2xl font-bold tracking-[-0.02em] text-text">
+            How it works
+          </h2>
+          <p className="mt-1.5 text-sm font-medium text-muted">
+            Five independent detectors, weighted and composed into one score.
+          </p>
+        </div>
+        <div className="divide-y divide-border-subtle border-y border-border-subtle">
+          {DETECTORS.map((d, i) => (
+            <div key={d.key} className="flex items-start gap-5 py-5">
+              <span className="w-6 shrink-0 pt-0.5 font-mono text-xs text-muted-dark">
+                {String(i + 1).padStart(2, "0")}
+              </span>
+              <div className="flex-1">
+                <div className="flex items-baseline justify-between gap-4">
+                  <h3 className="font-display text-[15px] font-semibold tracking-[-0.01em] text-text">
+                    {d.title}
+                  </h3>
+                  <span className="shrink-0 font-mono text-xs tabular-nums text-muted-dark">
+                    {weights ? `${weights[d.key]}%` : "—"}
+                  </span>
+                </div>
+                <p className="mt-1 text-sm leading-relaxed text-muted">{d.desc}</p>
               </div>
-              <div className="text-sm text-muted leading-[1.7] pl-7">{f.desc}</div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* CTA */}
-      <div className="gradient-border">
-        <section className="glass-card-elevated p-12 text-center space-y-5">
-          <h2 className="text-3xl font-display font-bold tracking-[-0.02em]">Ready to check bridge health?</h2>
-          <p className="text-text-secondary text-sm font-medium leading-relaxed">Live data. No token. No signup. Fully open source.</p>
-          <Link
-            href="/bridges"
-            className="inline-block rounded-lg bg-accent px-7 py-3.5 text-[13px] font-display font-semibold tracking-[-0.01em] text-bg shadow-glow-sm hover:bg-accent-bright hover:shadow-glow-md transition-all duration-200"
-          >
-            Open Dashboard
-          </Link>
-        </section>
-      </div>
+      {/* Close */}
+      <section className="space-y-4 pb-2 text-center">
+        <p className="text-sm text-muted">No token. No signup. Fully open source.</p>
+        <Link
+          href="/bridges"
+          className="inline-flex items-center gap-1.5 font-display text-sm font-semibold text-accent transition-colors hover:text-accent-bright"
+        >
+          Open the dashboard <span aria-hidden>→</span>
+        </Link>
+      </section>
     </div>
   );
 }
