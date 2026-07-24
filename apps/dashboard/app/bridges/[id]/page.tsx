@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ScoreChart } from "./score-chart";
 import { EventRow } from "@/components/event-row";
+import { StatBar, type StatBarSegment } from "@/components/stat-bar";
 import { bandFor, formatUsd, type BridgeWithHealth, type BridgeEvent, type HealthScore } from "@radar/shared";
-import { getBridge, getBridgeHistory, listEvents } from "@/lib/api";
+import { getBridge, getBridgeHistory, listEvents, listRegistry, type RegistryEntry } from "@/lib/api";
 
 const bandClass = {
   green: "text-green",
@@ -14,19 +15,38 @@ const bandClass = {
   unmonitored: "text-muted-dark",
 } as const;
 
-const bandStroke = {
+// Brighter chart-only variants of the semantic band colors — same hex the
+// score ring has always used, kept separate from the muted badge/dot tones
+// so the centerpiece chart reads clearly against the dark background.
+const bandChartColor = {
   green: "#3ec99d",
   yellow: "#e5b94e",
   red: "#e5697b",
   unmonitored: "#5a6478",
 } as const;
 
-const bandGlow = {
-  green: "shadow-glow-green",
-  yellow: "shadow-glow-yellow",
-  red: "shadow-glow-red",
-  unmonitored: "",
+const bandDot = {
+  green: "status-dot-green",
+  yellow: "status-dot-yellow",
+  red: "status-dot-red",
+  unmonitored: "status-dot-muted",
 } as const;
+
+const bandLabel = {
+  green: "Healthy",
+  yellow: "Watch",
+  red: "Alert",
+  unmonitored: "Not monitored",
+} as const;
+
+const bandStatusMessage = {
+  green: "No anomalies detected",
+  yellow: "Monitor for potential issues",
+  red: "Anomalies detected — review components",
+  unmonitored: "No adapter is watching this bridge on Solana yet",
+} as const;
+
+const SINCE_24H = () => new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
 export default function BridgePage({
   params,
@@ -37,6 +57,8 @@ export default function BridgePage({
   const [detail, setDetail] = useState<BridgeWithHealth | null>(null);
   const [history, setHistory] = useState<HealthScore[]>([]);
   const [events, setEvents] = useState<BridgeEvent[]>([]);
+  const [registryEntry, setRegistryEntry] = useState<RegistryEntry | null>(null);
+  const [count24h, setCount24h] = useState<{ count: number; capped: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -51,21 +73,27 @@ export default function BridgePage({
     const fetchData = async () => {
       try {
         const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-        const [bridgeData, historyData, eventsData] = await Promise.all([
+        const [bridgeData, historyData, eventsData, registryData, count24hData] = await Promise.all([
           getBridge(id).catch(() => null),
           getBridgeHistory(id, since).catch(() => ({ bridge_id: id, since, history: [] })),
           listEvents({ bridge: id, limit: 50 }).catch(() => ({ events: [] })),
+          listRegistry().catch(() => ({ summary: { total: 0, implemented: 0, planned: 0 }, implemented: [], planned: [] })),
+          listEvents({ bridge: id, since: SINCE_24H(), limit: 1000 }).catch(() => ({ events: [] })),
         ]);
 
         if (!cancelled) {
           setDetail(bridgeData?.bridge ?? null);
           setHistory(historyData.history);
           setEvents(eventsData.events);
+          setRegistryEntry(
+            [...registryData.implemented, ...registryData.planned].find((r) => r.id === id) ?? null,
+          );
+          setCount24h({ count: count24hData.events.length, capped: count24hData.events.length >= 1000 });
           setLoading(false);
         }
       } catch (error) {
         console.error("Error fetching bridge data:", error);
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
@@ -86,26 +114,11 @@ export default function BridgePage({
           <div className="skeleton h-7 w-64"></div>
           <div className="skeleton h-4 w-32"></div>
         </div>
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-          <div className="glass-card p-6 space-y-4">
-            <div className="skeleton h-4 w-24"></div>
-            <div className="skeleton h-28 w-28 rounded-full mx-auto"></div>
-            <div className="skeleton h-3 w-40 mx-auto"></div>
-          </div>
-          <div className="md:col-span-2 glass-card p-6 space-y-3">
-            <div className="skeleton h-4 w-24"></div>
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex justify-between items-center">
-                <div className="skeleton h-3 w-28"></div>
-                <div className="skeleton h-2 w-36 rounded-full"></div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="glass-card p-6 space-y-4">
+        <div className="glass-card-elevated space-y-4 p-6">
           <div className="skeleton h-4 w-48"></div>
-          <div className="skeleton h-56 w-full"></div>
+          <div className="skeleton h-64 w-full"></div>
         </div>
+        <div className="skeleton h-20 w-full rounded-2xl"></div>
       </div>
     );
   }
@@ -114,156 +127,109 @@ export default function BridgePage({
   const score = band === "unmonitored" ? undefined : detail.health?.score;
   const c = band === "unmonitored" ? undefined : detail.health?.components;
   const defillama = detail.defillama;
-  const circumference = 2 * Math.PI * 52;
+
+  const statSegments: StatBarSegment[] = [
+    {
+      key: "tvl",
+      label: "Protocol TVL",
+      value: defillama ? formatUsd(defillama.tvl_usd) : "no data",
+    },
+    {
+      key: "chains",
+      label: "Chains",
+      value: registryEntry ? registryEntry.supportedChains.length : "—",
+    },
+    {
+      key: "events24h",
+      label: "Events (24h)",
+      value: count24h ? `${count24h.count}${count24h.capped ? "+" : ""}` : "…",
+    },
+    {
+      key: "adapter",
+      label: "Adapter",
+      value: detail.enabled ? "live" : "none",
+      tone: detail.enabled ? "green" : "neutral",
+    },
+  ];
 
   return (
     <div className="space-y-8 animate-fade-in">
       {/* Header */}
-      <div className="pb-5 border-b border-border/40">
-        <Link href="/bridges" className="text-xs text-muted hover:text-text transition-colors inline-flex items-center gap-1">
+      <div className="space-y-3 border-b border-border/40 pb-5">
+        <Link href="/bridges" className="inline-flex items-center gap-1 text-xs text-muted transition-colors hover:text-text">
           ← All bridges
         </Link>
-        <div className="mt-3 flex items-baseline gap-3">
-          <h1 className="text-2xl font-bold tracking-tight">
-            {detail.display_name}
-          </h1>
-          <span className="text-xs text-muted-dark font-mono">{detail.id}</span>
+        <div className="flex flex-wrap items-baseline gap-3">
+          <h1 className="font-display text-2xl font-bold tracking-[-0.02em]">{detail.display_name}</h1>
+          <span className="font-mono text-xs text-muted-dark">{detail.id}</span>
           {detail.homepage ? (
             <a
               href={detail.homepage}
               target="_blank"
               rel="noreferrer"
-              className="text-xs text-muted hover:text-accent transition-colors"
+              className="text-xs text-muted transition-colors hover:text-accent"
             >
               homepage ↗
             </a>
           ) : null}
         </div>
+        <div className="flex items-center gap-2 text-sm">
+          <span className={`status-dot ${bandDot[band]}`}></span>
+          <span className={`font-medium ${bandClass[band]}`}>{bandLabel[band]}</span>
+          <span className="text-muted-dark">·</span>
+          <span className="text-text-secondary">{bandStatusMessage[band]}</span>
+          {detail.health?.computed_at ? (
+            <span className="ml-auto font-mono text-[11px] text-muted-dark">
+              as of {new Date(detail.health.computed_at).toLocaleTimeString()}
+            </span>
+          ) : null}
+        </div>
       </div>
 
-      {/* Health Score & Components */}
-      <section className="grid grid-cols-1 gap-5 md:grid-cols-3">
-        <div className={`glass-card-elevated p-6 flex flex-col items-center justify-center text-center ${bandGlow[band]}`}>
-          <p className="text-xs uppercase tracking-widest text-muted font-medium mb-4">Health Score</p>
-          <div className="relative w-32 h-32">
-            <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
-              <circle cx="60" cy="60" r="52" className="score-ring-track" strokeWidth="5" />
-              <circle
-                cx="60"
-                cy="60"
-                r="52"
-                className="score-ring-fill"
-                strokeWidth="5"
-                stroke={bandStroke[band]}
-                strokeDasharray={`${circumference}`}
-                strokeDashoffset={`${circumference * (1 - (score ?? 0) / 100)}`}
-              />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className={`text-3xl font-bold font-mono tabular-nums ${bandClass[band]}`}>
-                {score ?? "—"}
-              </span>
-            </div>
+      {/* Score history — the centerpiece */}
+      <section className="glass-card-elevated p-6">
+        <div className="mb-1 flex flex-wrap items-end justify-between gap-3">
+          <h2 className="text-sm font-semibold text-text">Score history (last 24h)</h2>
+          <div className="flex items-baseline gap-2">
+            <span className={`font-mono text-3xl font-bold tabular-nums ${bandClass[band]}`}>{score ?? "—"}</span>
+            <span className="text-xs text-muted-dark">/ 100</span>
           </div>
-          <p className="mt-3 text-xs text-muted">
-            {band === "unmonitored"
-              ? "no adapter watching this bridge yet"
-              : detail.health?.computed_at
-                ? `as of ${new Date(detail.health.computed_at).toLocaleString()}`
-                : "no score yet — start the scorer"}
-          </p>
         </div>
-        <div className="md:col-span-2 glass-card p-6">
-          <p className="text-xs uppercase tracking-widest text-muted font-medium">Components</p>
-          {band === "unmonitored" ? (
-            <p className="mt-4 text-sm text-muted">
-              This bridge has no adapter watching a verified Solana program yet, so there
-              is no real on-chain data to break down into components. Showing zeros here
-              would look identical to a genuinely quiet, healthy bridge — so we show
-              nothing instead.
-            </p>
-          ) : (
-            <ul className="mt-4 space-y-3 text-sm">
-              <Component label="Parity break" value={c?.parity_severity} weight={40} />
-              <Component label="Outflow anomaly" value={c?.outflow_severity} weight={25} />
-              <Component label="Signer change" value={c?.signer_recency} weight={15} />
-              <Component label="Frontend drift" value={c?.frontend_recency} weight={10} />
-              <Component label="Oracle staleness" value={c?.oracle_staleness} weight={10} />
-            </ul>
-          )}
-        </div>
+        <ScoreChart history={history} color={bandChartColor[band]} height="h-72" />
       </section>
 
-      {/* Bridge Context - real DeFiLlama protocol TVL, external reference only */}
-      {defillama ? (
-        <section className="glass-card p-6">
-          <h2 className="mb-4 text-sm font-semibold text-text">Bridge Context</h2>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div>
-              <p className="text-xs text-muted">Protocol TVL (DeFiLlama)</p>
-              <p className="mt-1 text-xl font-bold font-mono text-text tabular-nums">{formatUsd(defillama.tvl_usd)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted">Source</p>
-              <p className="mt-1 text-sm font-mono text-text-secondary">
-                {defillama.defillama_name} · as of {new Date(defillama.fetched_at).toLocaleString()}
-              </p>
-            </div>
-          </div>
-        </section>
-      ) : (
-        <section className="glass-card p-6">
-          <h2 className="mb-2 text-sm font-semibold text-text">Bridge Context</h2>
-          <p className="text-sm text-muted">
-            No DeFiLlama protocol TVL available for this bridge yet.
-          </p>
-        </section>
-      )}
+      {/* Stat row */}
+      <StatBar segments={statSegments} />
 
-      {/* Status */}
+      {/* Detector components */}
       <section className="glass-card p-6">
-        <h2 className="mb-3 text-sm font-semibold text-text">Status</h2>
-        <div className="flex items-center gap-2">
-          {band === "unmonitored" ? (
-            <>
-              <span className="status-dot status-dot-muted"></span>
-              <span className="text-sm text-text-secondary">
-                Not monitored — no adapter is watching this bridge on Solana yet
-              </span>
-            </>
-          ) : score !== undefined && score >= 80 ? (
-            <>
-              <span className="status-dot status-dot-green"></span>
-              <span className="text-sm text-text-secondary">No anomalies detected</span>
-            </>
-          ) : score !== undefined && score >= 50 ? (
-            <>
-              <span className="status-dot status-dot-yellow"></span>
-              <span className="text-sm text-text-secondary">Monitor for potential issues</span>
-            </>
-          ) : (
-            <>
-              <span className="status-dot status-dot-red"></span>
-              <span className="text-sm text-text-secondary">Anomalies detected — review components</span>
-            </>
-          )}
-        </div>
+        <p className="text-xs font-medium uppercase tracking-widest text-muted">Detector components</p>
+        {band === "unmonitored" ? (
+          <p className="mt-4 text-sm text-muted">
+            This bridge has no adapter watching a verified Solana program yet, so there
+            is no real on-chain data to break down into components. Showing zeros here
+            would look identical to a genuinely quiet, healthy bridge — so we show
+            nothing instead.
+          </p>
+        ) : (
+          <ul className="mt-4 space-y-3 text-sm">
+            <Component label="Parity break" value={c?.parity_severity} weight={40} />
+            <Component label="Outflow anomaly" value={c?.outflow_severity} weight={25} />
+            <Component label="Signer change" value={c?.signer_recency} weight={15} />
+            <Component label="Frontend drift" value={c?.frontend_recency} weight={10} />
+            <Component label="Oracle staleness" value={c?.oracle_staleness} weight={10} />
+          </ul>
+        )}
       </section>
 
-      {/* Score History Chart */}
-      <section className="glass-card p-6">
-        <h2 className="mb-4 text-sm font-semibold text-text">Score history (last 24h)</h2>
-        <ScoreChart history={history} />
-      </section>
-
-      {/* Recent Events */}
+      {/* Event log */}
       <section className="glass-card-elevated overflow-hidden">
         <header className="border-b border-border/40 px-6 py-3.5">
-          <h2 className="text-sm font-semibold text-text">Recent events</h2>
+          <h2 className="text-sm font-semibold text-text">Event log</h2>
         </header>
         <div className="max-h-[28rem] overflow-auto">
-          <table className="w-full text-left premium-table">
-            <thead className="text-xs uppercase tracking-widest text-muted-dark font-medium">
+          <table className="premium-table w-full text-left">
+            <thead className="text-xs font-medium uppercase tracking-widest text-muted-dark">
               <tr>
                 <th className="px-5 py-2.5">Time</th>
                 <th className="px-2 py-2.5">Bridge</th>
