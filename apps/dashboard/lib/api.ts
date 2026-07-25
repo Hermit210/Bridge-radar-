@@ -68,6 +68,10 @@ export interface WalletActivityMatch {
     display_name: string;
     program_id: string;
     historicalScore: { score: number; computed_at: string; minutesFromTx: number } | null;
+    /** Real amount_usd from our own indexed event for this exact tx, if any.
+     * null = we never indexed this transaction (predates/missed our
+     * monitoring) — distinct from a real indexed $0 (amount not tracked). */
+    amountUsd: number | null;
   }[];
 }
 

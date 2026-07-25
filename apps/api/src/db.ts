@@ -246,6 +246,26 @@ export class RadarDb {
     });
   }
 
+  /** Real events we ourselves indexed for a specific transaction signature
+   * (there can be more than one row per tx in the wormhole/portal ambiguous
+   * case). Returns [] when the tx predates or otherwise missed our own
+   * monitoring — that's a real "we don't know", never a fabricated $0. */
+  eventsByTx(tx: string): BridgeEvent[] {
+    const rows = this.db
+      .prepare(`SELECT id, event_time, bridge_id, payload FROM bridge_events WHERE tx = ?`)
+      .all(tx) as { id: string; event_time: string; bridge_id: string; payload: string }[];
+    return rows.map((r) => {
+      const payload = JSON.parse(r.payload) as Record<string, unknown>;
+      return {
+        id: r.id,
+        bridge_id: r.bridge_id,
+        event_time: r.event_time,
+        type: payload.type as BridgeEventKind,
+        ...payload,
+      } as BridgeEvent;
+    });
+  }
+
   // Used by the WS broadcast loop to find rows that landed since the last poll.
   eventsSince(rowidThreshold: number, limit = 50): { rowid: number; event: BridgeEvent }[] {
     const rows = this.db
