@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletConnectButton } from "@/components/wallet-connect-button";
 import { Reveal } from "@/components/reveal";
-import { getWalletActivity, type WalletActivityMatch, type WalletActivityResult } from "@/lib/api";
+import { getWalletActivity, type WalletActivityMatch } from "@/lib/api";
 import { bandOf } from "@radar/shared";
 
 const bandColor = {
@@ -76,23 +76,53 @@ function ActivityRow({ match }: { match: WalletActivityMatch }) {
   );
 }
 
+/** Accumulated scan state across one or more "scan further back" pages —
+ * each page covers an older slice of the wallet's real history than the
+ * last, never re-scanning the same window. */
+interface ScanState {
+  matches: WalletActivityMatch[];
+  signatureCount: number;
+  unreachableCount: number;
+  /** Oldest transaction time reached so far across all pages scanned. */
+  oldest: string | null;
+  /** Newest transaction time — always from the first page, since every
+   * later page is strictly older. */
+  newest: string | null;
+  /** Real signature to pass as `before` for the next "scan further back" — null once exhausted. */
+  nextBefore: string | null;
+  /** True if the most recent page came back full — there may be more history beyond it. */
+  hasMore: boolean;
+}
+
 export default function MyActivityPage() {
   const { publicKey, connected } = useWallet();
-  const [result, setResult] = useState<WalletActivityResult | null>(null);
+  const [scan, setScan] = useState<ScanState | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!publicKey) {
-      setResult(null);
+      setScan(null);
+      setError(null);
       return;
     }
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setScan(null);
     getWalletActivity(publicKey.toBase58())
       .then((r) => {
-        if (!cancelled) setResult(r);
+        if (cancelled) return;
+        setScan({
+          matches: r.matches,
+          signatureCount: r.scanned.signatureCount,
+          unreachableCount: r.scanned.unreachableCount,
+          oldest: r.scanned.oldest,
+          newest: r.scanned.newest,
+          nextBefore: r.scanned.oldestSignature,
+          hasMore: r.scanned.hasMore,
+        });
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
@@ -104,6 +134,34 @@ export default function MyActivityPage() {
       cancelled = true;
     };
   }, [publicKey]);
+
+  async function scanFurtherBack() {
+    if (!publicKey || !scan?.nextBefore || loadingMore) return;
+    setLoadingMore(true);
+    setError(null);
+    try {
+      const r = await getWalletActivity(publicKey.toBase58(), { before: scan.nextBefore });
+      setScan((prev) => {
+        if (!prev) return prev;
+        // New page's matches are strictly older — append after what we have.
+        const seen = new Set(prev.matches.map((m) => m.signature));
+        const newMatches = r.matches.filter((m) => !seen.has(m.signature));
+        return {
+          matches: [...prev.matches, ...newMatches],
+          signatureCount: prev.signatureCount + r.scanned.signatureCount,
+          unreachableCount: prev.unreachableCount + r.scanned.unreachableCount,
+          oldest: r.scanned.oldest ?? prev.oldest,
+          newest: prev.newest,
+          nextBefore: r.scanned.oldestSignature,
+          hasMore: r.scanned.hasMore,
+        };
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-8 animate-fade-in">
@@ -135,44 +193,74 @@ export default function MyActivityPage() {
             Couldn't reach the API to scan this wallet. {error}
           </p>
         </div>
-      ) : !result ? null : (
+      ) : !scan ? null : (
         <div className="space-y-6">
-          <p className="text-xs text-muted-dark">
-            Scanned {result.scanned.signatureCount} recent transaction
-            {result.scanned.signatureCount === 1 ? "" : "s"} for this wallet
-            {result.scanned.oldest && result.scanned.newest ? (
-              <>
-                {" "}
-                ({new Date(result.scanned.oldest).toLocaleDateString()} –{" "}
-                {new Date(result.scanned.newest).toLocaleDateString()})
-              </>
-            ) : null}
-            .
-          </p>
+          <div className="space-y-2">
+            <p className="text-xs text-muted-dark">
+              Scanned {scan.signatureCount} transaction
+              {scan.signatureCount === 1 ? "" : "s"} for this wallet
+              {scan.oldest && scan.newest ? (
+                <>
+                  {" "}
+                  ({new Date(scan.oldest).toLocaleDateString()} –{" "}
+                  {new Date(scan.newest).toLocaleDateString()})
+                </>
+              ) : null}
+              .
+            </p>
+            <p className="text-xs text-muted-dark">
+              {scan.hasMore
+                ? "This only covers the window scanned above — older bridge activity may exist beyond it. Scan further back to check."
+                : "This reaches the full available on-chain history for this wallet — there is nothing older to scan."}
+            </p>
+          </div>
 
-          {result.scanned.unreachableCount > 0 && (
+          {scan.unreachableCount > 0 && (
             <div className="rounded-xl border border-yellow/30 bg-yellow-glow/40 px-4 py-3 text-xs text-yellow">
-              Couldn't fetch {result.scanned.unreachableCount} of {result.scanned.signatureCount} scanned
+              Couldn't fetch {scan.unreachableCount} of {scan.signatureCount} scanned
               transactions (the Solana RPC rate-limited those requests even after retries) — results below may
               be incomplete, not necessarily a clean history.
             </div>
           )}
 
-          {!result.hasActivity ? (
-            <div className="glass-card-elevated p-10 text-center">
+          {scan.matches.length === 0 ? (
+            <div className="glass-card-elevated space-y-4 p-10 text-center">
               <p className="text-sm text-muted">
-                {result.scanned.unreachableCount > 0
+                {scan.unreachableCount > 0
                   ? "No bridge activity found among the transactions we could check — but the scan above was incomplete, so this isn't a confirmed clean history."
-                  : "No bridge activity found for this wallet among the transactions scanned."}
+                  : "No bridge activity found in the scanned window above."}
               </p>
+              {scan.hasMore && (
+                <button
+                  type="button"
+                  onClick={scanFurtherBack}
+                  disabled={loadingMore}
+                  className="badge text-xs transition-colors hover:text-text disabled:opacity-50"
+                >
+                  {loadingMore ? "Scanning…" : "Scan further back →"}
+                </button>
+              )}
             </div>
           ) : (
             <div className="space-y-4">
-              {result.matches.map((m, i) => (
+              {scan.matches.map((m, i) => (
                 <Reveal key={m.signature} delayMs={i * 60}>
                   <ActivityRow match={m} />
                 </Reveal>
               ))}
+            </div>
+          )}
+
+          {scan.matches.length > 0 && scan.hasMore && (
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={scanFurtherBack}
+                disabled={loadingMore}
+                className="badge text-xs transition-colors hover:text-text disabled:opacity-50"
+              >
+                {loadingMore ? "Scanning…" : "Scan further back →"}
+              </button>
             </div>
           )}
         </div>

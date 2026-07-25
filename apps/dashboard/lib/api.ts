@@ -73,16 +73,33 @@ export interface WalletActivityMatch {
 
 export interface WalletActivityResult {
   address: string;
-  scanned: { signatureCount: number; oldest: string | null; newest: string | null; unreachableCount: number };
+  scanned: {
+    signatureCount: number;
+    oldest: string | null;
+    newest: string | null;
+    unreachableCount: number;
+    /** Real signature of the oldest tx in this page — pass as `before` to
+     * scan further back into the same wallet's history. */
+    oldestSignature: string | null;
+    /** True when this page came back full — there may be older history
+     * beyond it. False means the wallet's real history genuinely ends here. */
+    hasMore: boolean;
+  };
   matches: WalletActivityMatch[];
   hasActivity: boolean;
 }
 
 /** Real, read-only on-chain lookup for the connected wallet — see
  * apps/api/src/wallet-activity.ts for what "real" means here (no
- * fabricated scores, no estimated matches). */
-export async function getWalletActivity(address: string, limit?: number) {
-  const q = limit ? `?limit=${limit}` : "";
+ * fabricated scores, no estimated matches). Pass `before` (a real
+ * signature from a previous response's `scanned.oldestSignature`) to
+ * page further back in the wallet's history instead of re-scanning the
+ * same recent window. */
+export async function getWalletActivity(address: string, opts?: { limit?: number; before?: string }) {
+  const params = new URLSearchParams();
+  if (opts?.limit) params.set("limit", String(opts.limit));
+  if (opts?.before) params.set("before", opts.before);
+  const q = params.toString() ? `?${params.toString()}` : "";
   return fetchJson<WalletActivityResult>(`/v1/wallet-activity/${encodeURIComponent(address)}${q}`);
 }
 

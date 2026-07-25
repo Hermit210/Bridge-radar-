@@ -82,6 +82,15 @@ export interface WalletActivityResult {
      * empty `matches` does NOT mean "no bridge activity"; it means the
      * scan was incomplete, and callers must say so. */
     unreachableCount: number;
+    /** Real signature of the oldest transaction in *this* page — pass as
+     * `before` to scan further back in the same wallet's history. Null
+     * when this page returned zero signatures (nothing left to page into). */
+    oldestSignature: string | null;
+    /** True when this page came back full (`signatureCount === limit`
+     * requested), meaning there may be older history beyond it. False
+     * means the RPC returned fewer than asked for — the wallet's real
+     * history genuinely ends here, not an artifact of the page size. */
+    hasMore: boolean;
   };
   matches: WalletActivityMatch[];
   /** `matches.length > 0` — real activity was found. When this is false,
@@ -136,12 +145,13 @@ export async function fetchWalletBridgeActivity(
   db: RadarDb,
   address: string,
   limit: number,
+  before?: string,
 ): Promise<WalletActivityResult> {
   const capped = Math.min(Math.max(limit, 1), WALLET_ACTIVITY_MAX_LIMIT);
   const pubkey = new PublicKey(address);
 
   const signatures = await withRetry("getSignaturesForAddress", () =>
-    connection.getSignaturesForAddress(pubkey, { limit: capped }),
+    connection.getSignaturesForAddress(pubkey, { limit: capped, before }),
   );
   const successful = signatures.filter((s) => s.err === null);
 
@@ -214,6 +224,12 @@ export async function fetchWalletBridgeActivity(
       oldest: times.length ? new Date(Math.min(...times) * 1000).toISOString() : null,
       newest: times.length ? new Date(Math.max(...times) * 1000).toISOString() : null,
       unreachableCount,
+      // Cursor is based on the raw (unfiltered) page, not `successful` —
+      // continuing "before" the RPC's own last-returned signature is what
+      // actually pages further back, regardless of which of those
+      // signatures errored on-chain.
+      oldestSignature: signatures[signatures.length - 1]?.signature ?? null,
+      hasMore: signatures.length === capped,
     },
     matches,
     hasActivity: matches.length > 0,
