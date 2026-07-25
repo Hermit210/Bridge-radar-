@@ -339,15 +339,18 @@ app.get("/v1/wallet-activity/:address", async (c) => {
   if (Number.isNaN(limit)) {
     return c.json({ error: "limit must be a number" }, 400);
   }
+  // Real signature to page further back from — the client passes back
+  // scanned.oldestSignature from the previous page's response.
+  const before = c.req.query("before") || undefined;
 
   try {
-    const result = await fetchWalletBridgeActivity(solanaConnection, db, address, limit);
+    const result = await fetchWalletBridgeActivity(solanaConnection, db, address, limit, before);
     return c.json(result);
   } catch (err) {
     // Full error object, not just .message — a bare 502 with nothing in the
     // server log is exactly how a silently-swallowed RPC failure (rate
     // limit, bad response, etc.) went undiagnosed last time.
-    console.error(`[wallet-activity] request failed for address=${address} limit=${limit}:`, err);
+    console.error(`[wallet-activity] request failed for address=${address} limit=${limit} before=${before}:`, err);
     if (isRateLimitError(err)) {
       return c.json(
         {
