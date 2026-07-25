@@ -19,7 +19,18 @@ import {
 
 const port = Number(process.env.API_PORT ?? 3001);
 const host = process.env.API_HOST ?? "0.0.0.0";
-const corsOrigin = process.env.API_CORS_ORIGIN ?? "http://localhost:3000";
+// Hono's cors({ origin }) only does exact-string (or exact-string-in-array)
+// matching — it never splits a comma-separated value itself. Passing the
+// raw env string straight through (as this used to) meant a
+// "http://localhost:3000,http://localhost:3002" config never matched
+// EITHER real Origin header the browser sends, so every cross-origin
+// request from the dashboard silently failed CORS: server logs a clean
+// 200 (the request did complete), but the browser's fetch() throws
+// "Failed to fetch" because it refuses to hand the response to JS.
+const corsOrigins = (process.env.API_CORS_ORIGIN ?? "http://localhost:3000")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
 const dbUrl = process.env.DATABASE_URL ?? "sqlite://./data/radar.db";
 const solanaRpcUrl = process.env.SOLANA_RPC_URL ?? "https://api.mainnet-beta.solana.com";
 
@@ -39,6 +50,7 @@ console.log(
   `[radar-api] Solana RPC endpoint: ${redactedRpcHost(solanaRpcUrl)} ` +
     `(${process.env.SOLANA_RPC_URL ? "from SOLANA_RPC_URL" : "default fallback — SOLANA_RPC_URL not set"})`,
 );
+console.log(`[radar-api] CORS allowed origins: ${corsOrigins.join(", ")}`);
 
 const db = new RadarDb(dbUrl);
 const defillama = new DefiLlamaStore(db.raw());
@@ -47,7 +59,7 @@ const app = new Hono();
 const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 
 app.use("*", logger());
-app.use("/v1/*", cors({ origin: corsOrigin }));
+app.use("/v1/*", cors({ origin: corsOrigins }));
 
 app.get("/", (c) =>
   c.json({
