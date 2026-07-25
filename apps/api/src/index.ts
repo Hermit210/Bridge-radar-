@@ -16,6 +16,7 @@ import {
   isValidSolanaAddress,
   WALLET_ACTIVITY_DEFAULT_LIMIT,
 } from "./wallet-activity.js";
+import { fetchWalletHoldings } from "./wallet-holdings.js";
 
 const port = Number(process.env.API_PORT ?? 3001);
 const host = process.env.API_HOST ?? "0.0.0.0";
@@ -73,6 +74,7 @@ app.get("/", (c) =>
       "GET /v1/bridges/:id/history",
       "GET /v1/events",
       "GET /v1/wallet-activity/:address",
+      "GET /v1/wallet-holdings/:address",
       "GET /v1/registry",
       "GET /v1/defillama/bridges",
       "GET /v1/defillama/bridge-volume",
@@ -365,6 +367,35 @@ app.get("/v1/wallet-activity/:address", async (c) => {
     }
     return c.json(
       { error: "failed to fetch wallet activity", detail: err instanceof Error ? err.message : String(err) },
+      502,
+    );
+  }
+});
+
+// Real, read-only SOL + SPL token balance snapshot for a connected wallet.
+// See wallet-holdings.ts for what "real" means here — USD values are null,
+// not zero, when DeFiLlama has no price for a mint.
+app.get("/v1/wallet-holdings/:address", async (c) => {
+  const address = c.req.param("address");
+  if (!isValidSolanaAddress(address)) {
+    return c.json({ error: "invalid Solana address" }, 400);
+  }
+  try {
+    const result = await fetchWalletHoldings(solanaConnection, address);
+    return c.json(result);
+  } catch (err) {
+    console.error(`[wallet-holdings] request failed for address=${address}:`, err);
+    if (isRateLimitError(err)) {
+      return c.json(
+        {
+          error: "Solana RPC rate-limited this request",
+          detail: "getBalance/getTokenAccountsByOwner were rate-limited. Set SOLANA_RPC_URL to a paid provider for reliable results.",
+        },
+        503,
+      );
+    }
+    return c.json(
+      { error: "failed to fetch wallet holdings", detail: err instanceof Error ? err.message : String(err) },
       502,
     );
   }

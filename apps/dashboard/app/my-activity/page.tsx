@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletConnectButton } from "@/components/wallet-connect-button";
 import { Reveal } from "@/components/reveal";
-import { getWalletActivity, type WalletActivityMatch } from "@/lib/api";
-import { bandOf } from "@radar/shared";
+import { getWalletActivity, getWalletHoldings, type WalletActivityMatch, type WalletHoldingsResult } from "@/lib/api";
+import { bandOf, formatUsd } from "@radar/shared";
 
 const bandColor = {
   green: "text-green",
@@ -76,6 +76,60 @@ function ActivityRow({ match }: { match: WalletActivityMatch }) {
   );
 }
 
+/** Real SOL + SPL token balance snapshot — every number here is either a
+ * live RPC balance or a live DeFiLlama price; "price unavailable" (not
+ * $0.00) is shown whenever DeFiLlama has no quote for a mint. */
+function WalletHoldingsCard({ holdings }: { holdings: WalletHoldingsResult }) {
+  return (
+    <section className="glass-card-elevated space-y-4 p-6">
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-sm font-semibold text-text">Wallet Holdings</h2>
+        <span className="font-mono text-[11px] text-muted-dark">
+          as of {new Date(holdings.fetchedAt).toLocaleTimeString()}
+        </span>
+      </div>
+
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-muted">SOL balance</span>
+        <span className="font-mono text-text">
+          {holdings.solBalance.toLocaleString(undefined, { maximumFractionDigits: 6 })} SOL
+          {holdings.solValueUsd !== null ? (
+            <span className="ml-2 text-muted-dark">({formatUsd(holdings.solValueUsd)})</span>
+          ) : (
+            <span className="ml-2 text-muted-dark">(price unavailable)</span>
+          )}
+        </span>
+      </div>
+
+      {holdings.tokens.length > 0 && (
+        <div className="space-y-2 border-t border-border/30 pt-3">
+          {holdings.tokens.map((t) => (
+            <div key={t.mint} className="flex items-center justify-between text-sm">
+              <span className="font-mono text-xs text-muted" title={t.mint}>
+                {t.symbol ?? `${t.mint.slice(0, 4)}…${t.mint.slice(-4)}`}
+              </span>
+              <span className="font-mono text-text-secondary">
+                {t.uiAmount.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                {t.valueUsd !== null ? (
+                  <span className="ml-2 text-muted-dark">({formatUsd(t.valueUsd)})</span>
+                ) : (
+                  <span className="ml-2 text-muted-dark">(price unavailable)</span>
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {holdings.tokens.length === 0 && (
+        <p className="border-t border-border/30 pt-3 text-xs text-muted-dark">
+          No SPL token balances found for this wallet.
+        </p>
+      )}
+    </section>
+  );
+}
+
 /** Accumulated scan state across one or more "scan further back" pages —
  * each page covers an older slice of the wallet's real history than the
  * last, never re-scanning the same window. */
@@ -100,6 +154,29 @@ export default function MyActivityPage() {
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [holdings, setHoldings] = useState<WalletHoldingsResult | null>(null);
+  const [holdingsError, setHoldingsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!publicKey) {
+      setHoldings(null);
+      setHoldingsError(null);
+      return;
+    }
+    let cancelled = false;
+    setHoldings(null);
+    setHoldingsError(null);
+    getWalletHoldings(publicKey.toBase58())
+      .then((r) => {
+        if (!cancelled) setHoldings(r);
+      })
+      .catch((e) => {
+        if (!cancelled) setHoldingsError(e instanceof Error ? e.message : String(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [publicKey]);
 
   useEffect(() => {
     if (!publicKey) {
@@ -176,6 +253,20 @@ export default function MyActivityPage() {
           signed or stored.
         </p>
       </div>
+
+      {connected && (
+        <>
+          {holdingsError ? (
+            <div className="glass-card-elevated p-6 text-center">
+              <p className="text-sm text-muted">Couldn't fetch wallet holdings. {holdingsError}</p>
+            </div>
+          ) : holdings ? (
+            <WalletHoldingsCard holdings={holdings} />
+          ) : (
+            <div className="skeleton h-32 w-full rounded-2xl"></div>
+          )}
+        </>
+      )}
 
       {!connected ? (
         <div className="glass-card-elevated flex flex-col items-center gap-4 p-10 text-center">

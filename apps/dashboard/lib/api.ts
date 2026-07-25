@@ -103,6 +103,31 @@ export async function getWalletActivity(address: string, opts?: { limit?: number
   return fetchJson<WalletActivityResult>(`/v1/wallet-activity/${encodeURIComponent(address)}${q}`);
 }
 
+export interface WalletHoldingsToken {
+  mint: string;
+  uiAmount: number;
+  decimals: number;
+  symbol: string | null;
+  priceUsd: number | null;
+  valueUsd: number | null;
+}
+
+export interface WalletHoldingsResult {
+  address: string;
+  solBalance: number;
+  solPriceUsd: number | null;
+  solValueUsd: number | null;
+  tokens: WalletHoldingsToken[];
+  fetchedAt: string;
+}
+
+/** Real, read-only SOL + SPL token balance snapshot — see
+ * apps/api/src/wallet-holdings.ts. valueUsd/priceUsd are null (never 0)
+ * when DeFiLlama has no live price for that mint. */
+export async function getWalletHoldings(address: string) {
+  return fetchJson<WalletHoldingsResult>(`/v1/wallet-holdings/${encodeURIComponent(address)}`);
+}
+
 export const apiUrls = {
   base: API_URL,
   ws: process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:3001/v1/ws",
