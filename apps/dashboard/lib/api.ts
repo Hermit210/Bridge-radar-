@@ -72,6 +72,10 @@ export interface WalletActivityMatch {
      * null = we never indexed this transaction (predates/missed our
      * monitoring) — distinct from a real indexed $0 (amount not tracked). */
     amountUsd: number | null;
+    /** A real, later health-score row that dropped into watch/alert
+     * territory — retrospective context only, never a claim that this
+     * specific transaction was affected. */
+    retroactiveRisk: { score: number; band: "yellow" | "red"; computed_at: string } | null;
   }[];
 }
 

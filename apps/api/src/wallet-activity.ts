@@ -9,7 +9,7 @@
  */
 
 import { Connection, PublicKey, type ParsedTransactionWithMeta } from "@solana/web3.js";
-import { PROGRAM_TO_BRIDGE_IDS } from "@radar/shared";
+import { bandOf, PROGRAM_TO_BRIDGE_IDS } from "@radar/shared";
 import type { RadarDb } from "./db.js";
 import { BRIDGE_REGISTRY } from "./bridges.js";
 
@@ -74,6 +74,13 @@ export interface WalletActivityMatch {
      * still means "amount not tracked", not "zero value" — callers must
      * distinguish all three states, never collapse them into one $0. */
     amountUsd: number | null;
+    /** A real, later health-score row for this bridge that dropped into
+     * "watch" or "alert" territory (band !== green) — null when the bridge
+     * either has no later score at all, or every later score stayed green.
+     * This is retrospective context only: it does not mean this specific
+     * transaction was affected, just that the bridge had a detected
+     * anomaly at some point afterward. Callers must word it that way. */
+    retroactiveRisk: { score: number; band: "yellow" | "red"; computed_at: string } | null;
   }[];
 }
 
@@ -217,7 +224,26 @@ export async function fetchWalletBridgeActivity(
         }
         const ourEvent = ourEventsByBridge.get(bridgeId);
         const amountUsd = ourEvent && typeof ourEvent.amount_usd === "number" ? ourEvent.amount_usd : null;
-        return { bridge_id: bridgeId, display_name: displayNameFor(bridgeId), program_id: programId, historicalScore, amountUsd };
+
+        let retroactiveRisk: WalletActivityMatch["bridges"][number]["retroactiveRisk"] = null;
+        if (blockTime) {
+          const worst = db.worstScoreAfter(bridgeId, blockTime);
+          if (worst) {
+            const band = bandOf(worst.score);
+            if (band === "yellow" || band === "red") {
+              retroactiveRisk = { score: worst.score, band, computed_at: worst.computed_at };
+            }
+          }
+        }
+
+        return {
+          bridge_id: bridgeId,
+          display_name: displayNameFor(bridgeId),
+          program_id: programId,
+          historicalScore,
+          amountUsd,
+          retroactiveRisk,
+        };
       }),
     });
   }
