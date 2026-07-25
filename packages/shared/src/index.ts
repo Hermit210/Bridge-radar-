@@ -133,7 +133,7 @@ export const BRIDGE_SOLANA_PROGRAMS: Record<string, string[]> = {
   wormhole: ["wormDTUJ6AWPNvk59vGQbDvGJmqbDTdgWgAqcLBCgUb"],
   portal: ["wormDTUJ6AWPNvk59vGQbDvGJmqbDTdgWgAqcLBCgUb"],
   debridge: ["src5qyZHqTqecJV4aY6Cb6zDZLMDzrDKKezs22MPHr4", "dst5MGcFPoBeREFAA5E3tU5ij8m5uVYwkzkSAbsLbNo"],
-  layerzero: ["LZ1qZQR2QFhkHUkbq6jKTpnyHbECFuY5gSUVCY6F2HT"],
+  layerzero: ["76y77prsiCMvXMjuoZ5VRrhG5qYBrUMYTE5WgHqgjEn6"],
   mayan: ["MAyANxBRcqRXaPfWoZyURiE9PyuYDxoR1dbW2hkfjxR"],
   axelar: ["gtwqvLL93XK7pC2eMvfGamqokvs19AytzaVhrL2iKiz"],
   allbridge: ["BrdgEoYCMWgRNKFt9Dx6JmAZAvWmu6oW3aZ4HGwjeoP"],
