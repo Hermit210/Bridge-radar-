@@ -136,7 +136,7 @@ export const BRIDGE_SOLANA_PROGRAMS: Record<string, string[]> = {
   layerzero: ["76y77prsiCMvXMjuoZ5VRrhG5qYBrUMYTE5WgHqgjEn6"],
   mayan: ["mayan34VedncxdK2XobtvWFDXQASUTBXhUVzt2kKgny"],
   axelar: ["gtwqvLL93XK7pC2eMvfGamqokvs19AytzaVhrL2iKiz"],
-  allbridge: ["BrdgEoYCMWgRNKFt9Dx6JmAZAvWmu6oW3aZ4HGwjeoP"],
+  allbridge: ["BrdgN2RPzEMWF96ZbnnJaUtQDQx7VRXYaHHbYCBvceWB"],
   relay: ["99vQwtBwYtrqqD9YSXbdum3KBdxPAVxYTaQ3cfnJSrN2"],
   across: ["DLv3NggMiSaef97YCkew5xKUHDh13tVGZ7tydt3ZeAru"],
   garden: ["2bag6xpshpvPe7SJ9nSDLHpxqhEAoHPGpEkjNSv7gxoF"],
