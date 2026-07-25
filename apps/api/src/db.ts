@@ -246,6 +246,27 @@ export class RadarDb {
     });
   }
 
+  /** The single lowest-scoring `bridge_health_scores` row recorded strictly
+   * after `afterIso`, for a bridge — used to answer "did this bridge ever
+   * show trouble after this transaction" honestly. Returns null when there
+   * is no later row at all, not when the bridge just stayed healthy (a
+   * caller comparing against a band threshold handles that case). Never
+   * interpolates; only surfaces a real recorded point. */
+  worstScoreAfter(bridgeId: string, afterIso: string): HealthScore | null {
+    const row = this.db
+      .prepare(
+        `SELECT bridge_id, computed_at, score,
+                parity_severity, outflow_severity, signer_recency,
+                frontend_recency, oracle_staleness
+           FROM bridge_health_scores
+           WHERE bridge_id = ? AND computed_at > ?
+           ORDER BY score ASC, computed_at ASC
+           LIMIT 1`,
+      )
+      .get(bridgeId, afterIso) as DbScoreRow | undefined;
+    return row ? rowToScore(row) : null;
+  }
+
   /** Real events we ourselves indexed for a specific transaction signature
    * (there can be more than one row per tx in the wormhole/portal ambiguous
    * case). Returns [] when the tx predates or otherwise missed our own

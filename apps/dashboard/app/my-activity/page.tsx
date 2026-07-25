@@ -87,6 +87,29 @@ function ActivityRow({ match }: { match: WalletActivityMatch }) {
           </div>
         ))}
       </div>
+
+      {match.bridges.some((b) => b.retroactiveRisk) && (
+        <div className="space-y-2 border-t border-border/30 pt-3">
+          {match.bridges
+            .filter((b) => b.retroactiveRisk)
+            .map((b) => (
+              <p
+                key={`${b.bridge_id}-risk`}
+                className={`rounded-lg border px-3 py-2 text-xs leading-relaxed ${
+                  b.retroactiveRisk!.band === "red"
+                    ? "border-red/30 bg-red-glow/40 text-red"
+                    : "border-yellow/30 bg-yellow-glow/40 text-yellow"
+                }`}
+              >
+                You used {b.display_name} on {when} — this bridge later showed a health score
+                drop to {b.retroactiveRisk!.score} on{" "}
+                {new Date(b.retroactiveRisk!.computed_at).toLocaleDateString()}. This does not mean
+                your specific transaction was affected, just that the bridge had a detected
+                anomaly afterward.
+              </p>
+            ))}
+        </div>
+      )}
     </div>
   );
 }
