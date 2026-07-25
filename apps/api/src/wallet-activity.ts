@@ -66,6 +66,14 @@ export interface WalletActivityMatch {
     display_name: string;
     program_id: string;
     historicalScore: { score: number; computed_at: string; minutesFromTx: number } | null;
+    /** Real amount_usd from our own indexed bridge_events row for this exact
+     * tx, if we have one. `null` means we never indexed this transaction at
+     * all (it predates or otherwise missed our monitoring) — not the same
+     * as a real, indexed $0. Most adapters currently store amount_usd as a
+     * 0.0 placeholder (no asset pricing yet), so a real indexed row often
+     * still means "amount not tracked", not "zero value" — callers must
+     * distinguish all three states, never collapse them into one $0. */
+    amountUsd: number | null;
   }[];
 }
 
@@ -186,6 +194,10 @@ export async function fetchWalletBridgeActivity(
     if (bridgeIds.size === 0) continue;
 
     const blockTime = tx.blockTime ? new Date(tx.blockTime * 1000).toISOString() : null;
+    // Real amounts, only if WE indexed this exact tx ourselves — never
+    // derived from the wallet scan's own (unpriced) transaction fetch.
+    const ourEvents = db.eventsByTx(sigInfo.signature);
+    const ourEventsByBridge = new Map(ourEvents.map((e) => [e.bridge_id, e]));
 
     matches.push({
       signature: sigInfo.signature,
@@ -203,7 +215,9 @@ export async function fetchWalletBridgeActivity(
             historicalScore = { score: nearest.score, computed_at: nearest.computed_at, minutesFromTx };
           }
         }
-        return { bridge_id: bridgeId, display_name: displayNameFor(bridgeId), program_id: programId, historicalScore };
+        const ourEvent = ourEventsByBridge.get(bridgeId);
+        const amountUsd = ourEvent && typeof ourEvent.amount_usd === "number" ? ourEvent.amount_usd : null;
+        return { bridge_id: bridgeId, display_name: displayNameFor(bridgeId), program_id: programId, historicalScore, amountUsd };
       }),
     });
   }

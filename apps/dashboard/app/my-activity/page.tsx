@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletConnectButton } from "@/components/wallet-connect-button";
@@ -68,6 +68,21 @@ function ActivityRow({ match }: { match: WalletActivityMatch }) {
               </span>
             ) : (
               <span className="text-xs text-muted-dark">no health-score data recorded for this bridge</span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="space-y-2 border-t border-border/30 pt-3">
+        {match.bridges.map((b) => (
+          <div key={`${b.bridge_id}-amount`} className="flex items-center justify-between text-sm">
+            <span className="text-muted">{b.display_name} value</span>
+            {b.amountUsd === null ? (
+              <span className="text-xs text-muted-dark">not indexed by us (predates or missed monitoring)</span>
+            ) : b.amountUsd > 0 ? (
+              <span className="font-mono font-medium text-text">{formatUsd(b.amountUsd)}</span>
+            ) : (
+              <span className="text-xs text-muted-dark">amount not tracked for this bridge yet</span>
             )}
           </div>
         ))}
@@ -212,6 +227,26 @@ export default function MyActivityPage() {
     };
   }, [publicKey]);
 
+  /** Real, honest breakdown of trackable dollar value across every matched
+   * bridge leg in the current scan — never fabricates a number for a leg
+   * we don't have real pricing for. */
+  const bridgedValue = useMemo(() => {
+    let totalUsd = 0;
+    let trackedLegs = 0;
+    let untrackedLegs = 0;
+    let notIndexedLegs = 0;
+    for (const m of scan?.matches ?? []) {
+      for (const b of m.bridges) {
+        if (b.amountUsd === null) notIndexedLegs++;
+        else if (b.amountUsd > 0) {
+          totalUsd += b.amountUsd;
+          trackedLegs++;
+        } else untrackedLegs++;
+      }
+    }
+    return { totalUsd, trackedLegs, untrackedLegs, notIndexedLegs };
+  }, [scan?.matches]);
+
   async function scanFurtherBack() {
     if (!publicKey || !scan?.nextBefore || loadingMore) return;
     setLoadingMore(true);
@@ -311,6 +346,25 @@ export default function MyActivityPage() {
               Couldn't fetch {scan.unreachableCount} of {scan.signatureCount} scanned
               transactions (the Solana RPC rate-limited those requests even after retries) — results below may
               be incomplete, not necessarily a clean history.
+            </div>
+          )}
+
+          {scan.matches.length > 0 && (
+            <div className="rounded-xl border border-border-subtle bg-surface/60 p-4 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted">Total historical bridged value (tracked amounts only)</span>
+                <span className="font-mono font-semibold text-text">
+                  {bridgedValue.trackedLegs > 0 ? formatUsd(bridgedValue.totalUsd) : "$0.00"}
+                </span>
+              </div>
+              <p className="mt-1.5 text-[11px] text-muted-dark">
+                {bridgedValue.trackedLegs} of{" "}
+                {bridgedValue.trackedLegs + bridgedValue.untrackedLegs + bridgedValue.notIndexedLegs} matched
+                bridge leg{bridgedValue.trackedLegs + bridgedValue.untrackedLegs + bridgedValue.notIndexedLegs === 1 ? "" : "s"} had a
+                real tracked dollar amount — {bridgedValue.untrackedLegs} had no pricing yet, and{" "}
+                {bridgedValue.notIndexedLegs} predate or otherwise missed our own monitoring, so their value is
+                genuinely unknown to us rather than zero.
+              </p>
             </div>
           )}
 
