@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletConnectButton } from "@/components/wallet-connect-button";
 import { Reveal } from "@/components/reveal";
+import { StatBar, type StatBarSegment } from "@/components/stat-bar";
 import { getWalletActivity, getWalletHoldings, type WalletActivityMatch, type WalletHoldingsResult } from "@/lib/api";
 import { bandOf, formatUsd } from "@radar/shared";
 
@@ -270,6 +271,16 @@ export default function MyActivityPage() {
     return { totalUsd, trackedLegs, untrackedLegs, notIndexedLegs };
   }, [scan?.matches]);
 
+  /** Real, simple stats derived directly from the scan already fetched —
+   * no separate query, nothing estimated. */
+  const summaryStats = useMemo(() => {
+    const uniqueBridges = new Set<string>();
+    for (const m of scan?.matches ?? []) {
+      for (const b of m.bridges) uniqueBridges.add(b.bridge_id);
+    }
+    return { uniqueBridgeCount: uniqueBridges.size };
+  }, [scan?.matches]);
+
   async function scanFurtherBack() {
     if (!publicKey || !scan?.nextBefore || loadingMore) return;
     setLoadingMore(true);
@@ -344,6 +355,25 @@ export default function MyActivityPage() {
         </div>
       ) : !scan ? null : (
         <div className="space-y-6">
+          <StatBar
+            segments={
+              [
+                { key: "scanned", label: "Transactions scanned", value: scan.signatureCount },
+                { key: "bridges", label: "Bridges used", value: summaryStats.uniqueBridgeCount },
+                {
+                  key: "earliest",
+                  label: "Earliest",
+                  value: scan.oldest ? new Date(scan.oldest).toLocaleDateString() : "—",
+                },
+                {
+                  key: "latest",
+                  label: "Latest",
+                  value: scan.newest ? new Date(scan.newest).toLocaleDateString() : "—",
+                },
+              ] satisfies StatBarSegment[]
+            }
+          />
+
           <div className="space-y-2">
             <p className="text-xs text-muted-dark">
               Scanned {scan.signatureCount} transaction
