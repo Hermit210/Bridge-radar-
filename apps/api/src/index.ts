@@ -17,6 +17,12 @@ import {
   WALLET_ACTIVITY_DEFAULT_LIMIT,
 } from "./wallet-activity.js";
 import { fetchWalletHoldings } from "./wallet-holdings.js";
+import {
+  extractHeliusApiKey,
+  fetchWalletTransactionTimeline,
+  HeliusKeyMissingError,
+  WALLET_TIMELINE_DEFAULT_LIMIT,
+} from "./wallet-timeline.js";
 
 const port = Number(process.env.API_PORT ?? 3001);
 const host = process.env.API_HOST ?? "0.0.0.0";
@@ -53,6 +59,16 @@ console.log(
 );
 console.log(`[radar-api] CORS allowed origins: ${corsOrigins.join(", ")}`);
 
+// Reuses the RPC key when it's a Helius one — never a second, separately
+// configured credential. Logged as enabled/disabled only, key itself never
+// touches the logs.
+const heliusApiKey = extractHeliusApiKey(solanaRpcUrl);
+console.log(
+  `[radar-api] Helius Enhanced Transactions API (full wallet timeline): ${
+    heliusApiKey ? "enabled" : "disabled — set HELIUS_API_KEY or point SOLANA_RPC_URL at Helius"
+  }`,
+);
+
 const db = new RadarDb(dbUrl);
 const defillama = new DefiLlamaStore(db.raw());
 const solanaConnection = new Connection(solanaRpcUrl, "confirmed");
@@ -75,6 +91,7 @@ app.get("/", (c) =>
       "GET /v1/events",
       "GET /v1/wallet-activity/:address",
       "GET /v1/wallet-holdings/:address",
+      "GET /v1/wallet-timeline/:address",
       "GET /v1/registry",
       "GET /v1/defillama/bridges",
       "GET /v1/defillama/bridge-volume",
@@ -396,6 +413,48 @@ app.get("/v1/wallet-holdings/:address", async (c) => {
     }
     return c.json(
       { error: "failed to fetch wallet holdings", detail: err instanceof Error ? err.message : String(err) },
+      502,
+    );
+  }
+});
+
+// Real, full transaction timeline for a connected wallet — every transaction
+// type (transfers, swaps, staking, NFT activity, everything), not just
+// bridge-matching ones. Classified by Helius's Enhanced Transactions API;
+// honestly reports "not configured" (501) rather than falling back to a
+// fake or degraded classification when no Helius key is available.
+app.get("/v1/wallet-timeline/:address", async (c) => {
+  const address = c.req.param("address");
+  if (!isValidSolanaAddress(address)) {
+    return c.json({ error: "invalid Solana address" }, 400);
+  }
+  const limitParam = c.req.query("limit");
+  const limit = limitParam ? Number(limitParam) : WALLET_TIMELINE_DEFAULT_LIMIT;
+  if (Number.isNaN(limit)) {
+    return c.json({ error: "limit must be a number" }, 400);
+  }
+  const before = c.req.query("before") || undefined;
+
+  try {
+    const result = await fetchWalletTransactionTimeline(solanaConnection, address, limit, before, heliusApiKey);
+    return c.json(result);
+  } catch (err) {
+    if (err instanceof HeliusKeyMissingError) {
+      return c.json({ error: "not configured", detail: err.message }, 501);
+    }
+    console.error(`[wallet-timeline] request failed for address=${address} limit=${limit} before=${before}:`, err);
+    if (isRateLimitError(err)) {
+      return c.json(
+        {
+          error: "rate-limited",
+          detail:
+            "Solana RPC or the Helius Enhanced Transactions API was rate-limited even after retries. Try again shortly.",
+        },
+        503,
+      );
+    }
+    return c.json(
+      { error: "failed to fetch wallet timeline", detail: err instanceof Error ? err.message : String(err) },
       502,
     );
   }

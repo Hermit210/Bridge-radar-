@@ -6,7 +6,15 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletConnectButton } from "@/components/wallet-connect-button";
 import { Reveal } from "@/components/reveal";
 import { StatBar, type StatBarSegment } from "@/components/stat-bar";
-import { getWalletActivity, getWalletHoldings, type WalletActivityMatch, type WalletHoldingsResult } from "@/lib/api";
+import {
+  getWalletActivity,
+  getWalletHoldings,
+  getWalletTimeline,
+  type TimelineCategory,
+  type WalletActivityMatch,
+  type WalletHoldingsResult,
+  type WalletTimelineEntry,
+} from "@/lib/api";
 import { bandOf, formatUsd } from "@radar/shared";
 
 const bandColor = {
@@ -115,6 +123,64 @@ function ActivityRow({ match }: { match: WalletActivityMatch }) {
   );
 }
 
+const categoryLabel: Record<TimelineCategory, string> = {
+  transfer: "Transfer",
+  swap: "Swap",
+  stake: "Stake",
+  nft: "NFT",
+  program: "Program interaction",
+  unknown: "Unknown",
+};
+
+const categoryBadge: Record<TimelineCategory, string> = {
+  transfer: "bg-accent/10 text-accent border-accent/20",
+  swap: "bg-green/10 text-green border-green/20",
+  stake: "bg-accent/10 text-accent-bright border-accent/20",
+  nft: "bg-yellow/10 text-yellow border-yellow/20",
+  program: "bg-surface-3 text-text-secondary border-border-subtle",
+  unknown: "bg-surface-3 text-muted-dark border-border-subtle",
+};
+
+function formatSol(lamports: number): string {
+  return `${(lamports / 1_000_000_000).toLocaleString(undefined, { maximumFractionDigits: 9 })} SOL`;
+}
+
+/** One real classified transaction from the wallet's full on-chain history —
+ * type/description/source come directly from Helius's Enhanced Transactions
+ * API response for this exact signature, never guessed client-side. */
+function TimelineRow({ entry }: { entry: WalletTimelineEntry }) {
+  const when = entry.blockTime ? new Date(entry.blockTime).toLocaleString() : "time unknown";
+  return (
+    <div className="group space-y-2 rounded-2xl border border-border-subtle bg-surface/60 p-4 transition-colors hover:border-accent/25 hover:bg-surface/80">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span
+          className={`badge border text-[11px] ${categoryBadge[entry.category]}`}
+          title={`Raw Helius type: ${entry.heliusType}`}
+        >
+          {categoryLabel[entry.category]}
+        </span>
+        <span className="font-mono text-[11px] text-muted-dark">{when}</span>
+      </div>
+
+      <p className="text-sm text-text-secondary">
+        {entry.description ?? `${entry.heliusType} via ${entry.source}`}
+      </p>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/30 pt-2 text-[11px] text-muted-dark">
+        <a
+          href={`https://solscan.io/tx/${entry.signature}`}
+          target="_blank"
+          rel="noreferrer"
+          className="truncate font-mono transition-colors group-hover:text-accent"
+        >
+          {entry.signature.slice(0, 20)}… ↗
+        </a>
+        <span className="font-mono">fee {formatSol(entry.feeLamports)}</span>
+      </div>
+    </div>
+  );
+}
+
 /** Real SOL + SPL token balance snapshot — every number here is either a
  * live RPC balance or a live DeFiLlama price; "price unavailable" (not
  * $0.00) is shown whenever DeFiLlama has no quote for a mint. */
@@ -187,6 +253,17 @@ interface ScanState {
   hasMore: boolean;
 }
 
+/** Same accumulation pattern as ScanState, for the unfiltered full timeline. */
+interface TimelineScanState {
+  entries: WalletTimelineEntry[];
+  signatureCount: number;
+  unreachableCount: number;
+  oldest: string | null;
+  newest: string | null;
+  nextBefore: string | null;
+  hasMore: boolean;
+}
+
 export default function MyActivityPage() {
   const { publicKey, connected } = useWallet();
   const [scan, setScan] = useState<ScanState | null>(null);
@@ -195,6 +272,10 @@ export default function MyActivityPage() {
   const [error, setError] = useState<string | null>(null);
   const [holdings, setHoldings] = useState<WalletHoldingsResult | null>(null);
   const [holdingsError, setHoldingsError] = useState<string | null>(null);
+  const [timeline, setTimeline] = useState<TimelineScanState | null>(null);
+  const [timelineLoading, setTimelineLoading] = useState(false);
+  const [timelineLoadingMore, setTimelineLoadingMore] = useState(false);
+  const [timelineError, setTimelineError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!publicKey) {
@@ -211,6 +292,40 @@ export default function MyActivityPage() {
       })
       .catch((e) => {
         if (!cancelled) setHoldingsError(e instanceof Error ? e.message : String(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [publicKey]);
+
+  useEffect(() => {
+    if (!publicKey) {
+      setTimeline(null);
+      setTimelineError(null);
+      return;
+    }
+    let cancelled = false;
+    setTimelineLoading(true);
+    setTimelineError(null);
+    setTimeline(null);
+    getWalletTimeline(publicKey.toBase58())
+      .then((r) => {
+        if (cancelled) return;
+        setTimeline({
+          entries: r.entries,
+          signatureCount: r.scanned.signatureCount,
+          unreachableCount: r.scanned.unreachableCount,
+          oldest: r.scanned.oldest,
+          newest: r.scanned.newest,
+          nextBefore: r.scanned.oldestSignature,
+          hasMore: r.scanned.hasMore,
+        });
+      })
+      .catch((e) => {
+        if (!cancelled) setTimelineError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => {
+        if (!cancelled) setTimelineLoading(false);
       });
     return () => {
       cancelled = true;
@@ -306,6 +421,33 @@ export default function MyActivityPage() {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoadingMore(false);
+    }
+  }
+
+  async function scanTimelineFurtherBack() {
+    if (!publicKey || !timeline?.nextBefore || timelineLoadingMore) return;
+    setTimelineLoadingMore(true);
+    setTimelineError(null);
+    try {
+      const r = await getWalletTimeline(publicKey.toBase58(), { before: timeline.nextBefore });
+      setTimeline((prev) => {
+        if (!prev) return prev;
+        const seen = new Set(prev.entries.map((e) => e.signature));
+        const newEntries = r.entries.filter((e) => !seen.has(e.signature));
+        return {
+          entries: [...prev.entries, ...newEntries],
+          signatureCount: prev.signatureCount + r.scanned.signatureCount,
+          unreachableCount: prev.unreachableCount + r.scanned.unreachableCount,
+          oldest: r.scanned.oldest ?? prev.oldest,
+          newest: prev.newest,
+          nextBefore: r.scanned.oldestSignature,
+          hasMore: r.scanned.hasMore,
+        };
+      });
+    } catch (e) {
+      setTimelineError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setTimelineLoadingMore(false);
     }
   }
 
@@ -459,6 +601,84 @@ export default function MyActivityPage() {
               >
                 {loadingMore ? "Scanning…" : "Scan further back →"}
               </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {connected && (
+        <div className="space-y-6 border-t border-border/40 pt-8">
+          <div className="space-y-2">
+            <h2 className="font-display text-lg font-semibold text-text">Full Transaction Timeline</h2>
+            <p className="text-sm text-text-secondary">
+              Every real transaction for this wallet — swaps, transfers, staking, NFT activity, and more — not
+              just bridge-matching ones. Classified by Helius's Enhanced Transactions API.
+            </p>
+          </div>
+
+          {timelineLoading ? (
+            <div className="space-y-4">
+              <div className="skeleton h-24 w-full rounded-2xl"></div>
+              <div className="skeleton h-24 w-full rounded-2xl"></div>
+              <div className="skeleton h-24 w-full rounded-2xl"></div>
+            </div>
+          ) : timelineError ? (
+            <div className="glass-card-elevated p-10 text-center">
+              <p className="text-sm text-muted">Couldn't load the full transaction timeline. {timelineError}</p>
+            </div>
+          ) : !timeline ? null : (
+            <div className="space-y-4">
+              <p className="text-xs text-muted-dark">
+                Scanned {timeline.signatureCount} transaction{timeline.signatureCount === 1 ? "" : "s"} for this
+                wallet
+                {timeline.oldest && timeline.newest ? (
+                  <>
+                    {" "}
+                    ({new Date(timeline.oldest).toLocaleDateString()} –{" "}
+                    {new Date(timeline.newest).toLocaleDateString()})
+                  </>
+                ) : null}
+                .
+              </p>
+
+              {timeline.unreachableCount > 0 && (
+                <div className="rounded-xl border border-yellow/30 bg-yellow-glow/40 px-4 py-3 text-xs text-yellow">
+                  Couldn't classify {timeline.unreachableCount} of {timeline.signatureCount} scanned transactions
+                  (Helius's Enhanced Transactions API didn't return them, even after retries) — results below may
+                  be incomplete.
+                </div>
+              )}
+
+              {timeline.entries.length === 0 ? (
+                <div className="glass-card-elevated space-y-4 p-10 text-center">
+                  <p className="text-sm text-muted">
+                    {timeline.unreachableCount > 0
+                      ? "No transactions could be classified in this window."
+                      : "No transactions found for this wallet."}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {timeline.entries.map((e, i) => (
+                    <Reveal key={e.signature} delayMs={i * 60}>
+                      <TimelineRow entry={e} />
+                    </Reveal>
+                  ))}
+                </div>
+              )}
+
+              {timeline.entries.length > 0 && timeline.hasMore && (
+                <div className="flex justify-center pt-2">
+                  <button
+                    type="button"
+                    onClick={scanTimelineFurtherBack}
+                    disabled={timelineLoadingMore}
+                    className="badge text-xs transition-colors hover:text-text disabled:opacity-50"
+                  >
+                    {timelineLoadingMore ? "Scanning…" : "Scan further back →"}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
