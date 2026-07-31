@@ -57,6 +57,30 @@ export async function withRetry<T>(label: string, fn: () => Promise<T>, attempts
   throw lastErr;
 }
 
+/** A bounded, factual look at this bridge's real recorded health score in
+ * the days immediately after a transaction — distinct from
+ * `retroactiveRisk`, which looks unbounded into the future for the single
+ * worst score ever recorded. Every field here is either a real
+ * `bridge_health_scores` row or an honest "we have no data" — nothing is
+ * interpolated, predicted, or judged. */
+export interface ScoreTrend {
+  /** Requested trailing window length in days (currently fixed at 7). */
+  windowDays: number;
+  /** How many of those days have actually elapsed as of now — less than
+   * `windowDays` when the transaction is recent; the window end is capped
+   * at "now", never projected past it. */
+  coveredDays: number;
+  /** True when fewer than `windowDays` have elapsed since the transaction —
+   * the window is still filling in, not yet a complete picture. */
+  partial: boolean;
+  /** Real count of `bridge_health_scores` rows found in this window. */
+  pointsRecorded: number;
+  /** The lowest real score recorded in the window, or null when we have no
+   * score data for this bridge in that window at all. */
+  minScore: number | null;
+  minScoreAt: string | null;
+}
+
 export interface WalletActivityMatch {
   signature: string;
   slot: number;
@@ -81,6 +105,8 @@ export interface WalletActivityMatch {
      * transaction was affected, just that the bridge had a detected
      * anomaly at some point afterward. Callers must word it that way. */
     retroactiveRisk: { score: number; band: "yellow" | "red"; computed_at: string } | null;
+    /** Real health-score trend for the 7 days following this transaction. */
+    scoreTrend: ScoreTrend | null;
   }[];
 }
 
@@ -113,6 +139,48 @@ export interface WalletActivityResult {
    * a nonzero count means the scan didn't fully complete, not that we
    * confirmed a clean history. */
   hasActivity: boolean;
+}
+
+const SCORE_TREND_WINDOW_DAYS = 7;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Builds a `ScoreTrend` from real `bridge_health_scores` rows only — see
+ * the `ScoreTrend` doc comment. `db.scoreHistory` already returns rows
+ * `>= txBlockTimeIso` in ascending order; this just bounds that to the
+ * 7-day window (capped at "now" for recent transactions) and reports the
+ * real minimum found, never estimating a point we didn't record. */
+function buildScoreTrend(db: RadarDb, bridgeId: string, txBlockTimeIso: string): ScoreTrend {
+  const txTime = new Date(txBlockTimeIso).getTime();
+  const idealEndTime = txTime + SCORE_TREND_WINDOW_DAYS * DAY_MS;
+  const now = Date.now();
+  const windowEndTime = Math.min(idealEndTime, now);
+  const coveredDays = Math.max(0, (windowEndTime - txTime) / DAY_MS);
+  const partial = idealEndTime > now;
+  const windowEndIso = new Date(windowEndTime).toISOString();
+
+  const rows = db.scoreHistory(bridgeId, txBlockTimeIso).filter((r) => r.computed_at <= windowEndIso);
+  if (rows.length === 0) {
+    return {
+      windowDays: SCORE_TREND_WINDOW_DAYS,
+      coveredDays,
+      partial,
+      pointsRecorded: 0,
+      minScore: null,
+      minScoreAt: null,
+    };
+  }
+  let min = rows[0]!;
+  for (const r of rows) {
+    if (r.score < min.score) min = r;
+  }
+  return {
+    windowDays: SCORE_TREND_WINDOW_DAYS,
+    coveredDays,
+    partial,
+    pointsRecorded: rows.length,
+    minScore: min.score,
+    minScoreAt: min.computed_at,
+  };
 }
 
 export function isValidSolanaAddress(address: string): boolean {
@@ -236,6 +304,8 @@ export async function fetchWalletBridgeActivity(
           }
         }
 
+        const scoreTrend = blockTime ? buildScoreTrend(db, bridgeId, blockTime) : null;
+
         return {
           bridge_id: bridgeId,
           display_name: displayNameFor(bridgeId),
@@ -243,6 +313,7 @@ export async function fetchWalletBridgeActivity(
           historicalScore,
           amountUsd,
           retroactiveRisk,
+          scoreTrend,
         };
       }),
     });

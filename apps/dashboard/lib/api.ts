@@ -66,6 +66,17 @@ export async function listRegistry() {
   }>("/v1/registry");
 }
 
+/** Real, bounded look at a bridge's recorded health score in the 7 days
+ * after a transaction — see apps/api/src/wallet-activity.ts ScoreTrend. */
+export interface ScoreTrend {
+  windowDays: number;
+  coveredDays: number;
+  partial: boolean;
+  pointsRecorded: number;
+  minScore: number | null;
+  minScoreAt: string | null;
+}
+
 export interface WalletActivityMatch {
   signature: string;
   slot: number;
@@ -83,6 +94,7 @@ export interface WalletActivityMatch {
      * territory — retrospective context only, never a claim that this
      * specific transaction was affected. */
     retroactiveRisk: { score: number; band: "yellow" | "red"; computed_at: string } | null;
+    scoreTrend: ScoreTrend | null;
   }[];
 }
 

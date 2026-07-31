@@ -10,6 +10,7 @@ import {
   getWalletActivity,
   getWalletHoldings,
   getWalletTimeline,
+  type ScoreTrend,
   type TimelineCategory,
   type WalletActivityMatch,
   type WalletHoldingsResult,
@@ -26,6 +27,39 @@ const bandColor = {
 
 function scoreBandColor(score: number) {
   return bandColor[bandOf(score)];
+}
+
+/** A real, verified transaction cited in BRIDGE_DISCOVERY.md — used only to
+ * demonstrate the bridge-health features against real data when the
+ * connected wallet has no bridge transaction history of its own. Real
+ * on-chain data from a real wallet, just not the person using this page. */
+const EXAMPLE_WALLET_ADDRESS = "9DSkvHgHVYJxZYvVKW4L36ibhpT1UD6geqJdz6VUhpdL";
+
+function formatDays(days: number): string {
+  if (days < 1) return "less than a day";
+  const rounded = Math.round(days);
+  return `${rounded} day${rounded === 1 ? "" : "s"}`;
+}
+
+/** Purely factual description of a real ScoreTrend — no advisory or
+ * predictive language, only what our own bridge_health_scores table
+ * actually recorded. */
+function describeScoreTrend(displayName: string, txBlockTime: string, trend: ScoreTrend): string {
+  if (trend.pointsRecorded === 0) {
+    return `No health-score data was recorded for ${displayName} in the ${formatDays(trend.coveredDays)} after this transaction${
+      trend.partial ? " so far" : ""
+    }.`;
+  }
+  const suffix = trend.partial ? `, ${formatDays(trend.coveredDays)} so far` : ` (${formatDays(trend.coveredDays)})`;
+  if (trend.minScore !== null && trend.minScore < 80) {
+    const daysAfter = trend.minScoreAt
+      ? (new Date(trend.minScoreAt).getTime() - new Date(txBlockTime).getTime()) / (24 * 60 * 60 * 1000)
+      : 0;
+    return `${displayName}'s health score dropped to ${trend.minScore} on ${new Date(
+      trend.minScoreAt!,
+    ).toLocaleDateString()}, ${formatDays(daysAfter)} after this transaction.`;
+  }
+  return `${displayName}'s health score stayed at or above ${trend.minScore} (green band) in the period after this transaction${suffix}.`;
 }
 
 function formatRelativeMinutes(minutes: number): string {
@@ -115,6 +149,18 @@ function ActivityRow({ match }: { match: WalletActivityMatch }) {
                 {new Date(b.retroactiveRisk!.computed_at).toLocaleDateString()}. This does not mean
                 your specific transaction was affected, just that the bridge had a detected
                 anomaly afterward.
+              </p>
+            ))}
+        </div>
+      )}
+
+      {match.blockTime && match.bridges.some((b) => b.scoreTrend) && (
+        <div className="space-y-2 border-t border-border/30 pt-3">
+          {match.bridges
+            .filter((b) => b.scoreTrend)
+            .map((b) => (
+              <p key={`${b.bridge_id}-trend`} className="text-xs leading-relaxed text-text-secondary">
+                {describeScoreTrend(b.display_name, match.blockTime!, b.scoreTrend!)}
               </p>
             ))}
         </div>
@@ -276,6 +322,14 @@ export default function MyActivityPage() {
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [timelineLoadingMore, setTimelineLoadingMore] = useState(false);
   const [timelineError, setTimelineError] = useState<string | null>(null);
+  /** When true, the bridge-activity scan (and the bridge-health features
+   * built on it) run against EXAMPLE_WALLET_ADDRESS — a real, cited
+   * transaction — instead of the connected wallet. Lets these features be
+   * demonstrated with real data even when the connected wallet has no
+   * bridge transaction history of its own. Never affects holdings or the
+   * full timeline, which stay tied to the actually-connected wallet. */
+  const [previewMode, setPreviewMode] = useState(false);
+  const activityAddress = previewMode ? EXAMPLE_WALLET_ADDRESS : (publicKey?.toBase58() ?? null);
 
   useEffect(() => {
     if (!publicKey) {
@@ -333,7 +387,7 @@ export default function MyActivityPage() {
   }, [publicKey]);
 
   useEffect(() => {
-    if (!publicKey) {
+    if (!activityAddress) {
       setScan(null);
       setError(null);
       return;
@@ -342,7 +396,7 @@ export default function MyActivityPage() {
     setLoading(true);
     setError(null);
     setScan(null);
-    getWalletActivity(publicKey.toBase58())
+    getWalletActivity(activityAddress)
       .then((r) => {
         if (cancelled) return;
         setScan({
@@ -364,7 +418,7 @@ export default function MyActivityPage() {
     return () => {
       cancelled = true;
     };
-  }, [publicKey]);
+  }, [activityAddress]);
 
   /** Real, honest breakdown of trackable dollar value across every matched
    * bridge leg in the current scan — never fabricates a number for a leg
@@ -397,11 +451,11 @@ export default function MyActivityPage() {
   }, [scan?.matches]);
 
   async function scanFurtherBack() {
-    if (!publicKey || !scan?.nextBefore || loadingMore) return;
+    if (!activityAddress || !scan?.nextBefore || loadingMore) return;
     setLoadingMore(true);
     setError(null);
     try {
-      const r = await getWalletActivity(publicKey.toBase58(), { before: scan.nextBefore });
+      const r = await getWalletActivity(activityAddress, { before: scan.nextBefore });
       setScan((prev) => {
         if (!prev) return prev;
         // New page's matches are strictly older — append after what we have.
@@ -479,10 +533,17 @@ export default function MyActivityPage() {
         </>
       )}
 
-      {!connected ? (
+      {!connected && !previewMode ? (
         <div className="glass-card-elevated flex flex-col items-center gap-4 p-10 text-center">
           <p className="text-sm text-muted">Connect your wallet to see your bridge activity.</p>
           <WalletConnectButton />
+          <button
+            type="button"
+            onClick={() => setPreviewMode(true)}
+            className="text-xs text-muted-dark underline transition-colors hover:text-text"
+          >
+            Or view an example with a real bridge transaction →
+          </button>
         </div>
       ) : loading ? (
         <div className="space-y-4">
@@ -497,6 +558,22 @@ export default function MyActivityPage() {
         </div>
       ) : !scan ? null : (
         <div className="space-y-6">
+          {previewMode && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/30 bg-accent-glow/40 px-4 py-3 text-xs text-accent-bright">
+              <span>
+                Example wallet — for demonstration. This is real, on-chain data from a real wallet and a
+                real bridge transaction (cited in BRIDGE_DISCOVERY.md), not the wallet connected above.
+              </span>
+              <button
+                type="button"
+                onClick={() => setPreviewMode(false)}
+                className="shrink-0 underline transition-colors hover:text-text"
+              >
+                Exit example
+              </button>
+            </div>
+          )}
+
           <StatBar
             segments={
               [
@@ -578,6 +655,15 @@ export default function MyActivityPage() {
                   className="badge text-xs transition-colors hover:text-text disabled:opacity-50"
                 >
                   {loadingMore ? "Scanning…" : "Scan further back →"}
+                </button>
+              )}
+              {!previewMode && (
+                <button
+                  type="button"
+                  onClick={() => setPreviewMode(true)}
+                  className="block text-xs text-muted-dark underline transition-colors hover:text-text"
+                >
+                  View a real example transaction instead →
                 </button>
               )}
             </div>
