@@ -37,7 +37,7 @@ export function isRateLimitError(err: unknown): boolean {
  * when the caller ultimately swallows it (e.g. one bad transaction in a
  * larger batch). Non-rate-limit errors are logged once and rethrown
  * immediately — no point retrying a genuine bad-request or network error. */
-async function withRetry<T>(label: string, fn: () => Promise<T>, attempts = 4): Promise<T> {
+export async function withRetry<T>(label: string, fn: () => Promise<T>, attempts = 4): Promise<T> {
   let lastErr: unknown;
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {

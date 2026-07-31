@@ -7,7 +7,14 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 async function fetchJson<T>(path: string): Promise<T> {
   const r = await fetch(`${API_URL}${path}`, { cache: "no-store" });
-  if (!r.ok) throw new Error(`fetch ${path} failed: ${r.status}`);
+  if (!r.ok) {
+    // The API returns a real `detail` string on most error responses
+    // (rate-limit explanations, "not configured" reasons, etc.) — surface
+    // it instead of a bare status code so the UI can show an honest reason.
+    const body = await r.json().catch(() => null);
+    const detail = body && typeof body === "object" && "detail" in body ? ` — ${(body as { detail: unknown }).detail}` : "";
+    throw new Error(`fetch ${path} failed: ${r.status}${detail}`);
+  }
   return r.json() as Promise<T>;
 }
 
@@ -134,6 +141,48 @@ export interface WalletHoldingsResult {
  * when DeFiLlama has no live price for that mint. */
 export async function getWalletHoldings(address: string) {
   return fetchJson<WalletHoldingsResult>(`/v1/wallet-holdings/${encodeURIComponent(address)}`);
+}
+
+export type TimelineCategory = "transfer" | "swap" | "stake" | "nft" | "program" | "unknown";
+
+export interface WalletTimelineEntry {
+  signature: string;
+  slot: number;
+  blockTime: string | null;
+  /** Raw Helius classification, e.g. "SWAP", "COMPRESSED_NFT_MINT". */
+  heliusType: string;
+  category: TimelineCategory;
+  source: string;
+  description: string | null;
+  feeLamports: number;
+  nativeTransfers: { fromUserAccount: string; toUserAccount: string; amountLamports: number }[];
+  tokenTransfers: { fromUserAccount: string; toUserAccount: string; mint: string; tokenAmount: number }[];
+}
+
+export interface WalletTimelineResult {
+  address: string;
+  scanned: {
+    signatureCount: number;
+    oldest: string | null;
+    newest: string | null;
+    unreachableCount: number;
+    oldestSignature: string | null;
+    hasMore: boolean;
+  };
+  entries: WalletTimelineEntry[];
+}
+
+/** Real, full transaction timeline (not just bridge-matching transactions) —
+ * see apps/api/src/wallet-timeline.ts. Classified by Helius's Enhanced
+ * Transactions API; throws with an honest "not configured" detail message
+ * (surfaced via fetchJson) when no Helius key is available server-side,
+ * rather than silently degrading to guessed data. */
+export async function getWalletTimeline(address: string, opts?: { limit?: number; before?: string }) {
+  const params = new URLSearchParams();
+  if (opts?.limit) params.set("limit", String(opts.limit));
+  if (opts?.before) params.set("before", opts.before);
+  const q = params.toString() ? `?${params.toString()}` : "";
+  return fetchJson<WalletTimelineResult>(`/v1/wallet-timeline/${encodeURIComponent(address)}${q}`);
 }
 
 export const apiUrls = {
