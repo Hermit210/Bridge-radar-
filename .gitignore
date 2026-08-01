@@ -17,6 +17,10 @@ out/
 test-ledger/
 **/*-keypair.json
 **/keypair*.json
+# attester.json didn't match either pattern above and got committed
+# (2026-04-26, purged from history 2026-08-02) -- covers that filename and
+# any future rotation (attester_new.json, attester_v2.json, etc.) explicitly.
+attester*.json
 
 # Local DB / runtime artifacts
 *.db
