@@ -71,9 +71,12 @@ export function BridgeUsageSummary({ usageCounts }: { usageCounts: Record<string
           const count = usageCounts[b.id] ?? 0;
           const band = bandFor(b);
           return (
-            <div key={b.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2.5 text-sm">
+            <div
+              key={b.id}
+              className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-lg py-2.5 px-2 -mx-2 text-sm transition-colors hover:bg-surface/60"
+            >
               <span className={count > 0 ? "text-text" : "text-muted"}>{b.display_name}</span>
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-4">
                 <span className="font-mono text-xs text-muted-dark">
                   {count > 0 ? `${count} transaction${count === 1 ? "" : "s"} found` : "no activity found"}
                 </span>

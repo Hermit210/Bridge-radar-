@@ -76,7 +76,7 @@ function ActivityRow({ match }: { match: WalletActivityMatch }) {
   const ambiguous = match.bridges.length > 1;
 
   return (
-    <div className="space-y-3 rounded-2xl border border-border-subtle bg-surface/60 p-5">
+    <div className="group space-y-3 rounded-2xl border border-border-subtle bg-surface/60 p-5 transition-colors hover:border-accent/25 hover:bg-surface/80">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <span className="font-display text-sm font-semibold text-text">
@@ -95,14 +95,14 @@ function ActivityRow({ match }: { match: WalletActivityMatch }) {
         href={`https://solscan.io/tx/${match.signature}`}
         target="_blank"
         rel="noreferrer"
-        className="block truncate font-mono text-xs text-muted transition-colors hover:text-accent"
+        className="block truncate font-mono text-xs text-muted transition-colors group-hover:text-accent"
       >
         {match.signature} ↗
       </a>
 
       <div className="space-y-2 border-t border-border/30 pt-3">
         {match.bridges.map((b) => (
-          <div key={b.bridge_id} className="flex items-center justify-between text-sm">
+          <div key={b.bridge_id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
             <span className="text-muted">{b.display_name} health score</span>
             {b.historicalScore ? (
               <span className={`font-mono font-medium ${scoreBandColor(b.historicalScore.score)}`}>
@@ -120,7 +120,7 @@ function ActivityRow({ match }: { match: WalletActivityMatch }) {
 
       <div className="space-y-2 border-t border-border/30 pt-3">
         {match.bridges.map((b) => (
-          <div key={`${b.bridge_id}-amount`} className="flex items-center justify-between text-sm">
+          <div key={`${b.bridge_id}-amount`} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
             <span className="text-muted">{b.display_name} value</span>
             {b.amountUsd === null ? (
               <span className="text-xs text-muted-dark">not indexed by us (predates or missed monitoring)</span>
@@ -242,7 +242,7 @@ function WalletHoldingsCard({ holdings }: { holdings: WalletHoldingsResult }) {
         </span>
       </div>
 
-      <div className="flex items-center justify-between text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
         <span className="text-muted">SOL balance</span>
         <span className="font-mono text-text">
           {holdings.solBalance.toLocaleString(undefined, { maximumFractionDigits: 6 })} SOL
@@ -257,7 +257,7 @@ function WalletHoldingsCard({ holdings }: { holdings: WalletHoldingsResult }) {
       {holdings.tokens.length > 0 && (
         <div className="space-y-2 border-t border-border/30 pt-3">
           {holdings.tokens.map((t) => (
-            <div key={t.mint} className="flex items-center justify-between text-sm">
+            <div key={t.mint} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
               <span className="font-mono text-xs text-muted" title={t.mint}>
                 {t.symbol ?? `${t.mint.slice(0, 4)}…${t.mint.slice(-4)}`}
               </span>
@@ -549,7 +549,9 @@ export default function MyActivityPage() {
               <p className="text-sm text-muted">Couldn't fetch wallet holdings. {holdingsError}</p>
             </div>
           ) : holdings ? (
-            <WalletHoldingsCard holdings={holdings} />
+            <Reveal>
+              <WalletHoldingsCard holdings={holdings} />
+            </Reveal>
           ) : (
             <div className="skeleton h-32 w-full rounded-2xl"></div>
           )}
@@ -597,24 +599,26 @@ export default function MyActivityPage() {
             </div>
           )}
 
-          <StatBar
-            segments={
-              [
-                { key: "scanned", label: "Transactions scanned", value: scan.signatureCount },
-                { key: "bridges", label: "Bridges used", value: summaryStats.uniqueBridgeCount },
-                {
-                  key: "earliest",
-                  label: "Earliest",
-                  value: scan.oldest ? new Date(scan.oldest).toLocaleDateString() : "—",
-                },
-                {
-                  key: "latest",
-                  label: "Latest",
-                  value: scan.newest ? new Date(scan.newest).toLocaleDateString() : "—",
-                },
-              ] satisfies StatBarSegment[]
-            }
-          />
+          <Reveal>
+            <StatBar
+              segments={
+                [
+                  { key: "scanned", label: "Transactions scanned", value: scan.signatureCount },
+                  { key: "bridges", label: "Bridges used", value: summaryStats.uniqueBridgeCount },
+                  {
+                    key: "earliest",
+                    label: "Earliest",
+                    value: scan.oldest ? new Date(scan.oldest).toLocaleDateString() : "—",
+                  },
+                  {
+                    key: "latest",
+                    label: "Latest",
+                    value: scan.newest ? new Date(scan.newest).toLocaleDateString() : "—",
+                  },
+                ] satisfies StatBarSegment[]
+              }
+            />
+          </Reveal>
 
           <div className="space-y-2">
             <p className="text-xs text-muted-dark">
@@ -649,22 +653,24 @@ export default function MyActivityPage() {
           </Reveal>
 
           {scan.matches.length > 0 && (
-            <div className="rounded-xl border border-border-subtle bg-surface/60 p-4 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-muted">Total historical bridged value (tracked amounts only)</span>
-                <span className="font-mono font-semibold text-text">
-                  {bridgedValue.trackedLegs > 0 ? formatUsd(bridgedValue.totalUsd) : "$0.00"}
-                </span>
+            <Reveal>
+              <div className="rounded-xl border border-border-subtle bg-surface/60 p-4 text-sm transition-colors hover:border-accent/25 hover:bg-surface/80">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-muted">Total historical bridged value (tracked amounts only)</span>
+                  <span className="font-mono font-semibold text-text">
+                    {bridgedValue.trackedLegs > 0 ? formatUsd(bridgedValue.totalUsd) : "$0.00"}
+                  </span>
+                </div>
+                <p className="mt-1.5 text-[11px] text-muted-dark">
+                  {bridgedValue.trackedLegs} of{" "}
+                  {bridgedValue.trackedLegs + bridgedValue.untrackedLegs + bridgedValue.notIndexedLegs} matched
+                  bridge leg{bridgedValue.trackedLegs + bridgedValue.untrackedLegs + bridgedValue.notIndexedLegs === 1 ? "" : "s"} had a
+                  real tracked dollar amount — {bridgedValue.untrackedLegs} had no pricing yet, and{" "}
+                  {bridgedValue.notIndexedLegs} predate or otherwise missed our own monitoring, so their value is
+                  genuinely unknown to us rather than zero.
+                </p>
               </div>
-              <p className="mt-1.5 text-[11px] text-muted-dark">
-                {bridgedValue.trackedLegs} of{" "}
-                {bridgedValue.trackedLegs + bridgedValue.untrackedLegs + bridgedValue.notIndexedLegs} matched
-                bridge leg{bridgedValue.trackedLegs + bridgedValue.untrackedLegs + bridgedValue.notIndexedLegs === 1 ? "" : "s"} had a
-                real tracked dollar amount — {bridgedValue.untrackedLegs} had no pricing yet, and{" "}
-                {bridgedValue.notIndexedLegs} predate or otherwise missed our own monitoring, so their value is
-                genuinely unknown to us rather than zero.
-              </p>
-            </div>
+            </Reveal>
           )}
 
           {usedBridges.length > 0 && (
@@ -727,13 +733,15 @@ export default function MyActivityPage() {
 
       {connected && (
         <div className="space-y-6 border-t border-border/40 pt-8">
-          <div className="space-y-2">
-            <h2 className="font-display text-lg font-semibold text-text">Full Transaction Timeline</h2>
-            <p className="text-sm text-text-secondary">
-              Every real transaction for this wallet — swaps, transfers, staking, NFT activity, and more — not
-              just bridge-matching ones. Classified by Helius's Enhanced Transactions API.
-            </p>
-          </div>
+          <Reveal>
+            <div className="space-y-2">
+              <h2 className="text-sm font-semibold text-text">Full Transaction Timeline</h2>
+              <p className="text-sm text-text-secondary">
+                Every real transaction for this wallet — swaps, transfers, staking, NFT activity, and more — not
+                just bridge-matching ones. Classified by Helius's Enhanced Transactions API.
+              </p>
+            </div>
+          </Reveal>
 
           {timelineLoading ? (
             <div className="space-y-4">
