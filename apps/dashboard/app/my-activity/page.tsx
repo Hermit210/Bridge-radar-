@@ -7,6 +7,7 @@ import { WalletConnectButton } from "@/components/wallet-connect-button";
 import { Reveal } from "@/components/reveal";
 import { StatBar, type StatBarSegment } from "@/components/stat-bar";
 import { BridgeScoreNotifications } from "@/components/bridge-score-notifications";
+import { BridgeUsageSummary } from "@/components/bridge-usage-summary";
 import {
   getWalletActivity,
   getWalletHoldings,
@@ -461,6 +462,17 @@ export default function MyActivityPage() {
     return [...byId.entries()].map(([bridgeId, displayName]) => ({ bridgeId, displayName }));
   }, [scan?.matches]);
 
+  /** Real per-bridge transaction counts for this scan — feeds the personal
+   * usage summary. Counts bridge legs (not tx rows), so the rare ambiguous
+   * wormhole/portal match counts once toward each, same as bridgedValue. */
+  const usageCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const m of scan?.matches ?? []) {
+      for (const b of m.bridges) counts[b.bridge_id] = (counts[b.bridge_id] ?? 0) + 1;
+    }
+    return counts;
+  }, [scan?.matches]);
+
   async function scanFurtherBack() {
     if (!activityAddress || !scan?.nextBefore || loadingMore) return;
     setLoadingMore(true);
@@ -631,6 +643,10 @@ export default function MyActivityPage() {
               be incomplete, not necessarily a clean history.
             </div>
           )}
+
+          <Reveal>
+            <BridgeUsageSummary usageCounts={usageCounts} />
+          </Reveal>
 
           {scan.matches.length > 0 && (
             <div className="rounded-xl border border-border-subtle bg-surface/60 p-4 text-sm">
