@@ -1,0 +1,25 @@
+[Unit]
+Description=Bridge Radar — signer/frontend/oracle detectors
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=radar
+Group=radar
+WorkingDirectory=/opt/bridge-radar
+EnvironmentFile=/opt/bridge-radar/.env
+ExecStart=/opt/bridge-radar/target/release/radar-watchers
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=radar-watchers
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/bridge-radar/data
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

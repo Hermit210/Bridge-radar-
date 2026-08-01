@@ -1,0 +1,25 @@
+[Unit]
+Description=Bridge Radar — Next.js dashboard
+After=network-online.target radar-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=radar
+Group=radar
+WorkingDirectory=/opt/bridge-radar/apps/dashboard
+EnvironmentFile=/opt/bridge-radar/.env
+ExecStart=/opt/bridge-radar/apps/dashboard/node_modules/.bin/next start -p 3000
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=radar-dashboard
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/bridge-radar/apps/dashboard/.next
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

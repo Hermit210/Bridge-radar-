@@ -1,0 +1,25 @@
+[Unit]
+Description=Bridge Radar — Health Score writer
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=radar
+Group=radar
+WorkingDirectory=/opt/bridge-radar
+EnvironmentFile=/opt/bridge-radar/.env
+ExecStart=/opt/bridge-radar/target/release/radar-scorer
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=radar-scorer
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/bridge-radar/data
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
