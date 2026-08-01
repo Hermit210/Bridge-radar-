@@ -204,7 +204,7 @@ export function BridgeScoreNotifications({ bridgesUsed }: { bridgesUsed: BridgeU
           return (
             <div
               key={b.bridgeId}
-              className="flex items-center justify-between gap-3 rounded-lg border border-border-subtle bg-surface/60 px-3 py-2 text-sm"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border-subtle bg-surface/60 px-3 py-2 text-sm transition-colors hover:border-accent/25 hover:bg-surface/80"
             >
               <div>
                 <span className="text-text-secondary">{b.displayName}</span>
