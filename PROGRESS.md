@@ -187,8 +187,17 @@ explicit, separate, real-funds decision not made yet.
   but `apps/api` (Node/Hono) reads SQLite directly via `better-sqlite3`,
   not through the Rust storage abstraction — pointing `DATABASE_URL` at
   Postgres today would not work for the API layer. Never run end-to-end.
-- **No `DEPLOYMENT.md`, no systemd units, no auto-reconnect/health-status
-  dashboard page** — none of this exists yet.
+- **`DEPLOYMENT.md` + `deploy/systemd/*.service` now exist** (2026-08-01) —
+  real, syntax-validated (`systemd-analyze verify`, all 9 units pass) but
+  never run end-to-end (no Docker/Postgres in the dev sandbox that wrote
+  them). Still missing: auto-reconnect/health-status endpoints beyond
+  `/v1/healthz`, and a system-status dashboard page. See
+  `TASK4_STATUS.md`.
+- **A real secret is in git history**: `attester.json` (a devnet Solana
+  keypair) is tracked and was pushed to the public GitHub remote —
+  `.gitignore`'s keypair patterns don't match that literal filename.
+  Flagged to the user 2026-08-01; not fixed (rotation + any history
+  rewrite is the user's call).
 - **`/events` and `/about`** never got a redesign pass; `/my-activity`
   never got a dedicated polish pass (only incidental motion from building
   features one at a time).

@@ -1,0 +1,31 @@
+# NOT enabled by default in DEPLOYMENT.md's setup loop — read the
+# "Attester / on-chain oracle" section of DEPLOYMENT.md before enabling
+# this. It signs and submits real transactions to the devnet oracle
+# program using ATTESTER_KEYPAIR_PATH; that keypair must be freshly
+# generated and never one that has ever touched git history.
+
+[Unit]
+Description=Bridge Radar — on-chain oracle attester (Solana devnet)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=radar
+Group=radar
+WorkingDirectory=/opt/bridge-radar
+EnvironmentFile=/opt/bridge-radar/.env
+ExecStart=/opt/bridge-radar/target/release/radar-attester
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=radar-attester
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/bridge-radar/data
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
