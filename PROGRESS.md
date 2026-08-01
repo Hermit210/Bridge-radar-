@@ -171,8 +171,18 @@ explicit, separate, real-funds decision not made yet.
 
 - **CCTP/Hyperlane**: no verified Solana program ID yet, `enabled=0`.
 - **`amount_usd` is an unpriced `0.0` placeholder** in 38 places across the
-  bridge adapters — every adapter logs a real event but doesn't yet resolve
-  a real USD amount. The Pyth client exists; wiring is per-adapter work.
+  bridge adapters. Scoped 2026-08-01 and it's bigger than "wire in the Pyth
+  client": no adapter, on either chain, currently extracts a real native
+  amount from anything. `SolanaLogContext` only carries `program_id` +
+  `log_line` text — no instruction data or balance deltas — so pricing
+  Solana-side events needs `radar-indexer-solana` to fetch full parsed
+  transactions instead of subscribing to log lines, an indexer-architecture
+  change, not adapter-level work. `EvmLogContext` does carry raw ABI `data`,
+  but every EVM adapter checked (e.g. Wormhole's `decode_evm_log`) discards
+  it after matching `topic0` — real per-bridge ABI decoding is still needed
+  before Pyth pricing applies to anything. The Pyth client (`amount_to_usd`)
+  itself is ready and correct; there's just no real amount anywhere to feed
+  it yet.
 - **Postgres/Timescale**: the Rust `Storage` trait impl is fully written,
   but `apps/api` (Node/Hono) reads SQLite directly via `better-sqlite3`,
   not through the Rust storage abstraction — pointing `DATABASE_URL` at
