@@ -1,9 +1,16 @@
 # Bridge Radar — build progress
 
-Snapshot 2026-08-01. Real-time bridge-health monitoring on Solana mainnet,
+Snapshot 2026-08-02. Real-time bridge-health monitoring on Solana mainnet,
 plus a wallet-facing layer (`/my-activity`) built entirely on Bridge Radar's
 own unique data — no feature here duplicates what Phantom/Solflare/Solscan
 already do well.
+
+**Security note**: a leaked credential (`attester.json`, a devnet Solana
+keypair) was found committed in git history on 2026-08-02. It was rotated
+(on-chain authority moved to a fresh key for all 7 affected bridges,
+verified on-chain) and purged from git history (`git filter-repo` +
+force-push, independently re-verified against a fresh clone from GitHub).
+No mainnet funds or mainnet program were ever involved.
 
 ## Shipped
 
@@ -18,12 +25,13 @@ already do well.
 | Scorer | `crates/radar-scorer` | Full whitepaper §4.4 weighted composite, every 60s: `100 − 40·parity − 25·outflow − 15·signer − 10·frontend − 10·oracle`. All 5 components real as of 2026-08-01. |
 | DeFiLlama sync | `crates/radar-defillama` | 9 categories on independent schedules into `defillama_cache`; 3 (bridges list, bridge volume, oracles TVS) require a paid Pro key ($300/mo) and honestly report `{"available": false}` without one — never fake/fallback data |
 | Attester | `crates/radar-attester` | Reads scores, derives PDA, `init_bridge`/`update_health` — **pinned to devnet** via `ATTESTER_RPC_URL`, independent of the mainnet-migrated indexer |
-| Alerter | `crates/radar-alerter` | Telegram + Discord + generic webhook fan-out |
+| Alerter | `crates/radar-alerter` | Telegram `sendMessage` + Discord webhook + generic webhook fan-out for signer/frontend/oracle events and score drops. **Code-complete, proven live in dry-run** (2026-08-02: caught 2 real `frontend_change` events from the live watcher, logged correctly) — actual Telegram/Discord message delivery not yet confirmed, pending real credentials. |
 | On-chain oracle | `programs/radar-oracle` | Anchor program, **deployed devnet only** — `6148M4aXYbDsscWn14zCazPy9V4fQFGozdDQp4LFmqHM`. Not touched/redeployed without explicit sign-off; real funds eventually involved. |
 | API | `apps/api` | Hono + WS. 21 REST routes (bridges/health/history/events/registry, 11 DeFiLlama passthroughs, the wallet layer: `wallet-holdings`, `wallet-activity`, `wallet-timeline`) plus a WebSocket live feed |
 | Dashboard | `apps/dashboard` | Next.js 15 — 7 pages: `/`, `/bridges`, `/bridges/[id]`, `/bridges/compare`, `/events`, `/about`, `/my-activity` (see Dashboard pages below for redesign coverage, which is uneven) |
-| Wallet layer | `apps/dashboard/app/my-activity` | Wallet connect (Phantom/Solflare/Coinbase/Ledger/Torus) + 8 features built entirely on our own data — see below |
-| Infra | `docker-compose.yml`, `migrations/0001_init.sql` | Timescale + Redis stack scaffolded, schema written, never actually run |
+| Wallet layer | `apps/dashboard/app/my-activity` | Wallet connect (Phantom/Solflare/Coinbase/Ledger/Torus) + 9 features built entirely on our own data — see below |
+| dApp SDK | `packages/sdk` (`@bridge-radar/sdk`, private/unpublished) | `getBridgeHealth` (real API) + `getBridgeHealthOnChain` (real on-chain PDA read) — verified against live data (real API score, real on-chain score, real thrown error for an unregistered bridge). Practical implementation of whitepaper §4.5's "dApps can gate withdrawals" promise. |
+| Infra | `docker-compose.yml`, `migrations/0001_init.sql` | Timescale + Redis stack scaffolded, schema written, never actually run — Docker still unavailable in every dev session so far (confirmed again 2026-08-02) |
 
 ## Bridge registry — 14 real adapters, 2 disabled, 6 blocked candidates
 
@@ -97,7 +105,7 @@ deterministic list that never diffs against itself — a real diffable
 source is future work); no bridge currently has a real `oracle_stale`
 (all 6 watched Pyth feeds are fresh).
 
-## Dashboard pages — redesign coverage is uneven
+## Dashboard pages — all 7 have a dedicated redesign pass (complete as of 2026-08-02)
 
 | Page | Redesign pass? |
 |---|---|
@@ -105,9 +113,9 @@ source is future work); no bridge currently has a real `oracle_stale`
 | `/bridges` (list) | ✅ Dedicated pass |
 | `/bridges/[id]` (detail) | ✅ Dedicated pass |
 | `/bridges/compare` | ✅ Dedicated pass (×2) |
-| `/events` | ❌ Never redesigned — bare fade-in only |
-| `/about` | ❌ Never redesigned — bare fade-in only |
-| `/my-activity` | ⚠️ Built feature-by-feature with incidental `Reveal`/skeleton use, never a dedicated polish pass matching the other four |
+| `/events` | ✅ Dedicated pass (2026-08-01) — real filters, real live stat breakdown |
+| `/about` | ✅ Dedicated pass (2026-08-01) — real live bridge-count badge, shared detector-grid component |
+| `/my-activity` | ✅ Dedicated pass (2026-08-02) — consistent entrance motion across all 9 features, hover states on every interactive row, mobile-safe wrapping |
 
 All hand-built — the 21st.dev MCP component-sourcing tools were never used
 anywhere in this codebase (no trace in source, lockfile, or git history);
@@ -152,9 +160,11 @@ has no real bridge history of its own to demo against.
   `SOLANA_PROGRAMS` arrays) — not touched or fixed here, tracked as a known
   gap below.
 - **TypeScript**: no unit test suites exist (`apps/api`, `apps/dashboard`,
-  `packages/shared` all have `"test": "echo 'no tests'"`) — verification is
-  `pnpm -r typecheck` (currently green) plus manual `curl` against the live
-  API with real data for every new endpoint/feature.
+  `packages/shared`, `packages/sdk` all have `"test": "echo 'no tests'"`) —
+  verification is `pnpm -r typecheck` (currently green across all 4
+  packages) plus manual `curl`/live-data checks against the real running
+  API and, for `packages/sdk`, the real devnet oracle for every new
+  endpoint/feature.
 - Live data flow validated end-to-end on mainnet: real bridge events, real
   wallet scans against a real address, real score changes proven against
   the live production DB (see Health Score Model above).
@@ -184,23 +194,23 @@ explicit, separate, real-funds decision not made yet.
   itself is ready and correct; there's just no real amount anywhere to feed
   it yet.
 - **Postgres/Timescale**: the Rust `Storage` trait impl is fully written,
-  but `apps/api` (Node/Hono) reads SQLite directly via `better-sqlite3`,
-  not through the Rust storage abstraction — pointing `DATABASE_URL` at
-  Postgres today would not work for the API layer. Never run end-to-end.
-- **`DEPLOYMENT.md` + `deploy/systemd/*.service` now exist** (2026-08-01) —
+  but `apps/api` (Node/Hono) has no Postgres client at all — reads SQLite
+  directly via `better-sqlite3`, not through the Rust storage abstraction.
+  Pointing `DATABASE_URL` at Postgres today would not work for the API
+  layer. Never run end-to-end — **Docker has been unavailable in every dev
+  session so far** (confirmed again 2026-08-02), so this remains blocked on
+  an environment with Docker access, not additional scoping work.
+- **`DEPLOYMENT.md` + `deploy/systemd/*.service` exist** (2026-08-01) —
   real, syntax-validated (`systemd-analyze verify`, all 9 units pass) but
   never run end-to-end (no Docker/Postgres in the dev sandbox that wrote
   them). Still missing: auto-reconnect/health-status endpoints beyond
   `/v1/healthz`, and a system-status dashboard page. See
   `TASK4_STATUS.md`.
-- **A real secret is in git history**: `attester.json` (a devnet Solana
-  keypair) is tracked and was pushed to the public GitHub remote —
-  `.gitignore`'s keypair patterns don't match that literal filename.
-  Flagged to the user 2026-08-01; not fixed (rotation + any history
-  rewrite is the user's call).
-- **`/events` and `/about`** never got a redesign pass; `/my-activity`
-  never got a dedicated polish pass (only incidental motion from building
-  features one at a time).
+- **Telegram/Discord live alert delivery unconfirmed**: `radar-alerter` is
+  code-complete and proven live in dry-run (real events, real formatted
+  messages, correctly logged), but no message has actually been delivered
+  to a real Telegram chat or Discord channel yet — pending real credentials
+  from the user.
 - **`cargo clippy -D warnings`** currently fails on 2 pre-existing warnings
   unrelated to any work done this session (see Tests above).
 - **No visual/screenshot verification of recent frontend work** — every
@@ -226,6 +236,7 @@ apps/
   dashboard/             Next.js 15, 7 pages
 packages/
   shared/                TS mirror of BridgeEvent / HealthScore / bandOf
+  sdk/                   @bridge-radar/sdk -- minimal dApp client (private, unpublished)
 programs/
   radar-oracle/          Anchor program (devnet)
 migrations/              Postgres + Timescale DDL (unused so far)

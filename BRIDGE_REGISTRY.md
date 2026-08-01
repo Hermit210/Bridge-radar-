@@ -124,7 +124,7 @@ around in a hedge state. Anything discovered in the future goes through
   `GET /v1/defillama/{bridges,bridge-volume,oracles}` — never fake data.
 
 ---
-( soon gonna use all bridges api to be stay updated with it ) 
+
 ## Bridge Registry Structure
 
 Located in: `apps/api/src/bridges.ts`

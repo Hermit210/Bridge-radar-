@@ -1,10 +1,10 @@
 # Bridge Radar
 
-Real-time bridge-health intelligence layer for Solana. Open source, public good, no token......
+Real-time bridge-health intelligence layer for Solana. Open source, public good, no token.
 
 ## What it does
-      
-Monitors every bridge with a Solana leg (Wormhole, LayerZero, Allbridge, deBridge, Mayan, Portal, Axelar) and exposes a single answer: **is this bridge healthy right now?**
+
+Monitors every bridge with a Solana leg — 14 real, mainnet-verified adapters today (Wormhole, LayerZero, Allbridge, deBridge, Mayan, Portal, Axelar, Relay, Across Protocol, Garden Finance, Coinbase Bridge, Atomiq Exchange, rhino.fi, Orderly Network) — and exposes a single answer: **is this bridge healthy right now?**
 
 Detectors:
 - Lock-vs-mint parity per asset across origin and Solana
@@ -21,7 +21,7 @@ Outputs:
 
 ## Status
 
-v1 shipped. 7 cargo crates + 2 Node apps + 1 Anchor program — full ingestion → detection → scoring → attestation → alerting → dashboard pipeline. Grant application in progress with Solana Foundation India ($5,000, 12-week build).
+v1 shipped. 8 cargo crates + 2 Node apps + 1 Anchor program + a minimal dApp SDK (`packages/sdk`) — full ingestion → detection → scoring → attestation → alerting → dashboard pipeline. All 14 bridge adapters, all 5 health-score detectors, and the Telegram/Discord/webhook alerter are real and live-verified (see [PROGRESS.md](./PROGRESS.md) for exactly what's proven vs. still pending). Grant application in progress with Solana Foundation India ($5,000, 12-week build).
 
 ## Quick start
 
@@ -35,6 +35,8 @@ cargo run -p radar-indexer-solana
 cargo run -p radar-indexer-evm
 cargo run -p radar-watchers
 cargo run -p radar-scorer
+cargo run -p radar-defillama     # optional; needs DEFILLAMA_API_KEY for 3 of 9 categories
+cargo run -p radar-alerter       # optional; dry-runs without TELEGRAM_BOT_TOKEN/DISCORD_WEBHOOK_URL
 pnpm --filter @radar/api dev
 pnpm --filter @radar/dashboard dev
 ```
@@ -46,12 +48,14 @@ Open `http://localhost:3000`. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the f
 Over $2.8B drained from bridges since 2022. Most exploits emitted detectable signals — anomalous outflows, signer rotations, parity breaks, frontend drift — minutes to days before drain completed. No public, real-time, neutral, Solana-focused service aggregates them today.
 
 ## Docs
-   
+
 - [Whitepaper](./WHITEPAPER.md)
+- [PROGRESS.md](./PROGRESS.md) — the definitive, honest current-state snapshot: what's proven, what's built-but-unverified, what's genuinely pending
+- [DEPLOYMENT.md](./DEPLOYMENT.md) — real deployment guide (unverified end-to-end — see its own honesty note)
+- [BRIDGE_REGISTRY.md](./BRIDGE_REGISTRY.md) — the full bridge list and how to add more
+- [BRIDGE_DISCOVERY.md](./BRIDGE_DISCOVERY.md) — verification trail for every bridge candidate ever evaluated
 
 ## License
-
-
 
 MIT (code), CC-BY 4.0 (docs). No token, no equity, no premine.
 Built by: Khan Saloni ([@Hermit210](https://github.com/Hermit210))
@@ -66,4 +70,11 @@ Built by: Khan Saloni ([@Hermit210](https://github.com/Hermit210))
 
 ## Devnet Deployment
 - Program ID: `6148M4aXYbDsscWn14zCazPy9V4fQFGozdDQp4LFmqHM`
+
+## Security
+
+A leaked credential (a devnet-only Solana keypair used by the attester
+service) was found committed in git history on 2026-08-02. It was rotated
+and purged from git history the same day — see [PROGRESS.md](./PROGRESS.md)
+for the factual summary. No mainnet funds or mainnet program were involved.
 
