@@ -1,17 +1,17 @@
 //! Health Score writer.
 //!
-//! v0-NAIVE: every `TICK_SECS`, look at the last `WINDOW_SECS` of events per
-//! bridge and compute `outflow_severity = clamp(events / baseline, 0, 1)` with
-//! `baseline = OUTFLOW_BASELINE` (configurable per-deploy). All other
-//! components stay 0.0. The whitepaper §4.4 weighting still applies, so the
-//! score is `100 - 25 * outflow_severity` for now — a quiet bridge sits at
-//! 100, an active bridge dips into the 80s.
-//!
-//! This is *deliberately* an under-claim: the dashboard renders a populated
-//! score immediately so the demo isn't dark, but tracing logs and the
-//! component breakdown make the under-claim visible. Real parity / signer /
-//! frontend / oracle severities arrive with the EVM indexer + detectors crate
-//! in v1.
+//! Every `TICK_SECS`, look at the last `WINDOW_SECS` of events per bridge and
+//! compute the whitepaper §4.4 weighted composite:
+//!   - `outflow_severity`: z-score of outflow events vs 30-day baseline.
+//!   - `parity_severity`: count-based lock/mint imbalance proxy (v0; v1
+//!     switches to USD-weighted parity per appendix B once assets are priced).
+//!   - `signer_recency` / `frontend_recency` / `oracle_staleness`: recency of
+//!     the most recent `signer_change` / `frontend_change` / `oracle_stale`
+//!     event `radar-watchers` recorded for that bridge, linearly decayed to 0
+//!     over each detector's window (24h / 6h / 5min respectively — see
+//!     `recency_severity`). These three detectors already run and persist
+//!     real events; this is purely reading them back into the score, not new
+//!     detection.
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Duration, Utc};
@@ -32,6 +32,22 @@ const OUTFLOW_BASELINE: f64 = 10.0; // events / 5min that yields severity 1.0 in
 const ZSCORE_LOOKBACK_DAYS: i64 = 30;
 const ZSCORE_MIN_BUCKETS: usize = 50; // ~4 hours of observations
 const ZSCORE_FIRES_AT: f64 = 4.0; // z >= 4.0 → severity 1.0 (whitepaper §4.3)
+
+// Whitepaper §4.4: "signer_change_recency (0..1, decays over 24h)" and
+// "frontend_drift_recency (0..1, decays over 6h)" — explicit windows.
+const SIGNER_RECENCY_WINDOW_HOURS: i64 = 24;
+const FRONTEND_RECENCY_WINDOW_HOURS: i64 = 6;
+// The whitepaper doesn't give oracle_staleness an explicit decay window (it
+// isn't framed as a "recency" component like the other two). Unlike
+// signer_change/frontend_change — which are edge-triggered, one event per
+// real change — radar-watchers' oracle loop (oracle.rs) is level-triggered:
+// it re-emits `oracle_stale` on every 60s poll for as long as the feed stays
+// stale. So "most recent event's age" is naturally ~0 while a feed is
+// actually stale right now, and decays away once it recovers and polls stop
+// firing. 5 minutes comfortably survives one skipped tick
+// (`MissedTickBehavior::Skip`) while still tracking "stale right now" rather
+// than "had an incident recently."
+const ORACLE_STALENESS_WINDOW_MINUTES: i64 = 5;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -87,7 +103,10 @@ async fn score_once(storage: &SqliteStorage) -> Result<usize> {
             score = score.score,
             outflow = format!("{:.2}", score.components.outflow_severity),
             parity = format!("{:.2}", score.components.parity_severity),
-            "v0-naive score written"
+            signer = format!("{:.2}", score.components.signer_recency),
+            frontend = format!("{:.2}", score.components.frontend_recency),
+            oracle = format!("{:.2}", score.components.oracle_staleness),
+            "score written"
         );
         updated += 1;
     }
@@ -167,10 +186,37 @@ async fn compute_score(
         1.0 - (lo / hi)
     };
 
+    let signer_recency = recency_severity(
+        storage,
+        bridge_id,
+        BridgeEventKind::SignerChange,
+        Duration::hours(SIGNER_RECENCY_WINDOW_HOURS),
+        now,
+    )
+    .await?;
+    let frontend_recency = recency_severity(
+        storage,
+        bridge_id,
+        BridgeEventKind::FrontendChange,
+        Duration::hours(FRONTEND_RECENCY_WINDOW_HOURS),
+        now,
+    )
+    .await?;
+    let oracle_staleness = recency_severity(
+        storage,
+        bridge_id,
+        BridgeEventKind::OracleStale,
+        Duration::minutes(ORACLE_STALENESS_WINDOW_MINUTES),
+        now,
+    )
+    .await?;
+
     let components = HealthComponents {
         outflow_severity,
         parity_severity,
-        ..Default::default()
+        signer_recency,
+        frontend_recency,
+        oracle_staleness,
     };
     Ok(HealthScore {
         bridge_id: bridge_id.clone(),
@@ -178,6 +224,35 @@ async fn compute_score(
         score: components.weighted_score(),
         components,
     })
+}
+
+/// Severity from how recently the most recent real event of `kind` landed
+/// for this bridge — linear decay from 1.0 at the moment it happened to 0.0
+/// at `window` out, 0.0 with no such event in the window at all. Never
+/// interpolates or predicts; only reads real `bridge_events` rows already
+/// written by `radar-watchers`.
+async fn recency_severity(
+    storage: &SqliteStorage,
+    bridge_id: &BridgeId,
+    kind: BridgeEventKind,
+    window: Duration,
+    now: DateTime<Utc>,
+) -> Result<f32> {
+    let events = storage
+        .list_events(&EventFilter {
+            bridge_id: Some(bridge_id.clone()),
+            kind: Some(kind),
+            since: Some(now - window),
+            limit: Some(1),
+            ..Default::default()
+        })
+        .await?;
+    let Some(latest) = events.first() else {
+        return Ok(0.0);
+    };
+    let age_secs = (now - latest.event_time).num_seconds().max(0) as f64;
+    let window_secs = window.num_seconds().max(1) as f64;
+    Ok((1.0 - age_secs / window_secs).clamp(0.0, 1.0) as f32)
 }
 
 #[cfg(test)]
@@ -221,6 +296,174 @@ mod tests {
             .unwrap();
         assert_eq!(score.score, 100);
         assert_eq!(score.components.outflow_severity, 0.0);
+        assert_eq!(score.components.signer_recency, 0.0);
+        assert_eq!(score.components.frontend_recency, 0.0);
+        assert_eq!(score.components.oracle_staleness, 0.0);
+    }
+
+    async fn store_event_at(
+        s: &SqliteStorage,
+        bridge: &str,
+        payload: BridgeEventPayload,
+        event_time: DateTime<Utc>,
+    ) {
+        s.insert_event(&BridgeEvent {
+            id: Uuid::new_v4(),
+            bridge_id: bridge.into(),
+            event_time,
+            payload,
+        })
+        .await
+        .unwrap();
+    }
+
+    fn signer_change_payload() -> BridgeEventPayload {
+        BridgeEventPayload::SignerChange {
+            before: vec!["guardian-01".into()],
+            after: vec!["guardian-02".into()],
+            tx: "set:19+1/-1".into(),
+        }
+    }
+
+    fn frontend_change_payload() -> BridgeEventPayload {
+        BridgeEventPayload::FrontendChange {
+            region: "default".into(),
+            old_hash: "aaaa".into(),
+            new_hash: "bbbb".into(),
+        }
+    }
+
+    fn oracle_stale_payload(now: DateTime<Utc>) -> BridgeEventPayload {
+        BridgeEventPayload::OracleStale {
+            feed: "SOL/USD".into(),
+            last_update: now - Duration::seconds(90),
+        }
+    }
+
+    /// A real, already-recorded signer_change event 1 hour old — well inside
+    /// the 24h decay window — must both populate signer_recency and pull the
+    /// score down from a perfect 100.
+    #[tokio::test]
+    async fn recent_signer_change_moves_score_down() {
+        let s = SqliteStorage::connect("sqlite::memory:").await.unwrap();
+        let now = Utc::now();
+        store_event_at(
+            &s,
+            "wormhole",
+            signer_change_payload(),
+            now - Duration::hours(1),
+        )
+        .await;
+        let score = compute_score(&s, &"wormhole".to_string(), now - Duration::minutes(5), now)
+            .await
+            .unwrap();
+        assert!(
+            score.components.signer_recency > 0.9,
+            "1h-old event in a 24h window should be near-full severity, got {}",
+            score.components.signer_recency
+        );
+        assert!(
+            score.score < 100,
+            "score should drop below 100, got {}",
+            score.score
+        );
+        // 15 * ~0.958 ≈ 14.4 → expect roughly 85-86
+        assert!((80..=90).contains(&score.score), "got {}", score.score);
+    }
+
+    /// A signer_change event older than the 24h window must not affect the
+    /// score at all — recency decays fully to 0, not partially.
+    #[tokio::test]
+    async fn old_signer_change_does_not_affect_score() {
+        let s = SqliteStorage::connect("sqlite::memory:").await.unwrap();
+        let now = Utc::now();
+        store_event_at(
+            &s,
+            "wormhole",
+            signer_change_payload(),
+            now - Duration::hours(25),
+        )
+        .await;
+        let score = compute_score(&s, &"wormhole".to_string(), now - Duration::minutes(5), now)
+            .await
+            .unwrap();
+        assert_eq!(score.components.signer_recency, 0.0);
+        assert_eq!(score.score, 100);
+    }
+
+    /// Same shape as the signer_change test, but for frontend_change and its
+    /// 6h window.
+    #[tokio::test]
+    async fn recent_frontend_change_moves_score_down() {
+        let s = SqliteStorage::connect("sqlite::memory:").await.unwrap();
+        let now = Utc::now();
+        store_event_at(
+            &s,
+            "portal",
+            frontend_change_payload(),
+            now - Duration::hours(1),
+        )
+        .await;
+        let score = compute_score(&s, &"portal".to_string(), now - Duration::minutes(5), now)
+            .await
+            .unwrap();
+        assert!(
+            score.components.frontend_recency > 0.7,
+            "1h-old event in a 6h window should be well above zero, got {}",
+            score.components.frontend_recency
+        );
+        assert!(
+            score.score < 100,
+            "score should drop below 100, got {}",
+            score.score
+        );
+    }
+
+    #[tokio::test]
+    async fn old_frontend_change_does_not_affect_score() {
+        let s = SqliteStorage::connect("sqlite::memory:").await.unwrap();
+        let now = Utc::now();
+        store_event_at(
+            &s,
+            "portal",
+            frontend_change_payload(),
+            now - Duration::hours(7),
+        )
+        .await;
+        let score = compute_score(&s, &"portal".to_string(), now - Duration::minutes(5), now)
+            .await
+            .unwrap();
+        assert_eq!(score.components.frontend_recency, 0.0);
+        assert_eq!(score.score, 100);
+    }
+
+    /// oracle_stale is level-triggered (radar-watchers re-emits it every poll
+    /// while a feed stays stale) so a fresh event should read as ~full
+    /// severity within its short 5-minute window.
+    #[tokio::test]
+    async fn recent_oracle_stale_moves_score_down() {
+        let s = SqliteStorage::connect("sqlite::memory:").await.unwrap();
+        let now = Utc::now();
+        store_event_at(
+            &s,
+            "mayan",
+            oracle_stale_payload(now),
+            now - Duration::seconds(30),
+        )
+        .await;
+        let score = compute_score(&s, &"mayan".to_string(), now - Duration::minutes(5), now)
+            .await
+            .unwrap();
+        assert!(
+            score.components.oracle_staleness > 0.8,
+            "30s-old event in a 5min window should be near-full severity, got {}",
+            score.components.oracle_staleness
+        );
+        assert!(
+            score.score < 100,
+            "score should drop below 100, got {}",
+            score.score
+        );
     }
 
     #[tokio::test]
