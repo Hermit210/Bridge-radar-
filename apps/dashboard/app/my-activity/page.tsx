@@ -6,6 +6,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletConnectButton } from "@/components/wallet-connect-button";
 import { Reveal } from "@/components/reveal";
 import { StatBar, type StatBarSegment } from "@/components/stat-bar";
+import { BridgeScoreNotifications } from "@/components/bridge-score-notifications";
 import {
   getWalletActivity,
   getWalletHoldings,
@@ -450,6 +451,16 @@ export default function MyActivityPage() {
     return { uniqueBridgeCount: uniqueBridges.size };
   }, [scan?.matches]);
 
+  /** Unique bridges this scan found real transaction history for — feeds
+   * the opt-in notification toggles, one per bridge actually used. */
+  const usedBridges = useMemo(() => {
+    const byId = new Map<string, string>();
+    for (const m of scan?.matches ?? []) {
+      for (const b of m.bridges) byId.set(b.bridge_id, b.display_name);
+    }
+    return [...byId.entries()].map(([bridgeId, displayName]) => ({ bridgeId, displayName }));
+  }, [scan?.matches]);
+
   async function scanFurtherBack() {
     if (!activityAddress || !scan?.nextBefore || loadingMore) return;
     setLoadingMore(true);
@@ -638,6 +649,12 @@ export default function MyActivityPage() {
                 genuinely unknown to us rather than zero.
               </p>
             </div>
+          )}
+
+          {usedBridges.length > 0 && (
+            <Reveal>
+              <BridgeScoreNotifications bridgesUsed={usedBridges} />
+            </Reveal>
           )}
 
           {scan.matches.length === 0 ? (
