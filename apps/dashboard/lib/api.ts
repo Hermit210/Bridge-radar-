@@ -40,9 +40,10 @@ export async function getBridgeHistory(id: string, since?: string) {
   );
 }
 
-export async function listEvents(opts: { bridge?: string; limit?: number; since?: string }) {
+export async function listEvents(opts: { bridge?: string; type?: BridgeEvent["type"]; limit?: number; since?: string }) {
   const params = new URLSearchParams();
   if (opts.bridge) params.set("bridge", opts.bridge);
+  if (opts.type) params.set("type", opts.type);
   if (opts.limit) params.set("limit", String(opts.limit));
   if (opts.since) params.set("since", opts.since);
   const q = params.toString() ? `?${params.toString()}` : "";

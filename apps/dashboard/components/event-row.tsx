@@ -20,13 +20,13 @@ const kindBg: Record<string, string> = {
   oracle_stale: "bg-red/10 text-red",
 };
 
-export function EventRow({ event }: { event: BridgeEvent }) {
+export function EventRow({ event, isNew = false }: { event: BridgeEvent; isNew?: boolean }) {
   const t = new Date(event.event_time).toLocaleTimeString();
   const amt = typeof event.amount_usd === "number" && event.amount_usd > 0
     ? `$${event.amount_usd.toLocaleString()}`
     : "—";
   return (
-    <tr className="text-sm">
+    <tr className={`text-sm ${isNew ? "animate-fade-in-up bg-accent-glow/30" : ""}`}>
       <td className="py-2.5 px-5 text-muted font-mono text-xs tabular-nums whitespace-nowrap">{t}</td>
       <td className="py-2.5 pr-4 font-medium text-text-secondary">{event.bridge_id}</td>
       <td className="py-2.5 pr-4">
