@@ -5,25 +5,31 @@ export default {
   theme: {
     extend: {
       colors: {
-        /* Deep navy foundation — sophisticated, premium depth */
-        bg: "#0a0e1a",
-        "surface-0": "#0f141f",
-        surface: "#141a28",
-        "surface-2": "#1a2030",
-        "surface-3": "#202938",
-        "surface-4": "#283244",
+        /* Warm near-black foundation — sophisticated, premium depth */
+        bg: "#0a0a09",
+        "surface-0": "#121110",
+        surface: "#1a1815",
+        "surface-2": "#221f1a",
+        "surface-3": "#2b2721",
+        "surface-4": "#363028",
 
-        border: "#2a3544",
-        "border-subtle": "#1e2634",
-        "border-glow": "rgba(212,165,116,0.12)",
+        border: "#3a352c",
+        "border-subtle": "#24211b",
+        "border-glow": "rgba(224,165,48,0.14)",
 
-        /* Premium text — platinum hierarchy with enhanced contrast */
-        text: "#eff1f3",
-        "text-secondary": "#b8bcc9",
-        muted: "#7f8799",
-        "muted-dark": "#5f6678",
+        /* Premium text — warm cream hierarchy with enhanced contrast */
+        text: "#f2ede1",
+        "text-secondary": "#c7bfae",
+        muted: "#948a78",
+        "muted-dark": "#695f52",
 
-        /* Semantic — refined, professional palette */
+        /* Cream — used sparingly as a light surface within dark panels
+           (e.g. the hero badge), never as a full section background. */
+        cream: "#f5f1e8",
+        "cream-ink": "#1a1815",
+
+        /* Semantic — refined, professional palette (never re-themed —
+           these mean healthy/watch/alert, independent of the accent) */
         green: "#2d9a77",
         "green-glow": "rgba(45,154,119,0.15)",
         yellow: "#c98a3f",
@@ -31,11 +37,11 @@ export default {
         red: "#b84f5e",
         "red-glow": "rgba(184,79,94,0.15)",
 
-        /* Primary accent — rich gold/amber, conveys luxury & trust */
-        accent: "#d4a574",
-        "accent-glow": "rgba(212,165,116,0.10)",
-        "accent-dim": "#c9935f",
-        "accent-bright": "#e6bc91",
+        /* Primary accent — vivid warm gold/amber, conveys luxury & trust */
+        accent: "#e0a530",
+        "accent-glow": "rgba(224,165,48,0.12)",
+        "accent-dim": "#c88f25",
+        "accent-bright": "#f0bd5c",
       },
       fontFamily: {
         display: [
@@ -85,15 +91,15 @@ export default {
         "3xl": "1.25rem",
       },
       boxShadow: {
-        "glow-sm": "0 0 20px -5px rgba(212,165,116,0.14)",
-        "glow-md": "0 0 40px -8px rgba(212,165,116,0.18)",
-        "glow-lg": "0 0 60px -10px rgba(212,165,116,0.22)",
+        "glow-sm": "0 0 20px -5px rgba(224,165,48,0.16)",
+        "glow-md": "0 0 40px -8px rgba(224,165,48,0.20)",
+        "glow-lg": "0 0 60px -10px rgba(224,165,48,0.24)",
         "glow-green": "0 0 25px -6px rgba(45,154,119,0.25)",
         "glow-yellow": "0 0 25px -6px rgba(201,138,63,0.25)",
         "glow-red": "0 0 25px -6px rgba(184,79,94,0.25)",
         card: "0 1px 3px rgba(0,0,0,0.5), 0 8px 28px rgba(0,0,0,0.35)",
         "card-hover":
-          "0 4px 20px rgba(0,0,0,0.6), 0 0 40px -8px rgba(212,165,116,0.15)",
+          "0 4px 20px rgba(0,0,0,0.6), 0 0 40px -8px rgba(224,165,48,0.17)",
       },
       animation: {
         "pulse-dot": "pulse-dot 2.5s ease-in-out infinite",
