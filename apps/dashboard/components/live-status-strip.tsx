@@ -78,32 +78,42 @@ export function LiveStatusStrip() {
   const eventsLastHour = useCountUp(snap?.eventsLastHour ?? 0);
   const avgScore = useCountUp(snap?.avgScore ?? 0);
 
-  const segments: { label: string; value: string; tone?: "green" }[] = [
-    { label: "Monitored", value: snap ? String(monitored) : "—" },
+  const segments: { label: string; value: string; tone?: "green"; barClass: string }[] = [
+    { label: "Monitored", value: snap ? String(monitored) : "—", barClass: "bg-accent/50" },
     {
       label: "Healthy",
       value: snap ? `${healthy}/${monitored}` : "—",
       tone: "green",
+      barClass: "bg-green/60",
     },
     {
       label: "Events (1h)",
       value: snap ? `${eventsLastHour}${snap.eventsCapped ? "+" : ""}` : "—",
+      barClass: "bg-yellow/50",
     },
     {
       label: "Avg score",
       value: snap && snap.avgScore !== null ? String(avgScore) : "—",
+      barClass: "bg-accent-bright/50",
     },
   ];
 
   return (
     <div className="w-full">
-      <div className="mb-3 flex items-center justify-center gap-1.5 text-[10px] font-mono uppercase tracking-[0.14em] text-muted-dark">
+      <div className="mb-3 flex items-center justify-center gap-1.5 rounded-full border border-border-subtle bg-surface-0/60 px-3.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-dark mx-auto w-fit">
         <span className="status-dot status-dot-green"></span>
         {snap ? `Live · updated ${ageSec}s ago` : "Connecting…"}
       </div>
       <div className="flex overflow-x-auto divide-x divide-border-subtle rounded-3xl border border-border-subtle bg-surface-0/70 shadow-card backdrop-blur-sm">
         {segments.map((s) => (
-          <div key={s.label} className="min-w-[128px] flex-1 px-6 py-6 text-center transition-colors sm:px-8">
+          <div
+            key={s.label}
+            className="group relative min-w-[128px] flex-1 px-6 py-6 text-center transition-colors hover:bg-surface-2/40 sm:px-8"
+          >
+            <span
+              aria-hidden
+              className={`absolute inset-x-0 top-0 h-[2px] rounded-t-full opacity-0 transition-opacity duration-300 group-hover:opacity-100 ${s.barClass}`}
+            />
             <div
               className={`font-mono text-3xl font-semibold tabular-nums transition-colors duration-300 sm:text-4xl ${
                 s.tone === "green" ? "text-green" : "text-text"
