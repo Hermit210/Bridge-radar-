@@ -2,6 +2,7 @@ import Link from "next/link";
 import { LiveStatusStrip } from "@/components/live-status-strip";
 import { Reveal } from "@/components/reveal";
 import { DetectorGrid } from "@/components/detector-grid";
+import { OrbitGlow } from "@/components/orbit-glow";
 
 const heroCtaClass =
   "cta-glow inline-flex items-center justify-center rounded-lg bg-accent px-8 py-4 font-display text-sm font-semibold tracking-[-0.01em] text-bg transition-all duration-200 hover:scale-[1.03] hover:bg-accent-bright hover:shadow-glow-md active:scale-[0.98]";
@@ -15,6 +16,7 @@ export default async function LandingPage() {
       {/* Hero */}
       <section className="relative overflow-hidden py-6 text-center">
         <div className="hero-grid pointer-events-none absolute inset-0 animate-grid-fade" />
+        <OrbitGlow />
 
         <div className="stagger-children relative z-10 space-y-8">
           <span className="badge inline-flex items-center gap-2">
@@ -26,7 +28,7 @@ export default async function LandingPage() {
           <h1 className="font-display text-6xl font-bold leading-[0.98] tracking-[-0.045em] sm:text-7xl md:text-8xl">
             Is this bridge
             <br />
-            <span className="italic text-gradient">safe</span> right now?
+            <span className="font-serif italic font-normal text-gradient">safe</span> right now?
           </h1>
 
           <p className="mx-auto max-w-xl text-base font-medium leading-[1.7] text-text-secondary sm:text-lg">

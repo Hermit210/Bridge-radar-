@@ -299,6 +299,15 @@ button, a {
   .cta-glow { animation: none; }
 }
 
+/* ===== Orbit Glow — hero ambient decoration (components/orbit-glow.tsx) ===== */
+@media (prefers-reduced-motion: reduce) {
+  .animate-orbit-slow,
+  .animate-orbit-slower,
+  .animate-glow-pulse {
+    animation: none;
+  }
+}
+
 /* ===== Score Ring ===== */
 .score-ring-track {
   stroke: rgba(42, 53, 68, 0.65);
