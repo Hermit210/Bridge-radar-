@@ -105,8 +105,13 @@ export default {
         "grid-fade": "grid-fade 10s ease-in-out infinite",
         "orbit-slow": "spin 34s linear infinite",
         "orbit-slower": "spin 52s linear infinite",
+        marquee: "marquee 28s linear infinite",
       },
       keyframes: {
+        marquee: {
+          "0%": { transform: "translateX(0)" },
+          "100%": { transform: "translateX(-50%)" },
+        },
         "pulse-dot": {
           "0%, 100%": { opacity: "1", transform: "scale(1)" },
           "50%": { opacity: "0.6", transform: "scale(1.3)" },
