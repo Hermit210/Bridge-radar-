@@ -13,7 +13,7 @@ import type { HealthScore } from "@radar/shared";
 
 export function ScoreChart({
   history,
-  color = "#d4a574",
+  color = "#e0a530",
   height = "h-56",
 }: {
   history: HealthScore[];
@@ -46,7 +46,7 @@ export function ScoreChart({
           </defs>
           <CartesianGrid
             strokeDasharray="3 3"
-            stroke="rgba(42,53,68,0.45)"
+            stroke="rgba(58,53,44,0.45)"
             vertical={false}
           />
           <XAxis
@@ -54,19 +54,19 @@ export function ScoreChart({
             type="number"
             domain={["dataMin", "dataMax"]}
             tickFormatter={(t) => new Date(t).toLocaleTimeString()}
-            stroke="#2a3544"
-            tick={{ fontSize: 10, fill: "#5a6478" }}
+            stroke="#3a352c"
+            tick={{ fontSize: 10, fill: "#5f5548" }}
           />
           <YAxis
             domain={[0, 100]}
-            stroke="#2a3544"
-            tick={{ fontSize: 10, fill: "#5a6478" }}
+            stroke="#3a352c"
+            tick={{ fontSize: 10, fill: "#5f5548" }}
             width={28}
           />
           <Tooltip
             contentStyle={{
-              background: "rgba(20,26,40,0.96)",
-              border: "1px solid rgba(42,53,68,0.65)",
+              background: "rgba(26,24,21,0.96)",
+              border: "1px solid rgba(58,53,44,0.65)",
               borderRadius: "0.5rem",
               padding: "8px 12px",
               fontSize: 12,
@@ -82,7 +82,7 @@ export function ScoreChart({
             fill={`url(#${gradientId})`}
             fillOpacity={1}
             dot={false}
-            activeDot={{ r: 4, stroke: color, strokeWidth: 2, fill: "#141a28" }}
+            activeDot={{ r: 4, stroke: color, strokeWidth: 2, fill: "#1a1815" }}
           />
         </AreaChart>
       </ResponsiveContainer>

@@ -22,7 +22,7 @@ const bandChartColor = {
   green: "#3ec99d",
   yellow: "#e5b94e",
   red: "#e5697b",
-  unmonitored: "#5a6478",
+  unmonitored: "#5f5548",
 } as const;
 
 const bandDot = {
