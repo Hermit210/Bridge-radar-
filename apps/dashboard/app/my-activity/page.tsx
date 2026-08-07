@@ -537,9 +537,7 @@ export default function MyActivityPage() {
         </Link>
         <h1 className="font-display text-2xl font-bold tracking-[-0.02em]">My Activity</h1>
         <p className="max-w-xl text-sm leading-relaxed text-text-secondary">
-          Your connected wallet's real on-chain history against our 14 monitored Solana bridge
-          programs, cross-referenced with our own health-score history. Read-only — nothing is
-          signed or stored.
+          Your wallet's real bridge activity, checked against our live health-score data.
         </p>
       </div>
 
