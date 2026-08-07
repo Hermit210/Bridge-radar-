@@ -18,10 +18,6 @@ export default async function EventsPage() {
       <Reveal>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">All events</h1>
-          <p className="mt-1.5 text-sm text-text-secondary leading-relaxed">
-            Live stream across every bridge. Pulled from the public{" "}
-            <code className="font-mono bg-surface-2 px-1.5 py-0.5 rounded text-accent text-xs">/v1/ws</code> endpoint.
-          </p>
         </div>
       </Reveal>
       <Reveal delayMs={80}>
