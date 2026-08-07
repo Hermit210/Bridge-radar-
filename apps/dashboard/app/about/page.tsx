@@ -59,11 +59,16 @@ export default async function AboutPage() {
                 </code>
               </>,
               <>
-                Telegram + Discord + webhook alerter for anomaly events — code-complete and
-                proven against real events in dry-run;{" "}
+                Telegram + Discord + webhook alerter for anomaly events — code-complete, proven
+                against real events in dry-run.{" "}
+                <span className="text-green">
+                  Discord delivery is live-confirmed (2026-08-08, real HTTP 204 from Discord's
+                  own servers)
+                </span>
+                ;{" "}
                 <span className="text-muted-dark">
-                  actual message delivery to a real Telegram chat or Discord channel is not yet
-                  confirmed, pending real bot/webhook credentials
+                  Telegram delivery is not yet confirmed — the bot token is real and valid, but no
+                  chat has messaged it yet, so there is no real chat ID to send to
                 </span>
                 .
               </>,

@@ -27,7 +27,7 @@ No mainnet funds or mainnet program were ever involved.
 | Scorer | `crates/radar-scorer` | Full whitepaper §4.4 weighted composite, every 60s: `100 − 40·parity − 25·outflow − 15·signer − 10·frontend − 10·oracle`. All 5 components real as of 2026-08-01. |
 | DeFiLlama sync | `crates/radar-defillama` | 9 categories on independent schedules into `defillama_cache`; 3 (bridges list, bridge volume, oracles TVS) require a paid Pro key ($300/mo) and honestly report `{"available": false}` without one — never fake/fallback data |
 | Attester | `crates/radar-attester` | Reads scores, derives PDA, `init_bridge`/`update_health` — **pinned to devnet** via `ATTESTER_RPC_URL`, independent of the mainnet-migrated indexer |
-| Alerter | `crates/radar-alerter` | Telegram `sendMessage` + Discord webhook + generic webhook fan-out for signer/frontend/oracle events and score drops. **Code-complete, proven live in dry-run** (2026-08-02: caught 2 real `frontend_change` events from the live watcher, logged correctly) — actual Telegram/Discord message delivery not yet confirmed, pending real credentials. |
+| Alerter | `crates/radar-alerter` | Telegram `sendMessage` + Discord webhook + generic webhook fan-out for signer/frontend/oracle events and score drops. **Code-complete, proven live in dry-run** (2026-08-02: caught 2 real `frontend_change` events from the live watcher, logged correctly). **Discord delivery live-confirmed 2026-08-08** — real `DISCORD_WEBHOOK_URL` wired into `.env`, `radar-alerter` restarted and its startup log read `discord=true`, a manually-triggered real POST to the real Discord webhook returned real HTTP 204. **Telegram delivery still unconfirmed** — the real bot token (`@bruhalert_bot`, created via BotFather) is valid (confirmed via a real `getUpdates` call), but no chat has messaged the bot yet, so there's no real `TELEGRAM_CHAT_ID` to send to; alerter startup log correctly reads `telegram=false` until one is provided. |
 | On-chain oracle | `programs/radar-oracle` | Anchor program, **deployed devnet only** — `6148M4aXYbDsscWn14zCazPy9V4fQFGozdDQp4LFmqHM`. Not touched/redeployed without explicit sign-off; real funds eventually involved. |
 | API | `apps/api` | Hono + WS. 21 REST routes (bridges/health/history/events/registry, 11 DeFiLlama passthroughs, the wallet layer: `wallet-holdings`, `wallet-activity`, `wallet-timeline`) plus a WebSocket live feed |
 | Dashboard | `apps/dashboard` | Next.js 15 — 7 pages: `/`, `/bridges`, `/bridges/[id]`, `/bridges/compare`, `/events`, `/about`, `/my-activity` (see Dashboard pages below — all 7 now have a redesign pass as of 2026-08-08) |
@@ -216,16 +216,24 @@ explicit, separate, real-funds decision not made yet.
   them). Still missing: auto-reconnect/health-status endpoints beyond
   `/v1/healthz`, and a system-status dashboard page. See
   `TASK4_STATUS.md`.
-- **Telegram/Discord live alert delivery unconfirmed**: `radar-alerter` is
-  code-complete and proven live in dry-run (real events, real formatted
-  messages, correctly logged), but no message has actually been delivered
-  to a real Telegram chat or Discord channel yet — pending real credentials
-  from the user. Reconfirmed 2026-08-08: `.env` still has all four sink
-  vars (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `DISCORD_WEBHOOK_URL`,
-  `ALERT_WEBHOOK_URL`) commented out, so the alerter is still genuinely
-  running in dry-run mode today, not just historically. The About page
-  (`apps/dashboard/app/about/page.tsx`) now states this exactly instead of
-  implying live delivery.
+- **Resolved (Discord) / still pending (Telegram) — live alert delivery,
+  2026-08-08**: the user provided real credentials. `DISCORD_WEBHOOK_URL`
+  is wired into the real `.env`; `radar-alerter` restarted and its
+  startup log read `telegram=false discord=true webhook=false`; a
+  manually-triggered real `curl POST` (clearly labeled a connectivity
+  test, not a fabricated bridge alert — no fake event was inserted into
+  the production DB to trigger this) to the real Discord webhook URL
+  returned a real HTTP 204 from Discord's own servers. Telegram remains
+  unconfirmed: `TELEGRAM_BOT_TOKEN` is real and valid (a real `getUpdates`
+  call against `api.telegram.org` returned `{"ok":true,"result":[]}` —
+  valid token, empty because no one has messaged `@bruhalert_bot` yet), but
+  the user's provided `TELEGRAM_CHAT_ID` was a literal placeholder string,
+  not a real ID, so it was left unset rather than guessed. Real unblocking
+  step: message `@bruhalert_bot` on Telegram once, then re-run
+  `getUpdates` to read the real chat ID out of the response. The About page
+  (`apps/dashboard/app/about/page.tsx`) states this exact split — Discord
+  live-confirmed, Telegram still pending — rather than rounding both up to
+  "done."
 - **`cargo clippy -D warnings`** currently fails on 2 pre-existing warnings
   unrelated to any work done this session (see Tests above).
 - **Resolved 2026-08-08**: headless Chromium screenshot verification is
