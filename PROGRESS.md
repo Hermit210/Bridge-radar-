@@ -1,6 +1,8 @@
 # Bridge Radar — build progress
 
-Snapshot 2026-08-02. Real-time bridge-health monitoring on Solana mainnet,
+Snapshot 2026-08-08 (originally 2026-08-02; see the Dashboard pages and
+Known gaps sections below for what changed since). Real-time bridge-health
+monitoring on Solana mainnet,
 plus a wallet-facing layer (`/my-activity`) built entirely on Bridge Radar's
 own unique data — no feature here duplicates what Phantom/Solflare/Solscan
 already do well.
@@ -28,10 +30,10 @@ No mainnet funds or mainnet program were ever involved.
 | Alerter | `crates/radar-alerter` | Telegram `sendMessage` + Discord webhook + generic webhook fan-out for signer/frontend/oracle events and score drops. **Code-complete, proven live in dry-run** (2026-08-02: caught 2 real `frontend_change` events from the live watcher, logged correctly) — actual Telegram/Discord message delivery not yet confirmed, pending real credentials. |
 | On-chain oracle | `programs/radar-oracle` | Anchor program, **deployed devnet only** — `6148M4aXYbDsscWn14zCazPy9V4fQFGozdDQp4LFmqHM`. Not touched/redeployed without explicit sign-off; real funds eventually involved. |
 | API | `apps/api` | Hono + WS. 21 REST routes (bridges/health/history/events/registry, 11 DeFiLlama passthroughs, the wallet layer: `wallet-holdings`, `wallet-activity`, `wallet-timeline`) plus a WebSocket live feed |
-| Dashboard | `apps/dashboard` | Next.js 15 — 7 pages: `/`, `/bridges`, `/bridges/[id]`, `/bridges/compare`, `/events`, `/about`, `/my-activity` (see Dashboard pages below for redesign coverage, which is uneven) |
+| Dashboard | `apps/dashboard` | Next.js 15 — 7 pages: `/`, `/bridges`, `/bridges/[id]`, `/bridges/compare`, `/events`, `/about`, `/my-activity` (see Dashboard pages below — all 7 now have a redesign pass as of 2026-08-08) |
 | Wallet layer | `apps/dashboard/app/my-activity` | Wallet connect (Phantom/Solflare/Coinbase/Ledger/Torus) + 9 features built entirely on our own data — see below |
 | dApp SDK | `packages/sdk` (`@bridge-radar/sdk`, private/unpublished) | `getBridgeHealth` (real API) + `getBridgeHealthOnChain` (real on-chain PDA read) — verified against live data (real API score, real on-chain score, real thrown error for an unregistered bridge). Practical implementation of whitepaper §4.5's "dApps can gate withdrawals" promise. |
-| Infra | `docker-compose.yml`, `migrations/0001_init.sql` | Timescale + Redis stack scaffolded, schema written, never actually run — Docker still unavailable in every dev session so far (confirmed again 2026-08-02) |
+| Infra | `docker-compose.yml`, `migrations/0001_init.sql` | Timescale + Redis stack scaffolded, schema written, never actually run — Docker still unavailable in every dev session so far (reconfirmed again 2026-08-08) |
 
 ## Bridge registry — 14 real adapters, 2 disabled, 6 blocked candidates
 
@@ -105,17 +107,21 @@ deterministic list that never diffs against itself — a real diffable
 source is future work); no bridge currently has a real `oracle_stale`
 (all 6 watched Pyth feeds are fresh).
 
-## Dashboard pages — all 7 have a dedicated redesign pass (complete as of 2026-08-02)
+## Dashboard pages — all 7 have a dedicated redesign pass (updated 2026-08-08)
 
 | Page | Redesign pass? |
 |---|---|
-| `/` (homepage) | ✅ Multiple dedicated passes |
-| `/bridges` (list) | ✅ Dedicated pass |
-| `/bridges/[id]` (detail) | ✅ Dedicated pass |
-| `/bridges/compare` | ✅ Dedicated pass (×2) |
-| `/events` | ✅ Dedicated pass (2026-08-01) — real filters, real live stat breakdown |
-| `/about` | ✅ Dedicated pass (2026-08-01) — real live bridge-count badge, shared detector-grid component |
-| `/my-activity` | ✅ Dedicated pass (2026-08-02) — consistent entrance motion across all 9 features, hover states on every interactive row, mobile-safe wrapping |
+| `/` (homepage) | ✅ Multiple passes, most recently 2026-08-08: warm near-black + amber palette, serif italic accent word, orbit-glow ambient animation (visibility bug fixed — was clipped by the hero section's `overflow-hidden`), real-data bridge marquee, centered navbar, removed the monitoring badge and the "Built with"/v0-preview scaffolding sitewide |
+| `/bridges` (list) | ✅ Dedicated pass + 2026-08-08 density pass: smaller cards (p-5→p-3.5), severity-first default sort, per-card entrance stagger, live count-up/color transitions on score updates, dropped the formula subtext and the JSON link |
+| `/bridges/[id]` (detail) | ✅ Dedicated pass, palette-updated 2026-08-08 |
+| `/bridges/compare` | ✅ Dedicated pass (×2), 2026-08-08: boxes resized to medium (p-6→p-4), dropped intro text and the Share button |
+| `/events` | ✅ Dedicated pass (2026-08-01) — real filters, real live stat breakdown; 2026-08-08: dropped the `/v1/ws` explanation subtext |
+| `/about` | ✅ Dedicated pass (2026-08-01) — real live bridge-count badge, shared detector-grid component; 2026-08-08: fixed two overstatements (alerter delivery status, SQLite-vs-Postgres claim) to match real current code |
+| `/my-activity` | ✅ Dedicated pass (2026-08-02) — consistent entrance motion across all 9 features, hover states on every interactive row, mobile-safe wrapping; 2026-08-08: split-panel wallet-connect empty state, intro paragraph removed, re-audited for fake data (none found) |
+
+Every item above was verified against a real rendered screenshot from the
+real dev server (see the Known gaps entry below on how headless Chromium
+was unblocked in this sandbox), not just typecheck.
 
 All hand-built — the 21st.dev MCP component-sourcing tools were never used
 anywhere in this codebase (no trace in source, lockfile, or git history);
@@ -198,8 +204,12 @@ explicit, separate, real-funds decision not made yet.
   directly via `better-sqlite3`, not through the Rust storage abstraction.
   Pointing `DATABASE_URL` at Postgres today would not work for the API
   layer. Never run end-to-end — **Docker has been unavailable in every dev
-  session so far** (confirmed again 2026-08-02), so this remains blocked on
-  an environment with Docker access, not additional scoping work.
+  session so far** (reconfirmed again 2026-08-08: no `docker` binary in
+  either the WSL or Windows-host PATH, no `docker.service` unit, no Docker
+  Desktop install found at its standard Windows path), so this remains
+  blocked on an environment with Docker access, not additional scoping
+  work. Real unblocking step: install Docker Desktop with WSL2 integration
+  enabled for the Ubuntu distro.
 - **`DEPLOYMENT.md` + `deploy/systemd/*.service` exist** (2026-08-01) —
   real, syntax-validated (`systemd-analyze verify`, all 9 units pass) but
   never run end-to-end (no Docker/Postgres in the dev sandbox that wrote
@@ -210,14 +220,24 @@ explicit, separate, real-funds decision not made yet.
   code-complete and proven live in dry-run (real events, real formatted
   messages, correctly logged), but no message has actually been delivered
   to a real Telegram chat or Discord channel yet — pending real credentials
-  from the user.
+  from the user. Reconfirmed 2026-08-08: `.env` still has all four sink
+  vars (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `DISCORD_WEBHOOK_URL`,
+  `ALERT_WEBHOOK_URL`) commented out, so the alerter is still genuinely
+  running in dry-run mode today, not just historically. The About page
+  (`apps/dashboard/app/about/page.tsx`) now states this exactly instead of
+  implying live delivery.
 - **`cargo clippy -D warnings`** currently fails on 2 pre-existing warnings
   unrelated to any work done this session (see Tests above).
-- **No visual/screenshot verification of recent frontend work** — every
-  `/my-activity` change this cycle was verified via typecheck + live API
-  proof only; headless Chromium cannot launch in this dev sandbox (missing
-  system libs, no passwordless `sudo` to install them). Needs a human
-  visual check.
+- **Resolved 2026-08-08**: headless Chromium screenshot verification is
+  now possible in this dev sandbox — the missing shared libs
+  (`libnspr4`/`libnss3`/`libasound2`) were fetched with `apt-get download`
+  (no sudo needed for download-only) and extracted locally with
+  `dpkg-deb -x` into a scratch prefix, then loaded via `LD_LIBRARY_PATH`
+  for a real Playwright/Chromium run. Every dashboard redesign change made
+  2026-08-07/08 (palette overhaul, navbar centering, orbit-glow visibility
+  fix, `/bridges` card resize, subtext removal across 4 pages, compare-box
+  resize, About page accuracy fix) was verified against a real rendered
+  screenshot from the real dev server, not just typecheck.
 
 ## Repo layout
 
