@@ -48,19 +48,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen font-sans antialiased">
         <WalletProviders>
           <header className="sticky top-3 z-50 px-3 sm:top-4 sm:px-4">
-            <div className="mx-auto flex max-w-7xl items-center gap-5 overflow-x-auto rounded-full border border-border-subtle bg-surface-0/85 px-5 py-3 shadow-card backdrop-blur-xl sm:gap-8 sm:px-7">
+            <div className="mx-auto grid max-w-7xl grid-cols-[auto_1fr_auto] items-center gap-4 rounded-full border border-border-subtle bg-surface-0/85 px-5 py-3 shadow-card backdrop-blur-xl sm:gap-6 sm:px-7">
               <Link href="/" className="flex shrink-0 items-center gap-2.5 whitespace-nowrap text-[15px] font-display font-semibold tracking-[-0.01em] text-text">
                 <span className="status-dot status-dot-green"></span>
                 Bridge Radar
               </Link>
-              <nav className="flex shrink-0 items-center gap-5 whitespace-nowrap text-[13px] font-medium text-text-secondary sm:gap-7">
+              <nav className="flex items-center justify-center gap-5 overflow-x-auto whitespace-nowrap text-[13px] font-medium text-text-secondary sm:gap-7">
                 <Link href="/bridges" className="transition-colors duration-150 hover:text-text">Bridges</Link>
                 <Link href="/bridges/compare" className="transition-colors duration-150 hover:text-text">Compare</Link>
                 <Link href="/events" className="transition-colors duration-150 hover:text-text">Events</Link>
                 <Link href="/my-activity" className="transition-colors duration-150 hover:text-text">My Activity</Link>
                 <Link href="/about" className="transition-colors duration-150 hover:text-text">About</Link>
               </nav>
-              <div className="ml-auto flex shrink-0 items-center gap-3 whitespace-nowrap">
+              <div className="flex shrink-0 items-center justify-end gap-3 whitespace-nowrap">
                 <div className="badge hidden text-[11px] font-medium sm:inline-flex">v0-preview</div>
                 <WalletConnectButton />
               </div>
