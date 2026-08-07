@@ -151,10 +151,6 @@ export default function Home() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-bold tracking-[-0.02em]">Bridges</h1>
-          <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-text-secondary">
-            Health Score composes parity, outflow z-score, signer-set drift, frontend
-            hash, and oracle staleness — greater is healthier.
-          </p>
         </div>
         <div className="flex items-center gap-2">
           <Link href="/bridges/compare" className="badge text-xs transition-colors hover:text-text">
@@ -192,20 +188,20 @@ export default function Home() {
       </div>
 
       {loading && bridges.length === 0 ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="glass-card space-y-4 p-5">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="glass-card space-y-3 p-3.5">
               <div className="flex justify-between">
                 <div className="space-y-2">
-                  <div className="skeleton h-5 w-32"></div>
-                  <div className="skeleton h-3 w-20"></div>
+                  <div className="skeleton h-4 w-28"></div>
+                  <div className="skeleton h-2.5 w-16"></div>
                 </div>
-                <div className="skeleton h-8 w-12"></div>
+                <div className="skeleton h-6 w-10"></div>
               </div>
               <div className="skeleton h-1.5 w-full rounded-full"></div>
               <div className="flex justify-between">
-                <div className="skeleton h-3 w-16"></div>
-                <div className="skeleton h-3 w-24"></div>
+                <div className="skeleton h-2.5 w-14"></div>
+                <div className="skeleton h-2.5 w-20"></div>
               </div>
             </div>
           ))}
@@ -222,7 +218,7 @@ export default function Home() {
           <p className="text-sm text-muted">No bridges match “{query}”.</p>
         </div>
       ) : view === "cards" ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {filtered.map((b, i) => (
             <div
               key={b.id}
