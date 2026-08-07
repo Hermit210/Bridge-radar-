@@ -3,6 +3,7 @@ import { LiveStatusStrip } from "@/components/live-status-strip";
 import { Reveal } from "@/components/reveal";
 import { DetectorGrid } from "@/components/detector-grid";
 import { OrbitGlow } from "@/components/orbit-glow";
+import { BridgeMarquee } from "@/components/bridge-marquee";
 
 const heroCtaClass =
   "cta-glow inline-flex items-center justify-center rounded-lg bg-accent px-8 py-4 font-display text-sm font-semibold tracking-[-0.01em] text-bg transition-all duration-200 hover:scale-[1.03] hover:bg-accent-bright hover:shadow-glow-md active:scale-[0.98]";
@@ -47,6 +48,11 @@ export default async function LandingPage() {
           <LiveStatusStrip />
         </Reveal>
       </section>
+
+      {/* Live bridge ticker */}
+      <Reveal delayMs={80}>
+        <BridgeMarquee />
+      </Reveal>
 
       {/* Why it matters */}
       <Reveal>

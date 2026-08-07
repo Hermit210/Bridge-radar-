@@ -308,6 +308,15 @@ button, a {
   }
 }
 
+/* ===== Bridge Marquee (components/bridge-marquee.tsx) — pauses on hover
+   via the [animation-play-state:paused] group-hover variant; disabled
+   entirely under reduced motion, falling back to a static wrapped row. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee {
+    animation: none;
+  }
+}
+
 /* ===== Score Ring ===== */
 .score-ring-track {
   stroke: rgba(42, 53, 68, 0.65);
