@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Inter, Instrument_Serif, JetBrains_Mono, Outfit } from "next/font/google";
 import { WalletProviders } from "@/components/wallet-providers";
 import { WalletConnectButton } from "@/components/wallet-connect-button";
+import { TelegramIcon, DiscordIcon } from "@/components/social-icons";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -68,7 +69,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <main className="mx-auto max-w-7xl px-6 py-10">{children}</main>
           <footer className="mt-20 border-t border-border/30">
           <div className="mx-auto max-w-7xl px-6 py-10">
-            <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
               <div className="space-y-3">
                 <div className="flex items-center gap-2.5 text-[15px] font-display font-semibold tracking-[-0.01em] text-text">
                   <span className="status-dot status-dot-green"></span>
@@ -85,6 +86,29 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <Link href="/bridges/compare" className="hover:text-text transition-colors">Compare bridges</Link>
                   <Link href="/events" className="hover:text-text transition-colors">Events</Link>
                   <Link href="/about" className="hover:text-text transition-colors">About</Link>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <p className="text-[11px] font-display font-semibold uppercase tracking-[0.1em] text-muted">Community</p>
+                <div className="flex flex-col gap-2 text-xs text-muted-dark font-medium">
+                  <a
+                    href="https://t.me/bruhalert_bot"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 transition-colors hover:text-text"
+                  >
+                    <TelegramIcon className="h-3.5 w-3.5 shrink-0" />
+                    Get real-time bridge health alerts on Telegram
+                  </a>
+                  <a
+                    href="https://discord.gg/nFShyzP7G"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 transition-colors hover:text-text"
+                  >
+                    <DiscordIcon className="h-3.5 w-3.5 shrink-0" />
+                    Join our Discord
+                  </a>
                 </div>
               </div>
             </div>
