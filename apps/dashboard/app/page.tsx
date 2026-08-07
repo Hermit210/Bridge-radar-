@@ -38,12 +38,6 @@ export default async function LandingPage() {
         <OrbitGlow />
 
         <div className="stagger-children relative z-10 space-y-8">
-          <span className="inline-flex items-center gap-2 rounded-full bg-cream px-4 py-1.5 text-[13px] font-medium text-cream-ink shadow-card">
-            <span className="status-dot status-dot-green"></span>
-            Monitoring Solana Mainnet
-            <span className="text-cream-ink/55">· Oracle on Devnet</span>
-          </span>
-
           <h1 className="font-display text-6xl font-bold leading-[0.98] tracking-[-0.045em] sm:text-7xl md:text-8xl">
             Is this bridge
             <br />
@@ -75,7 +69,7 @@ export default async function LandingPage() {
 
       {/* Why it matters */}
       <Reveal>
-        <section className="space-y-5">
+        <section className="grid grid-cols-1 gap-6 md:grid-cols-[320px_1fr] md:gap-12">
           <h2 className="font-display text-3xl font-bold tracking-[-0.02em] text-text">
             Why bridges are the weak point
           </h2>

@@ -61,7 +61,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Link href="/about" className="transition-colors duration-150 hover:text-text">About</Link>
               </nav>
               <div className="flex shrink-0 items-center justify-end gap-3 whitespace-nowrap">
-                <div className="badge hidden text-[11px] font-medium sm:inline-flex">v0-preview</div>
                 <WalletConnectButton />
               </div>
             </div>
@@ -69,7 +68,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <main className="mx-auto max-w-7xl px-6 py-10">{children}</main>
           <footer className="mt-20 border-t border-border/30">
           <div className="mx-auto max-w-7xl px-6 py-10">
-            <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
               <div className="space-y-3">
                 <div className="flex items-center gap-2.5 text-[15px] font-display font-semibold tracking-[-0.01em] text-text">
                   <span className="status-dot status-dot-green"></span>
@@ -87,15 +86,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <Link href="/events" className="hover:text-text transition-colors">Events</Link>
                   <Link href="/about" className="hover:text-text transition-colors">About</Link>
                 </div>
-              </div>
-              <div className="space-y-3">
-                <p className="text-[11px] font-display font-semibold uppercase tracking-[0.1em] text-muted">Built with</p>
-                <p className="text-xs text-muted-dark leading-[1.7] font-medium">
-                  Powered by Solana. MIT (code) &middot; CC-BY 4.0 (docs).
-                </p>
-                <p className="text-xs text-muted-dark font-medium">
-                  Built by Saloni Khan.
-                </p>
               </div>
             </div>
           </div>

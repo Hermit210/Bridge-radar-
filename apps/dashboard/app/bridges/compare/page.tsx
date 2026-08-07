@@ -43,7 +43,6 @@ export default function ComparePage() {
   const [loading, setLoading] = useState(true);
   const [idA, setIdA] = useState<string>("");
   const [idB, setIdB] = useState<string>("");
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,7 +72,8 @@ export default function ComparePage() {
     };
   }, []);
 
-  // Keep the URL in sync so the "Share" link always reflects the current pick.
+  // Keep the URL in sync so the current pick is bookmarkable/shareable directly
+  // from the browser's address bar.
   useEffect(() => {
     if (!idA || !idB) return;
     const params = new URLSearchParams();
@@ -84,13 +84,6 @@ export default function ComparePage() {
 
   const bridgeA = bridges.find((b) => b.id === idA);
   const bridgeB = bridges.find((b) => b.id === idB);
-
-  async function handleShare() {
-    const url = `${window.location.origin}/bridges/compare?a=${idA}&b=${idB}`;
-    await navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
 
   if (loading) {
     return (
@@ -127,13 +120,8 @@ export default function ComparePage() {
         <Link href="/bridges" className="text-xs text-muted hover:text-text transition-colors inline-flex items-center gap-1">
           ← All bridges
         </Link>
-        <div className="mt-3 flex flex-wrap items-baseline justify-between gap-3">
-          <div>
-            <h1 className="font-display text-2xl font-bold tracking-[-0.02em]">Bridge Battle</h1>
-          </div>
-          <button onClick={handleShare} className="badge hover:text-text transition-colors text-xs shrink-0">
-            {copied ? "Copied ✓" : "Share ↗"}
-          </button>
+        <div className="mt-3">
+          <h1 className="font-display text-2xl font-bold tracking-[-0.02em]">Bridge Battle</h1>
         </div>
       </div>
 

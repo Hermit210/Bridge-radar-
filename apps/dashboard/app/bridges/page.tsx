@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { HealthCard, type HeartbeatInfo } from "@/components/health-card";
 import { HeartbeatDot } from "@/components/heartbeat-dot";
 import { StatBar, type StatBarSegment } from "@/components/stat-bar";
-import { apiUrls, listBridges, listEvents } from "@/lib/api";
+import { listBridges, listEvents } from "@/lib/api";
 import { bandFor, formatUsd, type BridgeWithHealth, type BridgeEvent, type HealthBand } from "@radar/shared";
 
 // Window for "recent" activity used only to pick a faster heartbeat pulse
@@ -156,14 +156,6 @@ export default function Home() {
           <Link href="/bridges/compare" className="badge text-xs transition-colors hover:text-text">
             Compare bridges ⇄
           </Link>
-          <a
-            href={`${apiUrls.base}/v1/bridges`}
-            target="_blank"
-            rel="noreferrer"
-            className="badge text-xs transition-colors hover:text-text"
-          >
-            JSON ↗
-          </a>
         </div>
       </div>
 
