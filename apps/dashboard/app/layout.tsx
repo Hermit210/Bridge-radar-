@@ -1,7 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Inter, JetBrains_Mono, Outfit } from "next/font/google";
+import { Inter, Instrument_Serif, JetBrains_Mono, Outfit } from "next/font/google";
 import { WalletProviders } from "@/components/wallet-providers";
 import { WalletConnectButton } from "@/components/wallet-connect-button";
 
@@ -26,6 +26,14 @@ const jetbrainsMono = JetBrains_Mono({
   weight: ["400", "500", "600"],
 });
 
+const instrumentSerif = Instrument_Serif({
+  subsets: ["latin"],
+  variable: "--font-serif-accent",
+  display: "swap",
+  weight: ["400"],
+  style: ["italic", "normal"],
+});
+
 export const metadata: Metadata = {
   title: "Bridge Radar",
   description: "Real-time bridge-health intelligence layer for Solana. Open source, public good, no token.",
@@ -33,7 +41,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${outfit.variable} ${inter.variable} ${jetbrainsMono.variable}`}>
+    <html
+      lang="en"
+      className={`${outfit.variable} ${inter.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable}`}
+    >
       <body className="min-h-screen font-sans antialiased">
         <WalletProviders>
           <header className="sticky top-0 z-50 bg-bg/85 backdrop-blur-xl border-b border-border/40">

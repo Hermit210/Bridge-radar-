@@ -61,6 +61,11 @@ export default {
           "Consolas",
           "monospace",
         ],
+        serif: [
+          "var(--font-serif-accent)",
+          "Georgia",
+          "serif",
+        ],
       },
       fontSize: {
         xs: ["0.6875rem", { lineHeight: "1rem", letterSpacing: "0.01em" }],
