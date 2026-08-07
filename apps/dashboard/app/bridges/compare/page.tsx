@@ -96,7 +96,7 @@ export default function ComparePage() {
     return (
       <div className="space-y-8 animate-fade-in">
         <div className="skeleton h-7 w-64"></div>
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="glass-card p-6 space-y-4">
             <div className="skeleton h-5 w-32"></div>
             <div className="skeleton h-24 w-full"></div>
@@ -130,10 +130,6 @@ export default function ComparePage() {
         <div className="mt-3 flex flex-wrap items-baseline justify-between gap-3">
           <div>
             <h1 className="font-display text-2xl font-bold tracking-[-0.02em]">Bridge Battle</h1>
-            <p className="mt-1.5 text-sm text-text-secondary max-w-xl leading-relaxed">
-              Pick two bridges to compare side by side. Health score reflects current
-              detector state, not a permanent ranking.
-            </p>
           </div>
           <button onClick={handleShare} className="badge hover:text-text transition-colors text-xs shrink-0">
             {copied ? "Copied ✓" : "Share ↗"}
@@ -141,7 +137,7 @@ export default function ComparePage() {
         </div>
       </div>
 
-      <div className="relative grid grid-cols-1 gap-5 md:grid-cols-2">
+      <div className="relative grid grid-cols-1 gap-4 md:grid-cols-2">
         <BridgeSlot
           bridges={bridges}
           selected={idA}
@@ -228,12 +224,12 @@ function BridgeSlot({
   const tvlHigher = tvl !== undefined && oppTvl !== undefined && tvl > oppTvl;
 
   return (
-    <div className={`glass-card-elevated p-6 space-y-5 ${isHigher ? "ring-1 ring-green/40" : ""}`}>
+    <div className={`glass-card-elevated p-4 space-y-3.5 ${isHigher ? "ring-1 ring-green/40" : ""}`}>
       <div className="relative">
         <select
           value={selected}
           onChange={(e) => onSelect(e.target.value)}
-          className="w-full appearance-none rounded-md border border-border/60 bg-surface-2 px-3 py-2 pr-8 text-sm font-medium text-text focus:border-accent/50 focus:outline-none"
+          className="w-full appearance-none rounded-md border border-border/60 bg-surface-2 px-2.5 py-1.5 pr-8 text-sm font-medium text-text focus:border-accent/50 focus:outline-none"
         >
           {bridges.map((b) => (
             <option key={b.id} value={b.id}>
@@ -245,15 +241,15 @@ function BridgeSlot({
       </div>
 
       {isHigher && (
-        <div className="flex items-center gap-1.5 text-[11px] text-muted">
+        <div className="flex items-center gap-1.5 text-[10px] text-muted">
           <span className="status-dot status-dot-green"></span>
           Currently higher health score
         </div>
       )}
 
       <div className="flex items-center justify-between">
-        <span className="text-xs uppercase tracking-widest text-muted font-medium">Health Score</span>
-        <span className={`text-2xl font-bold font-mono tabular-nums ${bandColor[band]}`}>
+        <span className="text-[11px] uppercase tracking-widest text-muted font-medium">Health Score</span>
+        <span className={`text-xl font-bold font-mono tabular-nums ${bandColor[band]}`}>
           {score !== undefined ? animatedScore : "—"}
         </span>
       </div>
@@ -288,7 +284,7 @@ function BridgeSlot({
 
       <Link
         href={`/bridges/${bridge.id}`}
-        className="block text-center text-xs text-muted hover:text-accent transition-colors pt-2 border-t border-border/40"
+        className="block text-center text-xs text-muted hover:text-accent transition-colors pt-1.5 border-t border-border/40"
       >
         View full detail →
       </Link>
@@ -306,7 +302,7 @@ function Row({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between text-sm border-t border-border/30 pt-3">
+    <div className="flex items-center justify-between text-sm border-t border-border/30 pt-2.5">
       <span className="text-muted">{label}</span>
       <span className={`inline-flex items-center gap-1.5 font-medium ${winning ? "text-green" : "text-text-secondary"}`}>
         {winning && <span className="text-[10px]">▲</span>}
