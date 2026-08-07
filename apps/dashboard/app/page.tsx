@@ -33,7 +33,7 @@ export default async function LandingPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-28 px-6 py-16 sm:space-y-36 sm:py-24">
       {/* Hero */}
-      <section className="relative overflow-hidden py-6 text-center">
+      <section className="relative py-6 text-center">
         <div className="hero-grid pointer-events-none absolute inset-0 animate-grid-fade" />
         <OrbitGlow />
 

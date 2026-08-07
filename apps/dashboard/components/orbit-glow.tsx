@@ -7,20 +7,20 @@ export function OrbitGlow() {
   return (
     <div
       aria-hidden
-      className="pointer-events-none absolute left-1/2 top-[36%] -translate-x-1/2 -translate-y-1/2 opacity-70"
+      className="pointer-events-none absolute left-1/2 top-[40%] z-0 -translate-x-1/2 -translate-y-1/2 opacity-95"
     >
-      <div className="relative h-[420px] w-[420px] sm:h-[560px] sm:w-[560px]">
-        <div className="absolute left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent/30 blur-[70px] animate-glow-pulse" />
-        <div className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent/50 blur-2xl" />
+      <div className="relative h-[440px] w-[440px] sm:h-[600px] sm:w-[600px]">
+        <div className="absolute left-1/2 top-1/2 h-44 w-44 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent/45 blur-[80px] animate-glow-pulse" />
+        <div className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent-bright/70 blur-2xl" />
 
         <svg viewBox="0 0 560 560" className="absolute inset-0 h-full w-full animate-orbit-slow [animation-direction:reverse]">
-          <circle cx="280" cy="280" r="260" fill="none" stroke="rgba(224,165,48,0.20)" strokeWidth="1.25" strokeDasharray="3 11" />
+          <circle cx="280" cy="280" r="260" fill="none" stroke="rgba(224,165,48,0.34)" strokeWidth="1.5" strokeDasharray="3 11" />
         </svg>
         <svg viewBox="0 0 560 560" className="absolute inset-0 h-full w-full animate-orbit-slow">
-          <circle cx="280" cy="280" r="200" fill="none" stroke="rgba(224,165,48,0.26)" strokeWidth="1.25" strokeDasharray="2 9" />
+          <circle cx="280" cy="280" r="200" fill="none" stroke="rgba(224,165,48,0.42)" strokeWidth="1.5" strokeDasharray="2 9" />
         </svg>
         <svg viewBox="0 0 560 560" className="absolute inset-0 h-full w-full animate-orbit-slower [animation-direction:reverse]">
-          <circle cx="280" cy="280" r="140" fill="none" stroke="rgba(224,165,48,0.32)" strokeWidth="1.75" strokeDasharray="1 7" />
+          <circle cx="280" cy="280" r="140" fill="none" stroke="rgba(240,189,92,0.50)" strokeWidth="2" strokeDasharray="1 7" />
         </svg>
       </div>
     </div>
