@@ -77,30 +77,40 @@ const DETECTORS = [
     title: "Lock / mint parity",
     desc: "Flags imbalance between origin-chain locks and Solana-side mints.",
     icon: <ParityIcon />,
+    barClass: "bg-accent",
+    dotClass: "bg-accent",
   },
   {
     key: "outflow",
     title: "Outflow anomaly",
     desc: "Z-score over a rolling 30-day baseline catches unusual withdrawal volume.",
     icon: <OutflowIcon />,
+    barClass: "bg-green",
+    dotClass: "bg-green",
   },
   {
     key: "signer",
     title: "Signer set drift",
     desc: "Watches guardian / DVN signer sets for unexpected rotations.",
     icon: <SignerIcon />,
+    barClass: "bg-yellow",
+    dotClass: "bg-yellow",
   },
   {
     key: "frontend",
     title: "Frontend integrity",
     desc: "Hashes the live bundle to catch a hijacked front end before users do.",
     icon: <FrontendIcon />,
+    barClass: "bg-red",
+    dotClass: "bg-red",
   },
   {
     key: "oracle",
     title: "Oracle staleness",
     desc: "Checks that the price feeds a bridge depends on are still fresh.",
     icon: <OracleIcon />,
+    barClass: "bg-accent-bright",
+    dotClass: "bg-accent-bright",
   },
 ] as const;
 
@@ -116,9 +126,10 @@ export async function DetectorGrid({ reveal = true }: { reveal?: boolean }) {
       {DETECTORS.map((d, i) => (
         <Reveal key={d.key} delayMs={reveal ? i * 90 : 0}>
           <div className="group relative h-full space-y-4 overflow-hidden rounded-3xl border border-border-subtle bg-surface/60 p-7 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-accent/30 hover:shadow-glow-sm">
+            <span aria-hidden className={`absolute inset-x-0 top-0 h-[3px] ${d.barClass}/70`} />
             <span
               aria-hidden
-              className="pointer-events-none absolute right-5 top-4 font-display text-4xl font-bold text-text-secondary/[0.05] transition-colors duration-300 group-hover:text-accent/10"
+              className="pointer-events-none absolute right-5 top-6 font-display text-4xl font-bold text-text-secondary/[0.05] transition-colors duration-300 group-hover:text-accent/10"
             >
               {String(i + 1).padStart(2, "0")}
             </span>
@@ -133,7 +144,8 @@ export async function DetectorGrid({ reveal = true }: { reveal?: boolean }) {
               <h3 className="font-display text-base font-semibold tracking-[-0.01em] text-text">{d.title}</h3>
               <p className="mt-1.5 text-sm leading-relaxed text-muted">{d.desc}</p>
             </div>
-            <div className="relative font-mono text-xs tabular-nums text-muted-dark">
+            <div className="relative flex items-center gap-1.5 font-mono text-xs tabular-nums text-muted-dark">
+              <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${d.dotClass}`} />
               {weights ? `${weights[d.key]}% weight` : "— weight"}
             </div>
           </div>
