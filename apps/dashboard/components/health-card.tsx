@@ -1,6 +1,9 @@
+"use client";
+
 import Link from "next/link";
 import { bandFor, formatUsd, type BridgeWithHealth } from "@radar/shared";
 import { HeartbeatDot } from "./heartbeat-dot";
+import { useCountUp } from "@/lib/use-count-up";
 
 const bandColor = {
   green: "text-green",
@@ -30,6 +33,16 @@ const bandDot = {
   unmonitored: "status-dot-muted",
 } as const;
 
+/** Real band's own semantic color, reused as a thin top accent bar so the
+ * grid is scannable at a glance -- this is status information, not brand
+ * decoration, so it always tracks bandColor/bandBarClass exactly. */
+const bandTopBar = {
+  green: "bg-green",
+  yellow: "bg-yellow",
+  red: "bg-red",
+  unmonitored: "bg-muted-dark",
+} as const;
+
 export interface HeartbeatInfo {
   lastEventAt?: string;
   recentCount: number;
@@ -45,12 +58,14 @@ export function HealthCard({
   const band = bandFor(bridge);
   const score = band === "unmonitored" ? undefined : bridge.health?.score;
   const defillama = bridge.defillama;
+  const animatedScore = useCountUp(score ?? 0);
 
   return (
     <Link
       href={`/bridges/${bridge.id}`}
-      className="group block glass-card-interactive p-5"
+      className="group relative flex h-full flex-col overflow-hidden glass-card-interactive p-5"
     >
+      <span aria-hidden className={`absolute inset-x-0 top-0 h-[3px] transition-colors duration-500 ${bandTopBar[band]}`} />
       <div className="flex items-baseline justify-between">
         <div>
           <h3 className="flex items-center gap-2 text-base font-semibold group-hover:text-accent-bright transition-colors duration-150">
@@ -63,8 +78,8 @@ export function HealthCard({
           </h3>
           <p className="text-[11px] text-muted-dark font-mono mt-0.5">{bridge.id}</p>
         </div>
-        <div className={`text-2xl font-bold font-mono tabular-nums ${bandColor[band]}`}>
-          {score ?? "—"}
+        <div className={`text-2xl font-bold font-mono tabular-nums transition-colors duration-500 ${bandColor[band]}`}>
+          {score !== undefined ? animatedScore : "—"}
         </div>
       </div>
 
@@ -83,7 +98,7 @@ export function HealthCard({
       <div className="mt-3 flex items-center justify-between text-xs">
         <span className="inline-flex items-center gap-1.5">
           <span className={`status-dot ${bandDot[band]}`}></span>
-          <span className={bandColor[band]}>{bandLabel[band]}</span>
+          <span className={`transition-colors duration-500 ${bandColor[band]}`}>{bandLabel[band]}</span>
         </span>
         <span className="text-muted-dark font-mono text-[11px]">
           {band === "unmonitored"
