@@ -103,6 +103,8 @@ export default {
         float: "float 8s ease-in-out infinite",
         "glow-pulse": "glow-pulse 3s ease-in-out infinite",
         "grid-fade": "grid-fade 10s ease-in-out infinite",
+        "orbit-slow": "spin 34s linear infinite",
+        "orbit-slower": "spin 52s linear infinite",
       },
       keyframes: {
         "pulse-dot": {
