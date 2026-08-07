@@ -6,10 +6,28 @@ import { OrbitGlow } from "@/components/orbit-glow";
 import { BridgeMarquee } from "@/components/bridge-marquee";
 
 const heroCtaClass =
-  "cta-glow inline-flex items-center justify-center rounded-lg bg-accent px-8 py-4 font-display text-sm font-semibold tracking-[-0.01em] text-bg transition-all duration-200 hover:scale-[1.03] hover:bg-accent-bright hover:shadow-glow-md active:scale-[0.98]";
+  "cta-glow group inline-flex items-center justify-center gap-2 rounded-full bg-accent px-8 py-4 font-display text-sm font-semibold tracking-[-0.01em] text-bg transition-all duration-200 hover:scale-[1.03] hover:bg-accent-bright hover:shadow-glow-md active:scale-[0.98]";
 
 const ctaClass =
-  "inline-flex items-center justify-center rounded-lg bg-accent px-8 py-4 font-display text-sm font-semibold tracking-[-0.01em] text-bg shadow-glow-sm transition-all duration-200 hover:scale-[1.03] hover:bg-accent-bright hover:shadow-glow-md active:scale-[0.98]";
+  "group inline-flex items-center justify-center gap-2 rounded-full bg-accent px-8 py-4 font-display text-sm font-semibold tracking-[-0.01em] text-bg shadow-glow-sm transition-all duration-200 hover:scale-[1.03] hover:bg-accent-bright hover:shadow-glow-md active:scale-[0.98]";
+
+function ArrowIcon() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5"
+    >
+      <path d="M5 12h14" />
+      <path d="M13 6l6 6-6 6" />
+    </svg>
+  );
+}
 
 export default async function LandingPage() {
   return (
@@ -40,6 +58,7 @@ export default async function LandingPage() {
           <div className="flex items-center justify-center pt-2">
             <Link href="/bridges" className={heroCtaClass}>
               View Live Dashboard
+              <ArrowIcon />
             </Link>
           </div>
         </div>
@@ -104,6 +123,7 @@ export default async function LandingPage() {
           <div className="mt-7 flex items-center justify-center">
             <Link href="/bridges" className={ctaClass}>
               Open the dashboard
+              <ArrowIcon />
             </Link>
           </div>
         </section>
