@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletConnectButton } from "@/components/wallet-connect-button";
 import { Reveal } from "@/components/reveal";
+import { OrbitGlow } from "@/components/orbit-glow";
 import { StatBar, type StatBarSegment } from "@/components/stat-bar";
 import { BridgeScoreNotifications } from "@/components/bridge-score-notifications";
 import { BridgeUsageSummary } from "@/components/bridge-usage-summary";
@@ -559,16 +560,46 @@ export default function MyActivityPage() {
       )}
 
       {!connected && !previewMode ? (
-        <div className="glass-card-elevated flex flex-col items-center gap-4 p-10 text-center">
-          <p className="text-sm text-muted">Connect your wallet to see your bridge activity.</p>
-          <WalletConnectButton />
-          <button
-            type="button"
-            onClick={() => setPreviewMode(true)}
-            className="text-xs text-muted-dark underline transition-colors hover:text-text"
-          >
-            Or view an example with a real bridge transaction →
-          </button>
+        <div className="grid overflow-hidden rounded-3xl border border-border-subtle shadow-card sm:grid-cols-2">
+          <div className="relative flex flex-col justify-center gap-4 overflow-hidden bg-surface-0/80 p-8 sm:p-10">
+            <div aria-hidden className="absolute inset-0 opacity-50">
+              <OrbitGlow />
+            </div>
+            <div className="relative space-y-3">
+              <span className="badge inline-flex w-fit items-center gap-2">
+                <span className="status-dot status-dot-green"></span>
+                Read-only
+              </span>
+              <h2 className="font-display text-xl font-semibold tracking-[-0.01em] text-text">
+                Your history against real health-score data
+              </h2>
+              <ul className="space-y-2 text-sm leading-relaxed text-text-secondary">
+                <li className="flex items-start gap-2">
+                  <span aria-hidden className="mt-1.5 h-1 w-1 flex-shrink-0 rounded-full bg-accent" />
+                  Scans your wallet's real on-chain transactions via Solana RPC.
+                </li>
+                <li className="flex items-start gap-2">
+                  <span aria-hidden className="mt-1.5 h-1 w-1 flex-shrink-0 rounded-full bg-accent" />
+                  Cross-references matches against our own recorded health-score history.
+                </li>
+                <li className="flex items-start gap-2">
+                  <span aria-hidden className="mt-1.5 h-1 w-1 flex-shrink-0 rounded-full bg-accent" />
+                  Nothing is signed or stored — this only reads public chain data.
+                </li>
+              </ul>
+            </div>
+          </div>
+          <div className="flex flex-col items-center justify-center gap-4 bg-surface/60 p-8 text-center sm:p-10">
+            <p className="text-sm text-muted">Connect your wallet to get started.</p>
+            <WalletConnectButton />
+            <button
+              type="button"
+              onClick={() => setPreviewMode(true)}
+              className="text-xs text-muted-dark underline transition-colors hover:text-text"
+            >
+              Or view an example with a real bridge transaction →
+            </button>
+          </div>
         </div>
       ) : loading ? (
         <div className="space-y-4">
