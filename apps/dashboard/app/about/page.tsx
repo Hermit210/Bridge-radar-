@@ -58,7 +58,15 @@ export default async function AboutPage() {
                   6148M4aXYbDsscWn14zCazPy9V4fQFGozdDQp4LFmqHM
                 </code>
               </>,
-              <>Telegram + Discord + webhook alerter for anomaly events.</>,
+              <>
+                Telegram + Discord + webhook alerter for anomaly events — code-complete and
+                proven against real events in dry-run;{" "}
+                <span className="text-muted-dark">
+                  actual message delivery to a real Telegram chat or Discord channel is not yet
+                  confirmed, pending real bot/webhook credentials
+                </span>
+                .
+              </>,
             ].map((content, i) => (
               <div
                 key={i}
@@ -93,8 +101,10 @@ export default async function AboutPage() {
           <p className="text-sm leading-relaxed text-text-secondary">
             Rust cargo workspace for ingestion + scoring + attestation; pnpm
             workspace for API + dashboard; Anchor program for the on-chain
-            oracle. Storage trait abstracted over SQLite (dev) and
-            Postgres+Timescale (prod). See{" "}
+            oracle. Storage is a Rust trait with two implementations: SQLite
+            is the real backend actually running today (this API reads it
+            directly); a Postgres+Timescale implementation is fully written
+            but not yet wired into the API layer or run end-to-end. See{" "}
             <Link className={linkClass} href="https://github.com/Hermit210/Bridge-radar-/blob/master/ARCHITECTURE.md">
               ARCHITECTURE.md
             </Link>
