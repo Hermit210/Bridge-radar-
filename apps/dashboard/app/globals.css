@@ -366,7 +366,7 @@ button, a {
   letter-spacing: -0.01em;
   height: 2.5rem;
   padding: 0 1.1rem;
-  border-radius: 0.5rem;
+  border-radius: 999px;
   background-color: #d4a574;
   color: #0a0e1a;
   line-height: 1;
