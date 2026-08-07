@@ -536,9 +536,6 @@ export default function MyActivityPage() {
           ← All bridges
         </Link>
         <h1 className="font-display text-2xl font-bold tracking-[-0.02em]">My Activity</h1>
-        <p className="max-w-xl text-sm leading-relaxed text-text-secondary">
-          Your wallet's real bridge activity, checked against our live health-score data.
-        </p>
       </div>
 
       {connected && (
