@@ -125,7 +125,7 @@ button, a {
 .health-bar-fill {
   height: 100%;
   border-radius: 999px;
-  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1), background 0.5s ease, box-shadow 0.5s ease;
 }
 
 .health-bar-green {
@@ -168,6 +168,7 @@ button, a {
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
+  transition: background-color 0.4s ease;
 }
 
 .status-dot::before {

@@ -13,6 +13,11 @@ import { bandFor, formatUsd, type BridgeWithHealth, type BridgeEvent, type Healt
 // for busier bridges — not a data-freshness cutoff for anything else.
 const RECENT_WINDOW_MS = 60_000;
 
+// Default card-grid ordering: surfaces alert/watch bridges before healthy
+// ones, since that's what a security-monitoring dashboard's default view
+// should prioritize. Lower rank sorts first.
+const bandRank: Record<HealthBand, number> = { red: 0, yellow: 1, green: 2, unmonitored: 3 };
+
 /** Per-bridge last-event-time + recent-activity count, derived entirely
  * from the same polled event feed the live feed table already renders —
  * no separate fetch, no synthetic data. */
@@ -82,10 +87,17 @@ export default function Home() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return bridges.filter((b) => {
+    const matches = bridges.filter((b) => {
       if (bandFilter !== "all" && bandFor(b) !== bandFilter) return false;
       if (!q) return true;
       return b.display_name.toLowerCase().includes(q) || b.id.toLowerCase().includes(q);
+    });
+    // Default ordering: most actionable first (alert, then watch, then
+    // healthy, then not-monitored), alphabetical within each band so the
+    // order stays stable and predictable rather than following raw API order.
+    return matches.sort((a, b) => {
+      const rank = bandRank[bandFor(a)] - bandRank[bandFor(b)];
+      return rank !== 0 ? rank : a.display_name.localeCompare(b.display_name);
     });
   }, [bridges, bandFilter, query]);
 
@@ -210,9 +222,15 @@ export default function Home() {
           <p className="text-sm text-muted">No bridges match “{query}”.</p>
         </div>
       ) : view === "cards" ? (
-        <div className="stagger-children grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((b) => (
-            <HealthCard key={b.id} bridge={b} heartbeat={heartbeats[b.id]} />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          {filtered.map((b, i) => (
+            <div
+              key={b.id}
+              className="h-full opacity-0 [animation:fade-in-up_0.5s_ease-out_forwards]"
+              style={{ animationDelay: `${Math.min(i, 11) * 40}ms` }}
+            >
+              <HealthCard bridge={b} heartbeat={heartbeats[b.id]} />
+            </div>
           ))}
         </div>
       ) : (
