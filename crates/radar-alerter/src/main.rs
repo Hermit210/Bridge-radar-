@@ -6,18 +6,20 @@
 //!   - any new `bridge_health_score` row whose `score < ALERT_THRESHOLD` and
 //!     drops at least `ALERT_DELTA` from the previous score for that bridge
 //!
-//! State (last seen event rowid + last seen score per bridge) is persisted
-//! in-process; restarts pick up at the current head and may miss a tick of
-//! events. Production should swap to sqlx LISTEN/NOTIFY on Postgres.
+//! State (last seen event timestamp + last seen score per bridge) is
+//! persisted in-process; restarts pick up at the current head and may miss a
+//! tick of events. Reads go through the same `Storage` trait every other
+//! backend uses (via `connect_any`), so this runs against SQLite or Postgres
+//! without a backend-specific code path — no more hand-rolled SQL here.
 
 use anyhow::{Context, Result};
-use chrono::Utc;
-use radar_core::event::BridgeEvent;
+use chrono::{DateTime, Duration as ChronoDuration, Utc};
+use radar_core::event::{BridgeEvent, EventFilter};
+use radar_core::storage::connect_any;
+use radar_core::Storage;
 use serde_json::{json, Value};
-use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
-use sqlx::{Row, SqlitePool};
 use std::collections::HashMap;
-use std::str::FromStr;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::{interval, MissedTickBehavior};
 use tracing::{debug, info, warn};
@@ -26,6 +28,7 @@ use tracing_subscriber::EnvFilter;
 const TICK_SECS: u64 = 5;
 const ALERT_THRESHOLD: i64 = 70;
 const ALERT_DELTA: i64 = 10;
+const EVENT_BATCH_LIMIT: u32 = 200;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -56,15 +59,16 @@ async fn main() -> Result<()> {
         warn!("no alert sinks configured (TELEGRAM_BOT_TOKEN+TELEGRAM_CHAT_ID, DISCORD_WEBHOOK_URL, ALERT_WEBHOOK_URL); running in dry-run mode");
     }
 
-    let pool = pool(&db_url).await.context("connect storage")?;
+    let storage: Arc<dyn Storage> =
+        Arc::from(connect_any(&db_url).await.context("connect storage")?);
     let http = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))
         .build()?;
 
-    let mut last_event_rowid = max_event_rowid(&pool).await?;
+    let mut cursor = initial_cursor(storage.as_ref()).await?;
     let mut last_score: HashMap<String, i64> = HashMap::new();
-    for (b, s) in latest_score_per_bridge(&pool).await? {
-        last_score.insert(b, s);
+    for score in storage.latest_scores().await? {
+        last_score.insert(score.bridge_id.clone(), score.score as i64);
     }
 
     let mut tick = interval(Duration::from_secs(TICK_SECS));
@@ -73,28 +77,32 @@ async fn main() -> Result<()> {
     loop {
         tick.tick().await;
         // Events
-        match new_events(&pool, last_event_rowid).await {
-            Ok(rows) => {
-                for (rowid, event) in rows {
-                    last_event_rowid = last_event_rowid.max(rowid);
+        match new_events(storage.as_ref(), cursor, EVENT_BATCH_LIMIT).await {
+            Ok((events, next_cursor)) => {
+                for event in events {
                     if alert_worthy_event(&event) {
                         let msg = format_event(&event);
                         debug!(?msg, "event alert");
                         fan_out(&http, &cfg, &msg, payload_for_event(&event)).await;
                     }
                 }
+                if let Some(c) = next_cursor {
+                    cursor = c;
+                }
             }
             Err(e) => warn!(error = %e, "fetch new events"),
         }
         // Score drops
-        match latest_score_per_bridge(&pool).await {
+        match storage.latest_scores().await {
             Ok(scores) => {
-                for (bridge_id, score) in scores {
+                for score in scores {
+                    let bridge_id = score.bridge_id.clone();
+                    let current = score.score as i64;
                     let prev = last_score.get(&bridge_id).copied().unwrap_or(100);
-                    if score < ALERT_THRESHOLD && (prev - score) >= ALERT_DELTA {
+                    if current < ALERT_THRESHOLD && (prev - current) >= ALERT_DELTA {
                         let msg = format!(
-                            "🚨 {bridge_id}: HealthScore dropped from {prev} → {score} (band: {})",
-                            band(score)
+                            "🚨 {bridge_id}: HealthScore dropped from {prev} → {current} (band: {})",
+                            band(current)
                         );
                         info!(%msg, "score drop alert");
                         fan_out(
@@ -105,18 +113,58 @@ async fn main() -> Result<()> {
                                 "kind": "score_drop",
                                 "bridge_id": bridge_id,
                                 "from": prev,
-                                "to": score,
+                                "to": current,
                                 "ts": Utc::now().to_rfc3339(),
                             }),
                         )
                         .await;
                     }
-                    last_score.insert(bridge_id, score);
+                    last_score.insert(bridge_id, current);
                 }
             }
             Err(e) => warn!(error = %e, "fetch scores"),
         }
     }
+}
+
+/// Where to start tailing from: just past the most recent event that already
+/// existed at startup, so a restart doesn't replay the whole history as
+/// fresh alerts. Empty store (or storage error deriving no rows) starts at
+/// "now".
+async fn initial_cursor(storage: &dyn Storage) -> Result<DateTime<Utc>> {
+    let latest = storage
+        .list_events(&EventFilter {
+            limit: Some(1),
+            ..Default::default()
+        })
+        .await?;
+    Ok(latest
+        .first()
+        .map(|e| e.event_time + ChronoDuration::microseconds(1))
+        .unwrap_or_else(Utc::now))
+}
+
+/// Events strictly after `since`, oldest first, plus the cursor to resume
+/// from next tick (one microsecond past the newest event returned, so the
+/// next `since` filter — which is inclusive — doesn't re-match it).
+async fn new_events(
+    storage: &dyn Storage,
+    since: DateTime<Utc>,
+    limit: u32,
+) -> Result<(Vec<BridgeEvent>, Option<DateTime<Utc>>)> {
+    let mut rows = storage
+        .list_events(&EventFilter {
+            since: Some(since),
+            limit: Some(limit),
+            ..Default::default()
+        })
+        .await?;
+    // Storage impls return event_time DESC; rows[0] is the newest.
+    let next_cursor = rows
+        .first()
+        .map(|e| e.event_time + ChronoDuration::microseconds(1));
+    rows.reverse();
+    Ok((rows, next_cursor))
 }
 
 #[derive(Default, Debug)]
@@ -213,83 +261,6 @@ fn band(score: i64) -> &'static str {
     } else {
         "RED"
     }
-}
-
-async fn pool(db_url: &str) -> Result<SqlitePool> {
-    let opts = SqliteConnectOptions::from_str(db_url)?
-        .create_if_missing(true)
-        .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
-        .busy_timeout(std::time::Duration::from_secs(5));
-    Ok(SqlitePoolOptions::new()
-        .max_connections(4)
-        .connect_with(opts)
-        .await?)
-}
-
-async fn max_event_rowid(pool: &SqlitePool) -> Result<i64> {
-    let r = sqlx::query("SELECT COALESCE(MAX(rowid), 0) AS m FROM bridge_events")
-        .fetch_one(pool)
-        .await?;
-    Ok(r.try_get::<i64, _>("m")?)
-}
-
-async fn new_events(pool: &SqlitePool, last_rowid: i64) -> Result<Vec<(i64, BridgeEvent)>> {
-    let rows = sqlx::query(
-        r#"SELECT rowid, id, event_time, bridge_id, payload
-             FROM bridge_events
-            WHERE rowid > ?
-         ORDER BY rowid ASC LIMIT 200"#,
-    )
-    .bind(last_rowid)
-    .fetch_all(pool)
-    .await?;
-    let mut out = Vec::with_capacity(rows.len());
-    for row in rows {
-        let rowid: i64 = row.try_get("rowid")?;
-        let id_str: String = row.try_get("id")?;
-        let event_time_str: String = row.try_get("event_time")?;
-        let bridge_id: String = row.try_get("bridge_id")?;
-        let payload_str: String = row.try_get("payload")?;
-        let payload = match serde_json::from_str(&payload_str) {
-            Ok(p) => p,
-            Err(_) => continue,
-        };
-        let event_time = match chrono::DateTime::parse_from_rfc3339(&event_time_str) {
-            Ok(dt) => dt.with_timezone(&Utc),
-            Err(_) => continue,
-        };
-        let id = match uuid::Uuid::parse_str(&id_str) {
-            Ok(u) => u,
-            Err(_) => continue,
-        };
-        out.push((
-            rowid,
-            BridgeEvent {
-                id,
-                event_time,
-                bridge_id,
-                payload,
-            },
-        ));
-    }
-    Ok(out)
-}
-
-async fn latest_score_per_bridge(pool: &SqlitePool) -> Result<Vec<(String, i64)>> {
-    let rows = sqlx::query(
-        r#"SELECT s.bridge_id, s.score
-             FROM bridge_health_scores s
-        INNER JOIN (
-                 SELECT bridge_id, MAX(computed_at) AS m
-                   FROM bridge_health_scores GROUP BY bridge_id
-             ) latest ON latest.bridge_id = s.bridge_id AND latest.m = s.computed_at"#,
-    )
-    .fetch_all(pool)
-    .await?;
-    Ok(rows
-        .into_iter()
-        .map(|r| (r.get::<String, _>("bridge_id"), r.get::<i64, _>("score")))
-        .collect())
 }
 
 #[cfg(test)]
