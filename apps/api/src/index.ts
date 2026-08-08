@@ -7,9 +7,9 @@ import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import type { BridgeEventKind, BridgeWithHealth, WsMessage } from "@radar/shared";
-import { RadarDb } from "./db.js";
+import { createDb, type RadarDb } from "./db.js";
 import { getImplementedBridges, getPlannedBridges, BRIDGE_REGISTRY } from "./bridges.js";
-import { DefiLlamaStore, fetchDefiLlamaPrice } from "./defillama-store.js";
+import { fetchDefiLlamaPrice } from "./defillama-store.js";
 import {
   fetchWalletBridgeActivity,
   isRateLimitError,
@@ -69,8 +69,10 @@ console.log(
   }`,
 );
 
-const db = new RadarDb(dbUrl);
-const defillama = new DefiLlamaStore(db.raw());
+const db: RadarDb = createDb(dbUrl);
+console.log(
+  `[radar-api] storage backend: ${dbUrl.startsWith("sqlite") ? "sqlite" : "postgres"} (${dbUrl.replace(/:\/\/.*@/, "://***@")})`,
+);
 const solanaConnection = new Connection(solanaRpcUrl, "confirmed");
 const app = new Hono();
 const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
@@ -109,8 +111,8 @@ app.get("/", (c) =>
   }),
 );
 
-app.get("/v1/healthz", (c) =>
-  c.json({ ok: true, events: db.countEvents(), now: new Date().toISOString() }),
+app.get("/v1/healthz", async (c) =>
+  c.json({ ok: true, events: await db.countEvents(), now: new Date().toISOString() }),
 );
 
 // Surface the v0-naive scoring algorithm + weights on every health-bearing
@@ -156,8 +158,8 @@ app.get("/v1/registry", (c) => {
 // Real protocol TVL for a bridge, from the DeFiLlama-backed cache (see
 // crates/radar-defillama). Returns undefined if the bridge has no verified
 // DeFiLlama protocol slug or no sync has run yet — never a fabricated number.
-function protocolTvlFor(bridgeId: string) {
-  const row = defillama.get("protocols", bridgeId);
+async function protocolTvlFor(bridgeId: string) {
+  const row = await db.defillamaGet("protocols", bridgeId);
   if (!row) return undefined;
   const payload = JSON.parse(row.payload) as {
     defillama_slug: string;
@@ -176,24 +178,31 @@ function protocolTvlFor(bridgeId: string) {
 }
 
 app.get("/v1/bridges", async (c) => {
-  const bridges = db.listBridges();
-  const scores = new Map(db.latestScores().map((s) => [s.bridge_id, s]));
+  const [bridges, allScores] = await Promise.all([db.listBridges(), db.latestScores()]);
+  const scores = new Map(allScores.map((s) => [s.bridge_id, s]));
 
-  const out: BridgeWithHealth[] = bridges.map((b) => ({
-    ...b,
-    health: scores.get(b.id),
-    defillama: protocolTvlFor(b.id),
-  }));
+  const out: BridgeWithHealth[] = await Promise.all(
+    bridges.map(async (b) => ({
+      ...b,
+      health: scores.get(b.id),
+      defillama: await protocolTvlFor(b.id),
+    })),
+  );
   return c.json({ scoring: SCORING_META, bridges: out });
 });
 
 app.get("/v1/bridges/:id", async (c) => {
   const id = c.req.param("id");
-  const bridge = db.listBridges().find((b) => b.id === id);
+  const [bridges, allScores, defillama] = await Promise.all([
+    db.listBridges(),
+    db.latestScores(),
+    protocolTvlFor(id),
+  ]);
+  const bridge = bridges.find((b) => b.id === id);
   if (!bridge) return c.json({ error: "bridge not found" }, 404);
 
-  const score = db.latestScores().find((s) => s.bridge_id === id);
-  return c.json({ bridge, health: score, defillama: protocolTvlFor(id) });
+  const score = allScores.find((s) => s.bridge_id === id);
+  return c.json({ bridge, health: score, defillama });
 });
 
 // ── DeFiLlama Solana data layer (external reference data — see
@@ -205,8 +214,8 @@ app.get("/v1/bridges/:id", async (c) => {
 // service hasn't run yet, callers get an honest empty/unavailable state, not
 // fabricated numbers.
 
-function proOnly(c: Context, category: string) {
-  const row = defillama.get(category, "solana");
+async function proOnly(c: Context, category: string) {
+  const row = await db.defillamaGet(category, "solana");
   if (!row) {
     return c.json({
       source: "defillama",
@@ -233,8 +242,8 @@ app.get("/v1/defillama/bridges", (c) => proOnly(c, "bridges"));
 app.get("/v1/defillama/bridge-volume", (c) => proOnly(c, "bridge_volume"));
 app.get("/v1/defillama/oracles", (c) => proOnly(c, "oracles"));
 
-app.get("/v1/defillama/tvl", (c) => {
-  const row = defillama.get("chain_tvl", "solana");
+app.get("/v1/defillama/tvl", async (c) => {
+  const row = await db.defillamaGet("chain_tvl", "solana");
   if (!row) {
     return c.json({ source: "defillama", category: "chain_tvl", available: false, reason: "not synced yet" });
   }
@@ -248,8 +257,8 @@ app.get("/v1/defillama/tvl", (c) => {
   });
 });
 
-app.get("/v1/defillama/stablecoins", (c) => {
-  const rows = defillama.list("stablecoins");
+app.get("/v1/defillama/stablecoins", async (c) => {
+  const rows = await db.defillamaList("stablecoins");
   return c.json({
     source: "defillama",
     category: "stablecoins",
@@ -259,8 +268,8 @@ app.get("/v1/defillama/stablecoins", (c) => {
   });
 });
 
-app.get("/v1/defillama/protocols", (c) => {
-  const rows = defillama.list("protocols");
+app.get("/v1/defillama/protocols", async (c) => {
+  const rows = await db.defillamaList("protocols");
   return c.json({
     source: "defillama",
     category: "protocols",
@@ -270,8 +279,8 @@ app.get("/v1/defillama/protocols", (c) => {
   });
 });
 
-app.get("/v1/defillama/messaging-protocols", (c) => {
-  const rows = defillama.list("messaging_protocols");
+app.get("/v1/defillama/messaging-protocols", async (c) => {
+  const rows = await db.defillamaList("messaging_protocols");
   return c.json({
     source: "defillama",
     category: "messaging_protocols",
@@ -282,8 +291,8 @@ app.get("/v1/defillama/messaging-protocols", (c) => {
   });
 });
 
-app.get("/v1/defillama/yields", (c) => {
-  const row = defillama.get("yields", "solana");
+app.get("/v1/defillama/yields", async (c) => {
+  const row = await db.defillamaGet("yields", "solana");
   if (!row) {
     return c.json({
       source: "defillama",
@@ -303,14 +312,14 @@ app.get("/v1/defillama/yields", (c) => {
   });
 });
 
-app.get("/v1/defillama/dex-volume", (c) => {
-  const row = defillama.get("dex_volume", "solana");
+app.get("/v1/defillama/dex-volume", async (c) => {
+  const row = await db.defillamaGet("dex_volume", "solana");
   if (!row) return c.json({ source: "defillama", category: "dex_volume", available: false, reason: "not synced yet" });
   return c.json({ source: "defillama", category: "dex_volume", available: true, fetched_at: row.fetched_at, ...JSON.parse(row.payload) });
 });
 
-app.get("/v1/defillama/fees", (c) => {
-  const row = defillama.get("fees", "solana");
+app.get("/v1/defillama/fees", async (c) => {
+  const row = await db.defillamaGet("fees", "solana");
   if (!row) return c.json({ source: "defillama", category: "fees", available: false, reason: "not synced yet" });
   return c.json({ source: "defillama", category: "fees", available: true, fetched_at: row.fetched_at, ...JSON.parse(row.payload) });
 });
@@ -327,18 +336,19 @@ app.get("/v1/defillama/price/:mint", async (c) => {
   return c.json({ source: "defillama", available: true, ...result });
 });
 
-app.get("/v1/bridges/:id/health", (c) => {
+app.get("/v1/bridges/:id/health", async (c) => {
   const id = c.req.param("id");
-  const score = db.latestScores().find((s) => s.bridge_id === id);
+  const scores = await db.latestScores();
+  const score = scores.find((s) => s.bridge_id === id);
   if (!score) return c.json({ error: "no score yet" }, 404);
   return c.json({ scoring: SCORING_META, ...score });
 });
 
-app.get("/v1/bridges/:id/history", (c) => {
+app.get("/v1/bridges/:id/history", async (c) => {
   const id = c.req.param("id");
   const sinceParam = c.req.query("since");
   const since = sinceParam ?? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  return c.json({ bridge_id: id, since, history: db.scoreHistory(id, since) });
+  return c.json({ bridge_id: id, since, history: await db.scoreHistory(id, since) });
 });
 
 // ── Wallet activity — real on-chain history for a connected wallet ────────
@@ -460,8 +470,8 @@ app.get("/v1/wallet-timeline/:address", async (c) => {
   }
 });
 
-app.get("/v1/events", (c) => {
-  const events = db.listEvents({
+app.get("/v1/events", async (c) => {
+  const events = await db.listEvents({
     bridgeId: c.req.query("bridge"),
     kind: c.req.query("type") as BridgeEventKind | undefined,
     chain: c.req.query("chain"),
@@ -474,14 +484,14 @@ app.get("/v1/events", (c) => {
 // ── WebSocket live stream ────────────────────────────────────────────────────
 //
 // We don't have a notify mechanism from the Rust indexer back into the API,
-// so the API tails the SQLite `bridge_events` table by polling every 1s and
-// pushes new rows out to every connected WS client. Cheap and works.
+// so the API tails the `bridge_events` table by polling every 1s and pushes
+// new rows out to every connected WS client. Cheap and works.
 
 interface ClientCtx {
   send: (msg: WsMessage) => void;
 }
 const clients = new Set<ClientCtx>();
-let lastRowid = db.maxEventRowid();
+let eventCursor = await db.latestEventCursor();
 
 function broadcast(msg: WsMessage) {
   for (const c of clients) {
@@ -493,13 +503,21 @@ function broadcast(msg: WsMessage) {
   }
 }
 
+let tailInFlight = false;
 setInterval(() => {
-  if (clients.size === 0) return;
-  const fresh = db.eventsSince(lastRowid, 200);
-  for (const { rowid, event } of fresh) {
-    lastRowid = Math.max(lastRowid, rowid);
-    broadcast({ kind: "event", data: event });
-  }
+  if (clients.size === 0 || tailInFlight) return;
+  tailInFlight = true;
+  db.eventsSince(eventCursor, 200)
+    .then((fresh) => {
+      for (const { cursor, event } of fresh) {
+        eventCursor = cursor;
+        broadcast({ kind: "event", data: event });
+      }
+    })
+    .catch((err) => console.error("[radar-api] event tail poll failed:", err))
+    .finally(() => {
+      tailInFlight = false;
+    });
 }, 1000);
 
 app.get(
