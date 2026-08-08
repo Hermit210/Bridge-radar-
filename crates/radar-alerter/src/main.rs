@@ -12,6 +12,8 @@
 //! backend uses (via `connect_any`), so this runs against SQLite or Postgres
 //! without a backend-specific code path — no more hand-rolled SQL here.
 
+mod commands;
+
 use anyhow::{Context, Result};
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use radar_core::event::{BridgeEvent, EventFilter};
@@ -65,6 +67,37 @@ async fn main() -> Result<()> {
         .timeout(Duration::from_secs(15))
         .build()?;
 
+    let bot_token = std::env::var("TELEGRAM_BOT_TOKEN")
+        .ok()
+        .filter(|s| !s.is_empty());
+
+    let alert_handle = tokio::spawn(run_alert_loop(storage.clone(), cfg, http));
+
+    match bot_token {
+        Some(token) => {
+            let commands_handle = tokio::spawn(commands::run(token, storage.clone()));
+            tokio::select! {
+                r = alert_handle => match r {
+                    Ok(Ok(())) => info!("alert loop exited"),
+                    Ok(Err(e)) => warn!(error = %e, "alert loop failed"),
+                    Err(e)     => warn!(error = %e, "alert loop panicked"),
+                },
+                r = commands_handle => match r {
+                    Ok(Ok(())) => info!("command polling exited"),
+                    Ok(Err(e)) => warn!(error = %e, "command polling failed"),
+                    Err(e)     => warn!(error = %e, "command polling panicked"),
+                },
+            }
+        }
+        None => {
+            warn!("TELEGRAM_BOT_TOKEN not set — /start, /status, /help commands disabled");
+            alert_handle.await??;
+        }
+    }
+    Ok(())
+}
+
+async fn run_alert_loop(storage: Arc<dyn Storage>, cfg: SinkConfig, http: reqwest::Client) -> Result<()> {
     let mut cursor = initial_cursor(storage.as_ref()).await?;
     let mut last_score: HashMap<String, i64> = HashMap::new();
     for score in storage.latest_scores().await? {
@@ -253,7 +286,7 @@ fn payload_for_event(e: &BridgeEvent) -> Value {
     serde_json::to_value(e).unwrap_or(json!({}))
 }
 
-fn band(score: i64) -> &'static str {
+pub(crate) fn band(score: i64) -> &'static str {
     if score >= 80 {
         "GREEN"
     } else if score >= 50 {

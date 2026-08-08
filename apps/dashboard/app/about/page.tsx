@@ -59,16 +59,15 @@ export default async function AboutPage() {
                 </code>
               </>,
               <>
-                Telegram + Discord + webhook alerter for anomaly events — code-complete, proven
-                against real events in dry-run.{" "}
+                Telegram + Discord + webhook alerter for anomaly events, plus a real Telegram bot
+                (<code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-accent">@bruhalert_bot</code>
+                ) answering <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-accent">/start</code>,{" "}
+                <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-accent">/status</code>, and{" "}
+                <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-accent">/help</code> by
+                long-polling Telegram's <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-accent">getUpdates</code>.{" "}
                 <span className="text-green">
-                  Discord delivery is live-confirmed (2026-08-08, real HTTP 204 from Discord's
-                  own servers)
-                </span>
-                ;{" "}
-                <span className="text-muted-dark">
-                  Telegram delivery is not yet confirmed — the bot token is real and valid, but no
-                  chat has messaged it yet, so there is no real chat ID to send to
+                  Both outbound alert delivery (Discord: real HTTP 204; Telegram: a real reply with
+                  a real message_id) and inbound bot commands are live-confirmed (2026-08-08)
                 </span>
                 .
               </>,
