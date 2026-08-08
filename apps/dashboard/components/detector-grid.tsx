@@ -1,7 +1,7 @@
 import { apiUrls } from "@/lib/api";
 import { Reveal } from "@/components/reveal";
 
-interface ScoringWeights {
+export interface ScoringWeights {
   parity: number;
   outflow: number;
   signer: number;
@@ -11,8 +11,10 @@ interface ScoringWeights {
 
 /** Reads the real weighting the scorer actually uses (SCORING_META, served
  * on /v1/bridges) so the numbers shown can never drift from what the
- * detectors are really doing — no hardcoded duplicate of that config. */
-async function fetchScoringWeights(): Promise<ScoringWeights | null> {
+ * detectors are really doing — no hardcoded duplicate of that config.
+ * Exported so the beam diagram (scoring-beam-diagram.tsx) reads the exact
+ * same live values instead of a second hand-copied fetch. */
+export async function fetchScoringWeights(): Promise<ScoringWeights | null> {
   try {
     const r = await fetch(`${apiUrls.base}/v1/bridges`, { cache: "no-store" });
     if (!r.ok) return null;
@@ -71,7 +73,7 @@ function OracleIcon() {
   );
 }
 
-const DETECTORS = [
+export const DETECTORS = [
   {
     key: "parity",
     title: "Lock / mint parity",
@@ -79,6 +81,7 @@ const DETECTORS = [
     icon: <ParityIcon />,
     barClass: "bg-accent/70",
     dotClass: "bg-accent",
+    hex: "#e0a530",
   },
   {
     key: "outflow",
@@ -87,6 +90,7 @@ const DETECTORS = [
     icon: <OutflowIcon />,
     barClass: "bg-green/70",
     dotClass: "bg-green",
+    hex: "#2d9a77",
   },
   {
     key: "signer",
@@ -95,6 +99,7 @@ const DETECTORS = [
     icon: <SignerIcon />,
     barClass: "bg-yellow/70",
     dotClass: "bg-yellow",
+    hex: "#c98a3f",
   },
   {
     key: "frontend",
@@ -103,6 +108,7 @@ const DETECTORS = [
     icon: <FrontendIcon />,
     barClass: "bg-red/70",
     dotClass: "bg-red",
+    hex: "#b84f5e",
   },
   {
     key: "oracle",
@@ -111,6 +117,7 @@ const DETECTORS = [
     icon: <OracleIcon />,
     barClass: "bg-accent-bright/70",
     dotClass: "bg-accent-bright",
+    hex: "#f0bd5c",
   },
 ] as const;
 

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { LiveStatusStrip } from "@/components/live-status-strip";
 import { Reveal } from "@/components/reveal";
 import { DetectorGrid } from "@/components/detector-grid";
+import { ScoringBeamDiagram } from "@/components/scoring-beam-diagram";
 import { OrbitGlow } from "@/components/orbit-glow";
 import { BridgeMarquee } from "@/components/bridge-marquee";
 import { BridgeGlobe } from "@/components/bridge-globe";
@@ -120,6 +121,7 @@ export default async function LandingPage() {
           </div>
         </Reveal>
         <DetectorGrid />
+        <ScoringBeamDiagram />
       </section>
 
       {/* Close */}
