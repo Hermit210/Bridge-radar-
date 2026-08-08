@@ -9,6 +9,7 @@ import { OrbitGlow } from "@/components/orbit-glow";
 import { StatBar, type StatBarSegment } from "@/components/stat-bar";
 import { BridgeScoreNotifications } from "@/components/bridge-score-notifications";
 import { BridgeUsageSummary } from "@/components/bridge-usage-summary";
+import { BridgeRaceSection } from "@/components/bridge-race/bridge-race-section";
 import {
   getWalletActivity,
   getWalletHoldings,
@@ -836,6 +837,8 @@ export default function MyActivityPage() {
           )}
         </div>
       )}
+
+      {connected && <BridgeRaceSection />}
     </div>
   );
 }

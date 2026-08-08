@@ -106,6 +106,8 @@ app.get("/", (c) =>
       "GET /v1/defillama/dex-volume",
       "GET /v1/defillama/fees",
       "GET /v1/defillama/price/:mint",
+      "POST /v1/game-scores",
+      "GET /v1/game-scores/leaderboard",
       "GET /v1/ws",
     ],
   }),
@@ -479,6 +481,58 @@ app.get("/v1/events", async (c) => {
     limit: c.req.query("limit") ? Number(c.req.query("limit")) : undefined,
   });
   return c.json({ events });
+});
+
+// ── "Bridge Race" mini-game — real scores, real wallet-gated leaderboard ───
+//
+// Client-reported run results (score/blocks_used/distance) from a real
+// playthrough, saved under the real connected wallet that played. No
+// server-side replay verification in v0 — only the sane-bounds checks
+// below — so this is real client-reported data, honestly not tamper-proof.
+// See migrations/0008_game_scores.sql / db.ts's GameScoreEntry doc comment.
+const GAME_SCORE_MAX = 100_000;
+const GAME_BLOCKS_MAX = 1_000;
+const GAME_DISTANCE_MAX = 50_000;
+
+app.post("/v1/game-scores", async (c) => {
+  const body = await c.req.json().catch(() => null);
+  if (!body || typeof body !== "object") {
+    return c.json({ error: "invalid JSON body" }, 400);
+  }
+  const { wallet_address, score, blocks_used, distance } = body as Record<string, unknown>;
+
+  if (typeof wallet_address !== "string" || !isValidSolanaAddress(wallet_address)) {
+    return c.json({ error: "wallet_address must be a real, valid Solana address" }, 400);
+  }
+  if (typeof score !== "number" || !Number.isInteger(score) || score < 0 || score > GAME_SCORE_MAX) {
+    return c.json({ error: `score must be an integer between 0 and ${GAME_SCORE_MAX}` }, 400);
+  }
+  if (
+    typeof blocks_used !== "number" ||
+    !Number.isInteger(blocks_used) ||
+    blocks_used < 0 ||
+    blocks_used > GAME_BLOCKS_MAX
+  ) {
+    return c.json({ error: `blocks_used must be an integer between 0 and ${GAME_BLOCKS_MAX}` }, 400);
+  }
+  if (
+    typeof distance !== "number" ||
+    !Number.isInteger(distance) ||
+    distance < 0 ||
+    distance > GAME_DISTANCE_MAX
+  ) {
+    return c.json({ error: `distance must be an integer between 0 and ${GAME_DISTANCE_MAX}` }, 400);
+  }
+
+  const entry = await db.insertGameScore({ walletAddress: wallet_address, score, blocksUsed: blocks_used, distance });
+  return c.json({ saved: true, entry }, 201);
+});
+
+app.get("/v1/game-scores/leaderboard", async (c) => {
+  const limitParam = c.req.query("limit");
+  const limit = Math.min(Math.max(limitParam ? Number(limitParam) : 10, 1), 100);
+  const entries = await db.topGameScores(limit);
+  return c.json({ entries });
 });
 
 // ── WebSocket live stream ────────────────────────────────────────────────────
