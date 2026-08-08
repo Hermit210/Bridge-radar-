@@ -307,6 +307,16 @@ explicit, separate, real-funds decision not made yet.
   "username":"Hermit210"},"text":"👋 Welcome to Bridge Radar...`  —
   a real message_id assigned by Telegram, addressed to the user's real
   chat, confirmed independently in their own Telegram app.
+  **`/help` live-verified for real too** (2026-08-08, later the same day):
+  the user sent `/start`, `/help`, and two unrecognized commands
+  (`/bridge`, `/mayan`) directly from their own Telegram client; the
+  daemon's log shows four real `getUpdates`→`sendMessage` round trips,
+  including a real `/help` reply (`message_id: 12`) with the real help
+  text, and the two unknown commands correctly falling through to the
+  "Unknown command" + help-text response rather than crashing or going
+  silent. **`/status` has not yet been triggered by a real message** —
+  implemented and dispatched through the identical code path as the two
+  proven commands, but genuinely unconfirmed until sent for real.
 - **`cargo clippy -D warnings`** currently fails on 2 pre-existing warnings
   unrelated to any work done this session (see Tests above).
 - **Resolved 2026-08-08**: headless Chromium screenshot verification is
