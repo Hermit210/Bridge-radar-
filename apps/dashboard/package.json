@@ -12,6 +12,7 @@
     "test": "echo 'no tests'"
   },
   "dependencies": {
+    "@formkit/auto-animate": "^0.10.0",
     "@radar/shared": "workspace:*",
     "@solana/wallet-adapter-base": "^0.9.27",
     "@solana/wallet-adapter-coinbase": "^0.1.23",

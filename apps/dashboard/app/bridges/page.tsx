@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useAutoAnimate } from "@formkit/auto-animate/react";
 import { HealthCard, type HeartbeatInfo } from "@/components/health-card";
 import { HeartbeatDot } from "@/components/heartbeat-dot";
 import { StatBar, type StatBarSegment } from "@/components/stat-bar";
@@ -45,6 +46,7 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [bandFilter, setBandFilter] = useState<HealthBand | "all">("all");
   const [view, setView] = useState<"cards" | "list">("cards");
+  const [gridRef] = useAutoAnimate<HTMLDivElement>({ duration: 250 });
 
   useEffect(() => {
     let cancelled = false;
@@ -210,7 +212,7 @@ export default function Home() {
           <p className="text-sm text-muted">No bridges match “{query}”.</p>
         </div>
       ) : view === "cards" ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+        <div ref={gridRef} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {filtered.map((b, i) => (
             <div
               key={b.id}
@@ -322,6 +324,7 @@ function BridgeTable({
   const router = useRouter();
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [tbodyRef] = useAutoAnimate<HTMLTableSectionElement>({ duration: 250 });
 
   function toggleSort(key: SortKey) {
     if (sortKey !== key) {
@@ -364,7 +367,7 @@ function BridgeTable({
               <th className="px-2 py-2.5">Adapter</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody ref={tbodyRef}>
             {rows.map((b) => {
               const band = bandFor(b);
               const score = band === "unmonitored" ? undefined : b.health?.score;

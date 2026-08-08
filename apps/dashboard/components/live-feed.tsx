@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useAutoAnimate } from "@formkit/auto-animate/react";
 import type { BridgeEvent } from "@radar/shared";
 import { EventRow } from "./event-row";
 import { listEvents } from "@/lib/api";
@@ -25,6 +26,7 @@ const selectClass =
 
 export function LiveFeed({ initial, bridgeOptions }: Props) {
   const [events, setEvents] = useState<BridgeEvent[]>(initial);
+  const [tbodyRef] = useAutoAnimate<HTMLTableSectionElement>({ duration: 220 });
   const [connected, setConnected] = useState(true);
   const [bridgeFilter, setBridgeFilter] = useState<string>("");
   const [typeFilter, setTypeFilter] = useState<string>("");
@@ -168,7 +170,7 @@ export function LiveFeed({ initial, bridgeOptions }: Props) {
               <th className="px-2 py-2.5">Tx</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody ref={tbodyRef}>
             {events.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-6 py-14 text-center">
