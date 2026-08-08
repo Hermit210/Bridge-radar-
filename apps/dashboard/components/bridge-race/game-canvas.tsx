@@ -33,8 +33,8 @@ export function GameCanvas({ onGameOver }: { onGameOver: (result: RunResult) => 
 
       game = new Phaser.Game({
         type: Phaser.AUTO,
-        width: 680,
-        height: 380,
+        width: 700,
+        height: 420,
         parent: containerRef.current,
         backgroundColor: "#0a0a09",
         physics: {
