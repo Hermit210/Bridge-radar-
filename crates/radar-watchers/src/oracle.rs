@@ -8,7 +8,6 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use radar_core::event::{BridgeEvent, BridgeEventPayload};
 use radar_core::pricing::{feeds, PythHermesClient};
-use radar_core::storage::SqliteStorage;
 use radar_core::Storage;
 use std::sync::Arc;
 use std::time::Duration;
@@ -21,7 +20,7 @@ const POLL_INTERVAL: Duration = Duration::from_secs(60);
 /// operation, so anything beyond 60 seconds is genuinely abnormal.
 const STALE_THRESHOLD_SECS: i64 = 60;
 
-pub async fn run(storage: Arc<SqliteStorage>) -> Result<()> {
+pub async fn run(storage: Arc<dyn Storage>) -> Result<()> {
     let mut tick = interval(POLL_INTERVAL);
     tick.set_missed_tick_behavior(MissedTickBehavior::Skip);
     let client = PythHermesClient::new().with_ttl(Duration::from_secs(5));
@@ -45,7 +44,7 @@ pub async fn run(storage: Arc<SqliteStorage>) -> Result<()> {
 }
 
 async fn emit(
-    storage: &Arc<SqliteStorage>,
+    storage: &Arc<dyn Storage>,
     bridge_id: &str,
     feed_id: &str,
     last_update: DateTime<Utc>,

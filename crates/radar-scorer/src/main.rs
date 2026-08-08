@@ -18,7 +18,7 @@ use chrono::{DateTime, Duration, Utc};
 use radar_core::chain::ChainId;
 use radar_core::event::{BridgeEventKind, BridgeId, EventFilter};
 use radar_core::health::{HealthComponents, HealthScore};
-use radar_core::storage::SqliteStorage;
+use radar_core::storage::connect_any;
 use radar_core::Storage;
 use std::sync::Arc;
 use std::time::Duration as StdDuration;
@@ -69,11 +69,8 @@ async fn main() -> Result<()> {
 
     info!(%db_url, tick_secs = TICK_SECS, window_secs = WINDOW_SECS, "starting scorer (v0-naive)");
 
-    let storage = Arc::new(
-        SqliteStorage::connect(&db_url)
-            .await
-            .context("connecting to storage")?,
-    );
+    let storage: Arc<dyn Storage> =
+        Arc::from(connect_any(&db_url).await.context("connecting to storage")?);
 
     let mut tick = interval(StdDuration::from_secs(TICK_SECS));
     tick.set_missed_tick_behavior(MissedTickBehavior::Skip);
@@ -87,7 +84,7 @@ async fn main() -> Result<()> {
     }
 }
 
-async fn score_once(storage: &SqliteStorage) -> Result<usize> {
+async fn score_once(storage: &dyn Storage) -> Result<usize> {
     let now = Utc::now();
     let since = now - Duration::seconds(WINDOW_SECS);
     let bridges = storage.list_bridges().await?;
@@ -114,7 +111,7 @@ async fn score_once(storage: &SqliteStorage) -> Result<usize> {
 }
 
 async fn compute_score(
-    storage: &SqliteStorage,
+    storage: &dyn Storage,
     bridge_id: &BridgeId,
     since: DateTime<Utc>,
     now: DateTime<Utc>,
@@ -232,7 +229,7 @@ async fn compute_score(
 /// interpolates or predicts; only reads real `bridge_events` rows already
 /// written by `radar-watchers`.
 async fn recency_severity(
-    storage: &SqliteStorage,
+    storage: &dyn Storage,
     bridge_id: &BridgeId,
     kind: BridgeEventKind,
     window: Duration,
@@ -260,6 +257,7 @@ mod tests {
     use super::*;
     use radar_core::chain::ChainId;
     use radar_core::event::{BridgeEvent, BridgeEventPayload};
+    use radar_core::storage::SqliteStorage;
     use uuid::Uuid;
 
     async fn store_event(s: &SqliteStorage, bridge: &str, kind: &str) {

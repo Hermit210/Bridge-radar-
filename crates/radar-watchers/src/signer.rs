@@ -13,7 +13,6 @@
 use anyhow::Result;
 use chrono::Utc;
 use radar_core::event::{BridgeEvent, BridgeEventPayload};
-use radar_core::storage::SqliteStorage;
 use radar_core::Storage;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -24,7 +23,7 @@ use uuid::Uuid;
 
 const POLL_INTERVAL: Duration = Duration::from_secs(15 * 60);
 
-pub async fn run(storage: Arc<SqliteStorage>) -> Result<()> {
+pub async fn run(storage: Arc<dyn Storage>) -> Result<()> {
     let mut tick = interval(POLL_INTERVAL);
     tick.set_missed_tick_behavior(MissedTickBehavior::Skip);
     let client = reqwest::Client::builder()

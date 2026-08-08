@@ -19,7 +19,8 @@ mod oracle;
 mod signer;
 
 use anyhow::{Context, Result};
-use radar_core::storage::SqliteStorage;
+use radar_core::storage::connect_any;
+use radar_core::Storage;
 use std::sync::Arc;
 use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
@@ -44,11 +45,8 @@ async fn main() -> Result<()> {
 
     info!(%db_url, "starting watchers (signer + frontend + oracle)");
 
-    let storage = Arc::new(
-        SqliteStorage::connect(&db_url)
-            .await
-            .context("connect storage")?,
-    );
+    let storage: Arc<dyn Storage> =
+        Arc::from(connect_any(&db_url).await.context("connect storage")?);
 
     let signer_handle = tokio::spawn(signer::run(storage.clone()));
     let frontend_handle = tokio::spawn(frontend::run(storage.clone()));
