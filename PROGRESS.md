@@ -19,7 +19,7 @@ No mainnet funds or mainnet program were ever involved.
 | Layer | Crate / app | What's live |
 |---|---|---|
 | Shared types | `crates/radar-core` | `BridgeEvent`, `ChainId`, `HealthScore`/`HealthComponents`, `Storage` trait, `BridgeAdapter` trait, Pyth Hermes price client, DeFiLlama client, 14 bridge adapter modules |
-| Storage | `crates/radar-core/storage/{sqlite,postgres}.rs` | SQLite (the only backend actually running — `apps/api` reads it directly via `better-sqlite3`), Postgres+Timescale impl fully written but never wired to the API layer or run end-to-end (see Known gaps) |
+| Storage | `crates/radar-core/storage/{sqlite,postgres}.rs`, `apps/api/src/db.ts` | **Postgres+Timescale is live and verified end-to-end as of 2026-08-08.** All 8 Rust binaries (both indexers, scorer, watchers, attester, alerter, defillama) dispatch through `storage::connect_any(DATABASE_URL)` to either `SqliteStorage` or `PostgresStorage`; `apps/api`'s `db.ts` has a matching `createDb(url)` split (`SqliteRadarDb` / `PostgresRadarDb`, via `pg`). SQLite remains the zero-setup dev default. |
 | Solana ingestion | `crates/radar-indexer-solana` | **Mainnet** `logsSubscribe` (Helius) + reconnect/backoff + `getSignaturesForAddress` polling fallback — migrated off devnet 2026-07-23 |
 | EVM ingestion | `crates/radar-indexer-evm` | `eth_getLogs` poller across ETH/Arbitrum/Base/OP/BNB/Polygon, 12-block confirmation buffer |
 | Bridge adapters | `crates/radar-core/bridges/*.rs` | **14 real, mainnet-verified adapters** (see below) |
@@ -33,7 +33,7 @@ No mainnet funds or mainnet program were ever involved.
 | Dashboard | `apps/dashboard` | Next.js 15 — 7 pages: `/`, `/bridges`, `/bridges/[id]`, `/bridges/compare`, `/events`, `/about`, `/my-activity` (see Dashboard pages below — all 7 now have a redesign pass as of 2026-08-08) |
 | Wallet layer | `apps/dashboard/app/my-activity` | Wallet connect (Phantom/Solflare/Coinbase/Ledger/Torus) + 9 features built entirely on our own data — see below |
 | dApp SDK | `packages/sdk` (`@bridge-radar/sdk`, private/unpublished) | `getBridgeHealth` (real API) + `getBridgeHealthOnChain` (real on-chain PDA read) — verified against live data (real API score, real on-chain score, real thrown error for an unregistered bridge). Practical implementation of whitepaper §4.5's "dApps can gate withdrawals" promise. |
-| Infra | `docker-compose.yml`, `migrations/0001_init.sql` | Timescale + Redis stack scaffolded, schema written, never actually run — Docker still unavailable in every dev session so far (reconfirmed again 2026-08-08) |
+| Infra | `docker-compose.yml`, `migrations/0001_init.sql`–`0007` | **Running for real as of 2026-08-08** — `radar-timescale` + `radar-redis` containers up and healthy, all 7 migrations applied via the initdb mount (`\dt` shows all 7 tables, 16 bridges seeded). |
 
 ## Bridge registry — 14 real adapters, 2 disabled, 6 blocked candidates
 
@@ -199,17 +199,30 @@ explicit, separate, real-funds decision not made yet.
   before Pyth pricing applies to anything. The Pyth client (`amount_to_usd`)
   itself is ready and correct; there's just no real amount anywhere to feed
   it yet.
-- **Postgres/Timescale**: the Rust `Storage` trait impl is fully written,
-  but `apps/api` (Node/Hono) has no Postgres client at all — reads SQLite
-  directly via `better-sqlite3`, not through the Rust storage abstraction.
-  Pointing `DATABASE_URL` at Postgres today would not work for the API
-  layer. Never run end-to-end — **Docker has been unavailable in every dev
-  session so far** (reconfirmed again 2026-08-08: no `docker` binary in
-  either the WSL or Windows-host PATH, no `docker.service` unit, no Docker
-  Desktop install found at its standard Windows path), so this remains
-  blocked on an environment with Docker access, not additional scoping
-  work. Real unblocking step: install Docker Desktop with WSL2 integration
-  enabled for the Ubuntu distro.
+- **Postgres/Timescale: resolved, 2026-08-08.** Docker became available in
+  the dev sandbox (Docker Desktop + WSL2 integration); `docker compose up -d`
+  brought up `radar-timescale` (Timescale 2.16.1 / PG16) + `radar-redis`,
+  both healthy. All 7 migrations applied via the initdb mount, confirmed
+  with a real `psql \dt` (7 tables) and bridge count (16, matching the
+  SQLite seed). Every Rust binary that used to hardcode
+  `SqliteStorage::connect` (indexer-evm, indexer-solana, scorer, watchers,
+  attester) now goes through `storage::connect_any`, same as `radar-defillama`
+  already did; `radar-alerter` additionally had its hand-rolled SQLite-only
+  `SqlitePool` queries (a `rowid` cursor, raw `?`-placeholder SQL) replaced
+  with `Storage::list_events`/`latest_scores` so it has no backend-specific
+  code left either. `apps/api/src/db.ts` gained a real Postgres backend
+  (`pg`, `PostgresRadarDb`) implementing the same `RadarDb` interface as the
+  SQLite one, selected by `createDb(DATABASE_URL)`; every route handler and
+  `wallet-activity.ts` call site was updated to the now-async interface.
+  `DATABASE_URL` in `.env` now points at `postgres://radar:radar@localhost:5432/radar`.
+  Proven end-to-end for real: `radar-indexer-solana` ingested real mainnet
+  events straight into Postgres (confirmed via `psql`), `radar-scorer`
+  computed and wrote real health scores off those events (confirmed via
+  `psql`), and `apps/api` served both back out correctly — verified with
+  real `curl` against `/v1/healthz`, `/v1/events`, `/v1/bridges/wormhole/health`,
+  and a real WebSocket client that received live `event` messages off the
+  Postgres-backed tail. `cargo test --workspace` (90 passed) and
+  `pnpm -r typecheck` both clean throughout.
 - **`DEPLOYMENT.md` + `deploy/systemd/*.service` exist** (2026-08-01) —
   real, syntax-validated (`systemd-analyze verify`, all 9 units pass) but
   never run end-to-end (no Docker/Postgres in the dev sandbox that wrote
@@ -267,7 +280,7 @@ packages/
   sdk/                   @bridge-radar/sdk -- minimal dApp client (private, unpublished)
 programs/
   radar-oracle/          Anchor program (devnet)
-migrations/              Postgres + Timescale DDL (unused so far)
+migrations/              Postgres + Timescale DDL -- applied and live (2026-08-08)
 ```
 
 ## Run it
