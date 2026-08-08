@@ -501,3 +501,56 @@ button, a {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* ===== Scoring beam diagram (components/scoring-beam-diagram.tsx) =====
+   Flowing dashes along each detector's real weighted beam into the
+   composite score node — --beam-duration is set per-beam from the detector's
+   real live weight (heavier weight = faster flow), not a fixed value. */
+@keyframes beam-flow {
+  to { stroke-dashoffset: -48; }
+}
+.beam-path {
+  animation: beam-flow var(--beam-duration, 2s) linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .beam-path {
+    animation: none;
+  }
+}
+
+/* ===== Spotlight hero (bridge detail page score card) =====
+   Cursor-following radial glow, tinted by the bridge's real current health
+   band (set via --spotlight-color, a real band color, never a fixed hue).
+   Position is written directly to CSS custom properties from a mousemove
+   handler (see app/bridges/[id]/page.tsx) rather than React state, so it
+   never triggers a re-render on every pointer move. */
+.spotlight-hero {
+  position: relative;
+  isolation: isolate;
+}
+.spotlight-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  background: radial-gradient(
+    480px circle at var(--spotlight-x, 50%) var(--spotlight-y, 50%),
+    var(--spotlight-color, rgba(224, 165, 48, 0.16)),
+    transparent 70%
+  );
+  pointer-events: none;
+}
+.spotlight-hero:hover::before {
+  opacity: 1;
+}
+.spotlight-hero > * {
+  position: relative;
+  z-index: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .spotlight-hero::before {
+    display: none;
+  }
+}

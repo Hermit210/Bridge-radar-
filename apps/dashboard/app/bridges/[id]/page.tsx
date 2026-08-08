@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ScoreChart } from "./score-chart";
 import { EventRow } from "@/components/event-row";
@@ -46,6 +46,15 @@ const bandStatusMessage = {
   unmonitored: "No adapter is watching this bridge on Solana yet",
 } as const;
 
+// Real band color, tinted — the spotlight is never a fixed decorative hue,
+// it reflects this specific bridge's real current health.
+const bandSpotlightColor = {
+  green: "rgba(45,154,119,0.20)",
+  yellow: "rgba(201,138,63,0.20)",
+  red: "rgba(184,79,94,0.20)",
+  unmonitored: "rgba(224,165,48,0.14)",
+} as const;
+
 const SINCE_24H = () => new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
 export default function BridgePage({
@@ -60,6 +69,18 @@ export default function BridgePage({
   const [registryEntry, setRegistryEntry] = useState<RegistryEntry | null>(null);
   const [count24h, setCount24h] = useState<{ count: number; capped: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
+  const spotlightRef = useRef<HTMLElement>(null);
+
+  function handleSpotlightMove(e: React.MouseEvent<HTMLElement>) {
+    const el = spotlightRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    // Written directly to the DOM (not React state) so a fast mousemove
+    // stream never triggers a re-render — the CSS custom properties alone
+    // drive the ::before radial-gradient position (see globals.css).
+    el.style.setProperty("--spotlight-x", `${e.clientX - rect.left}px`);
+    el.style.setProperty("--spotlight-y", `${e.clientY - rect.top}px`);
+  }
 
   useEffect(() => {
     params.then((p) => setId(p.id));
@@ -194,7 +215,12 @@ export default function BridgePage({
       </div>
 
       {/* Score history — the centerpiece */}
-      <section className="glass-card-elevated p-6">
+      <section
+        ref={spotlightRef}
+        onMouseMove={handleSpotlightMove}
+        className="spotlight-hero glass-card-elevated p-6"
+        style={{ "--spotlight-color": bandSpotlightColor[band] } as React.CSSProperties}
+      >
         <div className="mb-1 flex flex-wrap items-end justify-between gap-3">
           <h2 className="text-sm font-semibold text-text">Score history (last 24h)</h2>
           <div className="flex items-baseline gap-2">
