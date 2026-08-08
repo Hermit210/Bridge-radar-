@@ -1,61 +1,10 @@
 /**
- * Reader for the `defillama_cache` table populated by the `radar-defillama`
- * Rust service (crates/radar-defillama). This file does NOT fetch from
- * DeFiLlama itself for scheduled categories — it only reads what the Rust
- * sync already cached, with real `fetched_at` timestamps.
- *
- * External reference data only. Every response carries `source: "defillama"`
- * so it's never confused with our own primary on-chain-derived detection
- * data. If a category has never been synced (Rust service not running yet)
- * or is genuinely unavailable (Pro-only, no key), callers get an honest
- * empty/unavailable state — never fabricated numbers.
+ * On-demand DeFiLlama token price lookup. The nine scheduled DeFiLlama
+ * categories (bridges, stablecoins, protocols, ...) are read straight off
+ * `RadarDb.defillamaList`/`defillamaGet` (see db.ts) — that table is
+ * populated by the `radar-defillama` Rust service (crates/radar-defillama),
+ * this file does not fetch those itself.
  */
-
-import type Database from "better-sqlite3";
-
-export interface DefiLlamaRow {
-  category: string;
-  key: string;
-  payload: string;
-  fetched_at: string;
-}
-
-export class DefiLlamaStore {
-  constructor(private db: Database.Database) {}
-
-  private ensureTable() {
-    // The Rust sync service owns this table's schema; this is a defensive
-    // no-op create so /v1/defillama/* doesn't 500 if the API starts before
-    // radar-defillama has ever run once.
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS defillama_cache (
-        category    TEXT NOT NULL,
-        key         TEXT NOT NULL,
-        payload     TEXT NOT NULL,
-        fetched_at  TEXT NOT NULL,
-        PRIMARY KEY (category, key)
-      );
-    `);
-  }
-
-  /** All rows for a category (e.g. every stablecoin, every tracked bridge's protocol TVL). */
-  list(category: string): DefiLlamaRow[] {
-    this.ensureTable();
-    return this.db
-      .prepare(
-        "SELECT category, key, payload, fetched_at FROM defillama_cache WHERE category = ? ORDER BY key",
-      )
-      .all(category) as DefiLlamaRow[];
-  }
-
-  /** The single row for a snapshot category (e.g. chain_tvl/solana). */
-  get(category: string, key: string): DefiLlamaRow | undefined {
-    this.ensureTable();
-    return this.db
-      .prepare("SELECT category, key, payload, fetched_at FROM defillama_cache WHERE category = ? AND key = ?")
-      .get(category, key) as DefiLlamaRow | undefined;
-  }
-}
 
 // ── On-demand token price (item 5) ──────────────────────────────────────────
 //

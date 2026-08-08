@@ -1,12 +1,15 @@
-// Thin synchronous SQLite reader. The Rust indexer is the only writer; the
-// API only reads, so better-sqlite3 (sync, zero-overhead) is the right tool.
-//
-// Runs against the same DB file the indexer writes to (DATABASE_URL). When
-// we move to Postgres+Timescale this file is the only thing that changes.
+// Storage abstraction for the API. Two backends implement the same
+// `RadarDb` interface — SQLite (v0 dev loop, `better-sqlite3`, sync under the
+// hood but wrapped in `async` so callers never care) and Postgres+Timescale
+// (production, `pg`). `createDb(url)` picks the backend from the
+// `DATABASE_URL` scheme, mirroring `radar_core::storage::connect_any` on the
+// Rust side — same idea, same dispatch rule, independently implemented here
+// because Node and Rust don't share a storage layer.
 
 import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
+import pg from "pg";
 import type {
   BridgeEvent,
   BridgeEventKind,
@@ -14,6 +17,91 @@ import type {
   HealthComponents,
   HealthScore,
 } from "@radar/shared";
+
+const { Pool } = pg;
+
+export interface DefiLlamaRow {
+  category: string;
+  key: string;
+  payload: string;
+  fetched_at: string;
+}
+
+/** One bridge_events row read back off the wire, paired with the cursor value
+ * (that row's own event_time) a caller should pass as `since` on the next
+ * poll to resume strictly after it. */
+export interface CursoredEvent {
+  cursor: string;
+  event: BridgeEvent;
+}
+
+export interface RadarDb {
+  listBridges(): Promise<BridgeRow[]>;
+  latestScores(): Promise<HealthScore[]>;
+  scoreHistory(bridgeId: string, since: string): Promise<HealthScore[]>;
+  nearestScore(bridgeId: string, atIso: string): Promise<HealthScore | null>;
+  worstScoreAfter(bridgeId: string, afterIso: string): Promise<HealthScore | null>;
+  listEvents(opts: {
+    bridgeId?: string;
+    kind?: BridgeEventKind;
+    chain?: string;
+    since?: string;
+    limit?: number;
+  }): Promise<BridgeEvent[]>;
+  eventsByTx(tx: string): Promise<BridgeEvent[]>;
+  /** Cursor positioned at the current head — used on startup so the WS
+   * tailer only broadcasts events that land after the API came up. */
+  latestEventCursor(): Promise<string>;
+  eventsSince(cursor: string, limit?: number): Promise<CursoredEvent[]>;
+  countEvents(): Promise<number>;
+  defillamaList(category: string): Promise<DefiLlamaRow[]>;
+  defillamaGet(category: string, key: string): Promise<DefiLlamaRow | undefined>;
+  close(): Promise<void>;
+}
+
+/** No events recorded yet: any real event_time sorts after this. */
+const EPOCH = "1970-01-01T00:00:00.000Z";
+
+function rowToScore(r: {
+  bridge_id: string;
+  computed_at: string;
+  score: number;
+  parity_severity: number;
+  outflow_severity: number;
+  signer_recency: number;
+  frontend_recency: number;
+  oracle_staleness: number;
+}): HealthScore {
+  const components: HealthComponents = {
+    parity_severity: r.parity_severity,
+    outflow_severity: r.outflow_severity,
+    signer_recency: r.signer_recency,
+    frontend_recency: r.frontend_recency,
+    oracle_staleness: r.oracle_staleness,
+  };
+  return {
+    bridge_id: r.bridge_id,
+    computed_at: r.computed_at,
+    score: r.score,
+    components,
+  };
+}
+
+function rowToEvent(r: { id: string; event_time: string; bridge_id: string; payload: unknown }): BridgeEvent {
+  const payload = (typeof r.payload === "string" ? JSON.parse(r.payload) : r.payload) as Record<
+    string,
+    unknown
+  >;
+  return {
+    id: r.id,
+    bridge_id: r.bridge_id,
+    event_time: r.event_time,
+    type: payload.type as BridgeEventKind,
+    ...payload,
+  } as BridgeEvent;
+}
+
+// ─── SQLite (v0 dev loop) ─────────────────────────────────────────────────
 
 function findWorkspaceRoot(start: string): string {
   let dir = start;
@@ -42,7 +130,7 @@ function resolveDbPath(url: string): string {
   return path.resolve(root, stripped);
 }
 
-export class RadarDb {
+class SqliteRadarDb implements RadarDb {
   private db: Database.Database;
 
   constructor(url: string) {
@@ -91,6 +179,13 @@ export class RadarDb {
         oracle_staleness REAL NOT NULL DEFAULT 0,
         PRIMARY KEY (bridge_id, computed_at)
       );
+      CREATE TABLE IF NOT EXISTS defillama_cache (
+        category    TEXT NOT NULL,
+        key         TEXT NOT NULL,
+        payload     TEXT NOT NULL,
+        fetched_at  TEXT NOT NULL,
+        PRIMARY KEY (category, key)
+      );
       INSERT OR IGNORE INTO bridges (id, display_name, homepage) VALUES
         ('wormhole','Wormhole','https://wormhole.com'),
         ('allbridge','Allbridge','https://allbridge.io'),
@@ -134,7 +229,7 @@ export class RadarDb {
     `);
   }
 
-  listBridges(): BridgeRow[] {
+  async listBridges(): Promise<BridgeRow[]> {
     const rows = this.db
       .prepare("SELECT id, display_name, homepage, enabled FROM bridges ORDER BY id")
       .all() as { id: string; display_name: string; homepage: string | null; enabled: number }[];
@@ -146,7 +241,7 @@ export class RadarDb {
     }));
   }
 
-  latestScores(): HealthScore[] {
+  async latestScores(): Promise<HealthScore[]> {
     const rows = this.db
       .prepare(
         `SELECT s.bridge_id, s.computed_at, s.score,
@@ -163,7 +258,7 @@ export class RadarDb {
     return rows.map(rowToScore);
   }
 
-  scoreHistory(bridgeId: string, since: string): HealthScore[] {
+  async scoreHistory(bridgeId: string, since: string): Promise<HealthScore[]> {
     const rows = this.db
       .prepare(
         `SELECT bridge_id, computed_at, score,
@@ -177,13 +272,7 @@ export class RadarDb {
     return rows.map(rowToScore);
   }
 
-  /** The single `bridge_health_scores` row closest in time to `atIso`, for
-   * either bridge_id. Used to answer "what was this bridge's score around
-   * the time of this transaction" honestly — returns null (not a guess)
-   * when the bridge has no score history at all. Callers must still check
-   * how far `computed_at` actually is from `atIso`; this never interpolates
-   * a value, it only finds the real recorded point nearest that moment. */
-  nearestScore(bridgeId: string, atIso: string): HealthScore | null {
+  async nearestScore(bridgeId: string, atIso: string): Promise<HealthScore | null> {
     const row = this.db
       .prepare(
         `SELECT bridge_id, computed_at, score,
@@ -198,13 +287,28 @@ export class RadarDb {
     return row ? rowToScore(row) : null;
   }
 
-  listEvents(opts: {
+  async worstScoreAfter(bridgeId: string, afterIso: string): Promise<HealthScore | null> {
+    const row = this.db
+      .prepare(
+        `SELECT bridge_id, computed_at, score,
+                parity_severity, outflow_severity, signer_recency,
+                frontend_recency, oracle_staleness
+           FROM bridge_health_scores
+           WHERE bridge_id = ? AND computed_at > ?
+           ORDER BY score ASC, computed_at ASC
+           LIMIT 1`,
+      )
+      .get(bridgeId, afterIso) as DbScoreRow | undefined;
+    return row ? rowToScore(row) : null;
+  }
+
+  async listEvents(opts: {
     bridgeId?: string;
     kind?: BridgeEventKind;
     chain?: string;
     since?: string;
     limit?: number;
-  }): BridgeEvent[] {
+  }): Promise<BridgeEvent[]> {
     const limit = Math.min(Math.max(opts.limit ?? 100, 1), 1000);
     const where: string[] = [];
     const params: (string | number)[] = [];
@@ -234,107 +338,68 @@ export class RadarDb {
            ORDER BY event_time DESC LIMIT ?`,
       )
       .all(...params) as { id: string; event_time: string; bridge_id: string; payload: string }[];
-    return rows.map((r) => {
-      const payload = JSON.parse(r.payload) as Record<string, unknown>;
-      return {
-        id: r.id,
-        bridge_id: r.bridge_id,
-        event_time: r.event_time,
-        type: payload.type as BridgeEventKind,
-        ...payload,
-      } as BridgeEvent;
-    });
+    return rows.map(rowToEvent);
   }
 
-  /** The single lowest-scoring `bridge_health_scores` row recorded strictly
-   * after `afterIso`, for a bridge — used to answer "did this bridge ever
-   * show trouble after this transaction" honestly. Returns null when there
-   * is no later row at all, not when the bridge just stayed healthy (a
-   * caller comparing against a band threshold handles that case). Never
-   * interpolates; only surfaces a real recorded point. */
-  worstScoreAfter(bridgeId: string, afterIso: string): HealthScore | null {
-    const row = this.db
-      .prepare(
-        `SELECT bridge_id, computed_at, score,
-                parity_severity, outflow_severity, signer_recency,
-                frontend_recency, oracle_staleness
-           FROM bridge_health_scores
-           WHERE bridge_id = ? AND computed_at > ?
-           ORDER BY score ASC, computed_at ASC
-           LIMIT 1`,
-      )
-      .get(bridgeId, afterIso) as DbScoreRow | undefined;
-    return row ? rowToScore(row) : null;
-  }
-
-  /** Real events we ourselves indexed for a specific transaction signature
-   * (there can be more than one row per tx in the wormhole/portal ambiguous
-   * case). Returns [] when the tx predates or otherwise missed our own
-   * monitoring — that's a real "we don't know", never a fabricated $0. */
-  eventsByTx(tx: string): BridgeEvent[] {
+  async eventsByTx(tx: string): Promise<BridgeEvent[]> {
     const rows = this.db
       .prepare(`SELECT id, event_time, bridge_id, payload FROM bridge_events WHERE tx = ?`)
       .all(tx) as { id: string; event_time: string; bridge_id: string; payload: string }[];
-    return rows.map((r) => {
-      const payload = JSON.parse(r.payload) as Record<string, unknown>;
-      return {
-        id: r.id,
-        bridge_id: r.bridge_id,
-        event_time: r.event_time,
-        type: payload.type as BridgeEventKind,
-        ...payload,
-      } as BridgeEvent;
-    });
+    return rows.map(rowToEvent);
   }
 
-  // Used by the WS broadcast loop to find rows that landed since the last poll.
-  eventsSince(rowidThreshold: number, limit = 50): { rowid: number; event: BridgeEvent }[] {
+  async latestEventCursor(): Promise<string> {
+    const r = this.db
+      .prepare("SELECT MAX(event_time) AS m FROM bridge_events")
+      .get() as { m: string | null } | undefined;
+    return r?.m ?? EPOCH;
+  }
+
+  async eventsSince(cursor: string, limit = 200): Promise<CursoredEvent[]> {
     const rows = this.db
       .prepare(
-        `SELECT rowid, id, event_time, bridge_id, payload
+        `SELECT id, event_time, bridge_id, payload
            FROM bridge_events
-           WHERE rowid > ?
-           ORDER BY rowid ASC LIMIT ?`,
+           WHERE event_time > ?
+           ORDER BY event_time ASC LIMIT ?`,
       )
-      .all(rowidThreshold, limit) as {
-      rowid: number;
-      id: string;
-      event_time: string;
-      bridge_id: string;
-      payload: string;
-    }[];
-    return rows.map((r) => {
-      const payload = JSON.parse(r.payload) as Record<string, unknown>;
-      return {
-        rowid: r.rowid,
-        event: {
-          id: r.id,
-          bridge_id: r.bridge_id,
-          event_time: r.event_time,
-          type: payload.type as BridgeEventKind,
-          ...payload,
-        } as BridgeEvent,
-      };
-    });
+      .all(cursor, limit) as { id: string; event_time: string; bridge_id: string; payload: string }[];
+    return rows.map((r) => ({ cursor: r.event_time, event: rowToEvent(r) }));
   }
 
-  maxEventRowid(): number {
-    const r = this.db.prepare("SELECT COALESCE(MAX(rowid), 0) AS m FROM bridge_events").get() as
-      | { m: number }
-      | undefined;
-    return r?.m ?? 0;
-  }
-
-  countEvents(): number {
+  async countEvents(): Promise<number> {
     const r = this.db.prepare("SELECT COUNT(*) AS c FROM bridge_events").get() as { c: number };
     return r.c;
   }
 
-  /** Underlying connection, for readers of tables this class doesn't own (e.g. defillama_cache). */
-  raw(): Database.Database {
-    return this.db;
+  async defillamaList(category: string): Promise<DefiLlamaRow[]> {
+    return this.db
+      .prepare(
+        "SELECT category, key, payload, fetched_at FROM defillama_cache WHERE category = ? ORDER BY key",
+      )
+      .all(category) as DefiLlamaRow[];
+  }
+
+  async defillamaGet(category: string, key: string): Promise<DefiLlamaRow | undefined> {
+    return this.db
+      .prepare(
+        "SELECT category, key, payload, fetched_at FROM defillama_cache WHERE category = ? AND key = ?",
+      )
+      .get(category, key) as DefiLlamaRow | undefined;
+  }
+
+  async close(): Promise<void> {
+    this.db.close();
   }
 }
+
+// ─── Postgres + Timescale (production) ───────────────────────────────────
+//
+// Schema lives in migrations/0001_init.sql + 0002_defillama_cache.sql,
+// applied via docker-compose's initdb mount (or `psql -f` manually) — this
+// class is purely the query layer, same column names / row shapes as the
+// SQLite impl above and radar-core's PostgresStorage on the Rust side, so
+// swapping DATABASE_URL requires no code changes anywhere else.
 
 interface DbScoreRow {
   bridge_id: string;
@@ -347,18 +412,211 @@ interface DbScoreRow {
   oracle_staleness: number;
 }
 
-function rowToScore(r: DbScoreRow): HealthScore {
-  const components: HealthComponents = {
-    parity_severity: r.parity_severity,
-    outflow_severity: r.outflow_severity,
-    signer_recency: r.signer_recency,
-    frontend_recency: r.frontend_recency,
-    oracle_staleness: r.oracle_staleness,
-  };
-  return {
-    bridge_id: r.bridge_id,
-    computed_at: r.computed_at,
-    score: r.score,
-    components,
-  };
+function isoOf(v: string | Date): string {
+  return v instanceof Date ? v.toISOString() : v;
+}
+
+class PostgresRadarDb implements RadarDb {
+  private pool: InstanceType<typeof Pool>;
+
+  constructor(url: string) {
+    this.pool = new Pool({ connectionString: url, max: 8 });
+  }
+
+  async listBridges(): Promise<BridgeRow[]> {
+    const { rows } = await this.pool.query<{
+      id: string;
+      display_name: string;
+      homepage: string | null;
+      enabled: boolean;
+    }>("SELECT id, display_name, homepage, enabled FROM bridges ORDER BY id");
+    return rows.map((r) => ({
+      id: r.id,
+      display_name: r.display_name,
+      homepage: r.homepage ?? undefined,
+      enabled: r.enabled,
+    }));
+  }
+
+  private mapScoreRow(r: {
+    bridge_id: string;
+    computed_at: string | Date;
+    score: number;
+    parity_severity: number;
+    outflow_severity: number;
+    signer_recency: number;
+    frontend_recency: number;
+    oracle_staleness: number;
+  }): HealthScore {
+    return rowToScore({ ...r, computed_at: isoOf(r.computed_at) });
+  }
+
+  async latestScores(): Promise<HealthScore[]> {
+    const { rows } = await this.pool.query(
+      `SELECT s.bridge_id, s.computed_at, s.score,
+              s.parity_severity, s.outflow_severity, s.signer_recency,
+              s.frontend_recency, s.oracle_staleness
+         FROM bridge_health_scores s
+         INNER JOIN (
+             SELECT bridge_id, MAX(computed_at) AS m
+               FROM bridge_health_scores GROUP BY bridge_id
+         ) latest ON latest.bridge_id = s.bridge_id AND latest.m = s.computed_at`,
+    );
+    return rows.map((r) => this.mapScoreRow(r));
+  }
+
+  async scoreHistory(bridgeId: string, since: string): Promise<HealthScore[]> {
+    const { rows } = await this.pool.query(
+      `SELECT bridge_id, computed_at, score,
+              parity_severity, outflow_severity, signer_recency,
+              frontend_recency, oracle_staleness
+         FROM bridge_health_scores
+         WHERE bridge_id = $1 AND computed_at >= $2
+         ORDER BY computed_at ASC`,
+      [bridgeId, since],
+    );
+    return rows.map((r) => this.mapScoreRow(r));
+  }
+
+  async nearestScore(bridgeId: string, atIso: string): Promise<HealthScore | null> {
+    const { rows } = await this.pool.query(
+      `SELECT bridge_id, computed_at, score,
+              parity_severity, outflow_severity, signer_recency,
+              frontend_recency, oracle_staleness
+         FROM bridge_health_scores
+         WHERE bridge_id = $1
+         ORDER BY ABS(EXTRACT(EPOCH FROM (computed_at - $2::timestamptz))) ASC
+         LIMIT 1`,
+      [bridgeId, atIso],
+    );
+    return rows.length ? this.mapScoreRow(rows[0]) : null;
+  }
+
+  async worstScoreAfter(bridgeId: string, afterIso: string): Promise<HealthScore | null> {
+    const { rows } = await this.pool.query(
+      `SELECT bridge_id, computed_at, score,
+              parity_severity, outflow_severity, signer_recency,
+              frontend_recency, oracle_staleness
+         FROM bridge_health_scores
+         WHERE bridge_id = $1 AND computed_at > $2
+         ORDER BY score ASC, computed_at ASC
+         LIMIT 1`,
+      [bridgeId, afterIso],
+    );
+    return rows.length ? this.mapScoreRow(rows[0]) : null;
+  }
+
+  private mapEventRow(r: { id: string; event_time: string | Date; bridge_id: string; payload: unknown }): BridgeEvent {
+    return rowToEvent({ ...r, event_time: isoOf(r.event_time) });
+  }
+
+  async listEvents(opts: {
+    bridgeId?: string;
+    kind?: BridgeEventKind;
+    chain?: string;
+    since?: string;
+    limit?: number;
+  }): Promise<BridgeEvent[]> {
+    const limit = Math.min(Math.max(opts.limit ?? 100, 1), 1000);
+    const where: string[] = [];
+    const params: (string | number)[] = [];
+    if (opts.bridgeId) {
+      params.push(opts.bridgeId);
+      where.push(`bridge_id = $${params.length}`);
+    }
+    if (opts.kind) {
+      params.push(opts.kind);
+      where.push(`event_type = $${params.length}`);
+    }
+    if (opts.chain) {
+      params.push(opts.chain);
+      where.push(`chain_id = $${params.length}`);
+    }
+    if (opts.since) {
+      params.push(opts.since);
+      where.push(`event_time >= $${params.length}`);
+    }
+    const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+    params.push(limit);
+    const { rows } = await this.pool.query(
+      `SELECT id, event_time, bridge_id, payload
+         FROM bridge_events
+         ${whereSql}
+         ORDER BY event_time DESC LIMIT $${params.length}`,
+      params,
+    );
+    return rows.map((r) => this.mapEventRow(r));
+  }
+
+  async eventsByTx(tx: string): Promise<BridgeEvent[]> {
+    const { rows } = await this.pool.query(
+      `SELECT id, event_time, bridge_id, payload FROM bridge_events WHERE tx = $1`,
+      [tx],
+    );
+    return rows.map((r) => this.mapEventRow(r));
+  }
+
+  async latestEventCursor(): Promise<string> {
+    const { rows } = await this.pool.query<{ m: string | Date | null }>(
+      "SELECT MAX(event_time) AS m FROM bridge_events",
+    );
+    const m = rows[0]?.m;
+    return m ? isoOf(m) : EPOCH;
+  }
+
+  async eventsSince(cursor: string, limit = 200): Promise<CursoredEvent[]> {
+    const { rows } = await this.pool.query(
+      `SELECT id, event_time, bridge_id, payload
+         FROM bridge_events
+         WHERE event_time > $1
+         ORDER BY event_time ASC LIMIT $2`,
+      [cursor, limit],
+    );
+    return rows.map((r) => {
+      const event = this.mapEventRow(r);
+      return { cursor: event.event_time, event };
+    });
+  }
+
+  async countEvents(): Promise<number> {
+    const { rows } = await this.pool.query<{ c: string }>("SELECT COUNT(*) AS c FROM bridge_events");
+    return Number(rows[0]?.c ?? 0);
+  }
+
+  async defillamaList(category: string): Promise<DefiLlamaRow[]> {
+    const { rows } = await this.pool.query(
+      "SELECT category, key, payload, fetched_at FROM defillama_cache WHERE category = $1 ORDER BY key",
+      [category],
+    );
+    return rows.map((r) => ({
+      category: r.category,
+      key: r.key,
+      payload: JSON.stringify(r.payload),
+      fetched_at: isoOf(r.fetched_at),
+    }));
+  }
+
+  async defillamaGet(category: string, key: string): Promise<DefiLlamaRow | undefined> {
+    const { rows } = await this.pool.query(
+      "SELECT category, key, payload, fetched_at FROM defillama_cache WHERE category = $1 AND key = $2",
+      [category, key],
+    );
+    const r = rows[0];
+    if (!r) return undefined;
+    return { category: r.category, key: r.key, payload: JSON.stringify(r.payload), fetched_at: isoOf(r.fetched_at) };
+  }
+
+  async close(): Promise<void> {
+    await this.pool.end();
+  }
+}
+
+/** Connect to whichever backend `url` points at — `sqlite://...` opens
+ * SqliteRadarDb and any other prefix is routed to PostgresRadarDb. Mirrors
+ * `radar_core::storage::connect_any` on the Rust side. */
+export function createDb(url: string): RadarDb {
+  if (url.startsWith("sqlite:") || url.startsWith("sqlite://")) {
+    return new SqliteRadarDb(url);
+  }
+  return new PostgresRadarDb(url);
 }

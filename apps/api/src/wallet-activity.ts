@@ -149,7 +149,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * `>= txBlockTimeIso` in ascending order; this just bounds that to the
  * 7-day window (capped at "now" for recent transactions) and reports the
  * real minimum found, never estimating a point we didn't record. */
-function buildScoreTrend(db: RadarDb, bridgeId: string, txBlockTimeIso: string): ScoreTrend {
+async function buildScoreTrend(db: RadarDb, bridgeId: string, txBlockTimeIso: string): Promise<ScoreTrend> {
   const txTime = new Date(txBlockTimeIso).getTime();
   const idealEndTime = txTime + SCORE_TREND_WINDOW_DAYS * DAY_MS;
   const now = Date.now();
@@ -158,7 +158,8 @@ function buildScoreTrend(db: RadarDb, bridgeId: string, txBlockTimeIso: string):
   const partial = idealEndTime > now;
   const windowEndIso = new Date(windowEndTime).toISOString();
 
-  const rows = db.scoreHistory(bridgeId, txBlockTimeIso).filter((r) => r.computed_at <= windowEndIso);
+  const history = await db.scoreHistory(bridgeId, txBlockTimeIso);
+  const rows = history.filter((r) => r.computed_at <= windowEndIso);
   if (rows.length === 0) {
     return {
       windowDays: SCORE_TREND_WINDOW_DAYS,
@@ -271,18 +272,15 @@ export async function fetchWalletBridgeActivity(
     const blockTime = tx.blockTime ? new Date(tx.blockTime * 1000).toISOString() : null;
     // Real amounts, only if WE indexed this exact tx ourselves — never
     // derived from the wallet scan's own (unpriced) transaction fetch.
-    const ourEvents = db.eventsByTx(sigInfo.signature);
+    const ourEvents = await db.eventsByTx(sigInfo.signature);
     const ourEventsByBridge = new Map(ourEvents.map((e) => [e.bridge_id, e]));
 
-    matches.push({
-      signature: sigInfo.signature,
-      slot: tx.slot,
-      blockTime,
-      bridges: [...bridgeIds].map((bridgeId) => {
+    const bridges = await Promise.all(
+      [...bridgeIds].map(async (bridgeId) => {
         const programId = programByBridge.get(bridgeId) ?? "";
         let historicalScore: WalletActivityMatch["bridges"][number]["historicalScore"] = null;
         if (blockTime) {
-          const nearest = db.nearestScore(bridgeId, blockTime);
+          const nearest = await db.nearestScore(bridgeId, blockTime);
           if (nearest) {
             const minutesFromTx = Math.round(
               (new Date(nearest.computed_at).getTime() - new Date(blockTime).getTime()) / 60000,
@@ -295,7 +293,7 @@ export async function fetchWalletBridgeActivity(
 
         let retroactiveRisk: WalletActivityMatch["bridges"][number]["retroactiveRisk"] = null;
         if (blockTime) {
-          const worst = db.worstScoreAfter(bridgeId, blockTime);
+          const worst = await db.worstScoreAfter(bridgeId, blockTime);
           if (worst) {
             const band = bandOf(worst.score);
             if (band === "yellow" || band === "red") {
@@ -304,7 +302,7 @@ export async function fetchWalletBridgeActivity(
           }
         }
 
-        const scoreTrend = blockTime ? buildScoreTrend(db, bridgeId, blockTime) : null;
+        const scoreTrend = blockTime ? await buildScoreTrend(db, bridgeId, blockTime) : null;
 
         return {
           bridge_id: bridgeId,
@@ -316,6 +314,13 @@ export async function fetchWalletBridgeActivity(
           scoreTrend,
         };
       }),
+    );
+
+    matches.push({
+      signature: sigInfo.signature,
+      slot: tx.slot,
+      blockTime,
+      bridges,
     });
   }
 
