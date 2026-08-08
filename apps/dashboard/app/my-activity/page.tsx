@@ -838,7 +838,12 @@ export default function MyActivityPage() {
         </div>
       )}
 
-      {connected && <BridgeRaceSection />}
+      {/* Belt-and-suspenders: gate on a real, non-null publicKey too, not
+          just the `connected` boolean alone — a real wallet must genuinely
+          be attached before Bridge Race (or its score-saving path) ever
+          mounts. `connected` without a `publicKey` should never happen in
+          practice, but this makes it structurally impossible either way. */}
+      {connected && publicKey && <BridgeRaceSection />}
     </div>
   );
 }
