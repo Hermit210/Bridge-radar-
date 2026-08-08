@@ -7,7 +7,7 @@
 //! attester quorum is v2 and gated on a public attester role discussion.
 
 use anyhow::{anyhow, Context, Result};
-use radar_core::storage::SqliteStorage;
+use radar_core::storage::connect_any;
 use radar_core::Storage;
 use sha2::{Digest, Sha256};
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -65,11 +65,8 @@ async fn main() -> Result<()> {
         "starting attester"
     );
 
-    let storage = Arc::new(
-        SqliteStorage::connect(&db_url)
-            .await
-            .context("connect storage")?,
-    );
+    let storage: Arc<dyn Storage> =
+        Arc::from(connect_any(&db_url).await.context("connect storage")?);
     let rpc = Arc::new(RpcClient::new_with_commitment(
         rpc_url,
         CommitmentConfig::confirmed(),
@@ -80,7 +77,7 @@ async fn main() -> Result<()> {
 
     loop {
         tick.tick().await;
-        match push_once(&storage, &rpc, &program_id, &keypair).await {
+        match push_once(storage.as_ref(), &rpc, &program_id, &keypair).await {
             Ok(n) if n > 0 => info!(updated = n, "attester tick"),
             Ok(_) => info!("attester tick — no scores to push"),
             Err(e) => warn!(error = %e, "attester tick failed"),
@@ -89,7 +86,7 @@ async fn main() -> Result<()> {
 }
 
 async fn push_once(
-    storage: &SqliteStorage,
+    storage: &dyn Storage,
     rpc: &RpcClient,
     program_id: &Pubkey,
     keypair: &solana_sdk::signature::Keypair,

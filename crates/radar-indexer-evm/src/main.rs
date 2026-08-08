@@ -15,7 +15,7 @@
 use anyhow::{Context, Result};
 use radar_core::adapter::EvmLogContext;
 use radar_core::chain::ChainId;
-use radar_core::storage::SqliteStorage;
+use radar_core::storage::connect_any;
 use radar_core::{bridges, BridgeAdapter, Storage};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -57,11 +57,8 @@ async fn main() -> Result<()> {
         }
     }
 
-    let storage = Arc::new(
-        SqliteStorage::connect(&db_url)
-            .await
-            .context("connecting to storage")?,
-    );
+    let storage: Arc<dyn Storage> =
+        Arc::from(connect_any(&db_url).await.context("connecting to storage")?);
 
     // Build (chain, rpc_url, contracts[]) tuples from registered adapters.
     let chain_rpcs: HashMap<ChainId, String> = [
@@ -158,7 +155,7 @@ async fn poll_loop(
     rpc_url: String,
     chain: ChainId,
     contracts: Vec<(String, Arc<dyn BridgeAdapter>)>,
-    storage: Arc<SqliteStorage>,
+    storage: Arc<dyn Storage>,
 ) -> Result<()> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
@@ -195,7 +192,7 @@ async fn scan_once(
     rpc_url: &str,
     chain: &ChainId,
     contracts: &[(String, Arc<dyn BridgeAdapter>)],
-    storage: &Arc<SqliteStorage>,
+    storage: &Arc<dyn Storage>,
     next_from: &mut Option<u64>,
 ) -> Result<usize> {
     let head = get_block_number(client, rpc_url).await?;

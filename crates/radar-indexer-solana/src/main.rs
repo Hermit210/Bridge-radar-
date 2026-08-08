@@ -6,7 +6,7 @@ mod poll;
 mod ws;
 
 use anyhow::{Context, Result};
-use radar_core::storage::SqliteStorage;
+use radar_core::storage::connect_any;
 use radar_core::{bridges, BridgeAdapter};
 use std::sync::Arc;
 use tracing::{info, warn};
@@ -38,11 +38,8 @@ async fn main() -> Result<()> {
 
     info!(%ws_url, %rpc_url, %db_url, "starting Solana indexer");
 
-    let storage = Arc::new(
-        SqliteStorage::connect(&db_url)
-            .await
-            .context("connecting to storage")?,
-    );
+    let storage: Arc<dyn radar_core::Storage> =
+        Arc::from(connect_any(&db_url).await.context("connecting to storage")?);
 
     // Collect every Solana program any registered adapter cares about.
     let adapters: Vec<Arc<dyn BridgeAdapter>> = bridges::registry();

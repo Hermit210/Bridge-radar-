@@ -5,7 +5,6 @@
 
 use anyhow::{Context, Result};
 use radar_core::adapter::SolanaLogContext;
-use radar_core::storage::SqliteStorage;
 use radar_core::{BridgeAdapter, Storage};
 use serde_json::{json, Value};
 use std::collections::HashSet;
@@ -20,7 +19,7 @@ const SIG_LIMIT: u32 = 50;
 pub async fn run(
     rpc_url: String,
     watched: Vec<(String, Arc<dyn BridgeAdapter>)>,
-    storage: Arc<SqliteStorage>,
+    storage: Arc<dyn Storage>,
 ) -> Result<()> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
@@ -50,7 +49,7 @@ pub async fn run(
                 &rpc_url,
                 program_id,
                 adapter.as_ref(),
-                &storage,
+                storage.as_ref(),
                 &mut seen,
             )
             .await
@@ -72,7 +71,7 @@ async fn poll_program(
     rpc_url: &str,
     program_id: &str,
     adapter: &dyn BridgeAdapter,
-    storage: &SqliteStorage,
+    storage: &dyn Storage,
     seen: &mut HashSet<String>,
 ) -> Result<usize> {
     let sigs = get_signatures(client, rpc_url, program_id).await?;

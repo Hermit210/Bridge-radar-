@@ -3,7 +3,6 @@
 use anyhow::{anyhow, Context, Result};
 use futures_util::{SinkExt, StreamExt};
 use radar_core::adapter::SolanaLogContext;
-use radar_core::storage::SqliteStorage;
 use radar_core::{BridgeAdapter, Storage};
 use serde_json::{json, Value};
 use std::sync::Arc;
@@ -31,7 +30,7 @@ const IDLE_TIMEOUT: Duration = Duration::from_secs(90);
 pub async fn run(
     ws_url: String,
     watched: Vec<(String, Arc<dyn BridgeAdapter>)>,
-    storage: Arc<SqliteStorage>,
+    storage: Arc<dyn Storage>,
 ) -> Result<()> {
     let mut backoff = MIN_BACKOFF;
 
@@ -53,7 +52,7 @@ pub async fn run(
 async fn connect_and_drive(
     ws_url: &str,
     watched: &[(String, Arc<dyn BridgeAdapter>)],
-    storage: Arc<SqliteStorage>,
+    storage: Arc<dyn Storage>,
 ) -> Result<()> {
     let url = Url::parse(ws_url).context("parsing SOLANA_WS_URL")?;
     let (mut socket, _resp) = tokio_tungstenite::connect_async(url.as_str())
