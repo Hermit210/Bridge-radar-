@@ -127,6 +127,14 @@ All hand-built — the 21st.dev MCP component-sourcing tools were never used
 anywhere in this codebase (no trace in source, lockfile, or git history);
 fully abandoned in favor of hand-built components from the start.
 
+List items (event feed rows, bridge cards, notification entries) that get
+added/removed/reordered from an already-mounted list — as opposed to first
+mount, which the existing `Reveal`/stagger CSS already handled — now animate
+via `@formkit/auto-animate` (`/events` table, `/bridges` card grid + list
+view, `/my-activity`'s score-change notifications). Verified live: filtering
+`/bridges` by band visibly collapses/fades non-matching cards instead of an
+instant snap.
+
 ## 3D globe (homepage) — real data, added 2026-08-08
 
 `apps/dashboard/components/bridge-globe.tsx`, `react-globe.gl` (MIT,
