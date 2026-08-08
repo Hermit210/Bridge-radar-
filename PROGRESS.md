@@ -127,6 +127,21 @@ All hand-built — the 21st.dev MCP component-sourcing tools were never used
 anywhere in this codebase (no trace in source, lockfile, or git history);
 fully abandoned in favor of hand-built components from the start.
 
+## Bridge Race — Phase 1 shipped, 2026-08-08 (single-player only)
+
+A mini-game on `/my-activity` (behind the existing wallet gate, 10th feature,
+not a separate page): run, collect real blocks, bridge 4 real gaps, real
+score, real leaderboard. Phaser 4.2.1, `migrations/0008_game_scores.sql` +
+matching SQLite table, `POST /v1/game-scores` / `GET /v1/game-scores/leaderboard`.
+No server-side replay verification — real client-reported data under a real
+wallet, honestly not tamper-proof. Full writeup, the real bridge-collision
+bug found and fixed during testing, and the real end-to-end verification
+(backend curl+psql, a full headless Playwright playthrough to a real
+"Finished!" with score 5066) are in the Phase 1 commit message
+(`feat(dashboard): Bridge Race Phase 1`). Phase 2 (real bridge-event bonus
+blocks) and Phase 3 (solsocket multiplayer) are scoped but explicitly not
+started — each needs a separate go-ahead.
+
 List items (event feed rows, bridge cards, notification entries) that get
 added/removed/reordered from an already-mounted list — as opposed to first
 mount, which the existing `Reveal`/stagger CSS already handled — now animate
