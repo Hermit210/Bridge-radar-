@@ -14,18 +14,30 @@ const GameCanvas = dynamic(() => import("./game-canvas").then((m) => m.GameCanva
 
 type Phase = "idle" | "playing" | "saving" | "result";
 
+const LEADERBOARD_DISPLAY_LIMIT = 10;
+// Fetched once per submission so a real rank can be reported even when it
+// falls outside the displayed top 10 — never a guessed/estimated position.
+const LEADERBOARD_RANK_LOOKUP_LIMIT = 100;
+
+const outcomeLabel: Record<RunResult["outcome"], string> = {
+  finished: "🏁 Finished!",
+  fell: "💥 Fell short",
+  hit: "⚠️ Hit too many hazards",
+};
+
 export function BridgeRaceSection() {
   const { publicKey } = useWallet();
   const [phase, setPhase] = useState<Phase>("idle");
   const [runKey, setRunKey] = useState(0);
   const [result, setResult] = useState<RunResult | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [rank, setRank] = useState<number | null>(null);
   const [leaderboard, setLeaderboard] = useState<GameScoreEntry[] | null>(null);
   const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
   const [listRef] = useAutoAnimate<HTMLOListElement>({ duration: 220 });
 
   const loadLeaderboard = useCallback(() => {
-    getGameLeaderboard(10)
+    return getGameLeaderboard(LEADERBOARD_DISPLAY_LIMIT)
       .then((r) => {
         setLeaderboard(r.entries);
         setLeaderboardError(null);
@@ -40,6 +52,7 @@ export function BridgeRaceSection() {
   const handleGameOver = useCallback(
     async (r: RunResult) => {
       setResult(r);
+      setRank(null);
       if (!publicKey) {
         setSaveError("Wallet disconnected before the score could be saved.");
         setPhase("result");
@@ -48,13 +61,23 @@ export function BridgeRaceSection() {
       setPhase("saving");
       setSaveError(null);
       try {
-        await submitGameScore({
+        const submitted = await submitGameScore({
           wallet_address: publicKey.toBase58(),
           score: r.score,
           blocks_used: r.blocksUsed,
           distance: r.distance,
         });
-        loadLeaderboard();
+        // Real rank: search a real, larger fetch for the exact row just
+        // inserted (matched by wallet + completedAt, which insertGameScore
+        // returns) rather than estimating a position.
+        const wide = await getGameLeaderboard(LEADERBOARD_RANK_LOOKUP_LIMIT).catch(() => null);
+        if (wide) {
+          const idx = wide.entries.findIndex(
+            (e) => e.walletAddress === submitted.entry.walletAddress && e.completedAt === submitted.entry.completedAt,
+          );
+          setRank(idx >= 0 ? idx + 1 : null);
+        }
+        await loadLeaderboard();
       } catch (e) {
         setSaveError(e instanceof Error ? e.message : String(e));
       } finally {
@@ -67,6 +90,7 @@ export function BridgeRaceSection() {
   function startRun() {
     setResult(null);
     setSaveError(null);
+    setRank(null);
     setRunKey((k) => k + 1);
     setPhase("playing");
   }
@@ -77,8 +101,8 @@ export function BridgeRaceSection() {
         <div className="space-y-2">
           <h2 className="text-sm font-semibold text-text">Bridge Race</h2>
           <p className="text-sm text-text-secondary">
-            Run, collect real blocks, and bridge every gap before you run out. Real scores save to
-            a real leaderboard under your connected wallet.
+            Run, dodge real detector-themed hazards, collect real blocks, and bridge every gap
+            before you run out. Real scores save to a real leaderboard under your connected wallet.
           </p>
         </div>
       </Reveal>
@@ -89,8 +113,10 @@ export function BridgeRaceSection() {
             <div className="flex flex-col items-center gap-4 py-10 text-center">
               <p className="max-w-md text-sm text-muted">
                 You run automatically — press <span className="text-text-secondary">↑</span> or{" "}
-                <span className="text-text-secondary">Space</span> to jump. Every gap needs real
-                collected blocks to bridge; come up short and you fall.
+                <span className="text-text-secondary">Space</span> to jump. Dodge the red{" "}
+                <span className="text-red">signer-change</span> and amber{" "}
+                <span className="text-yellow">frontend-hijack</span> hazards, and collect enough
+                real blocks before each gap — come up short and you fall.
               </p>
               <button
                 type="button"
@@ -114,9 +140,7 @@ export function BridgeRaceSection() {
 
           {phase === "result" && result && (
             <div className="mx-auto max-w-md space-y-3 rounded-2xl border border-border-subtle bg-surface/60 p-5 text-center">
-              <p className="font-display text-lg font-semibold text-text">
-                {result.outcome === "finished" ? "🏁 Finished!" : "💥 Fell short"}
-              </p>
+              <p className="font-display text-lg font-semibold text-text">{outcomeLabel[result.outcome]}</p>
               <p className="text-sm text-text-secondary">
                 Score <span className="font-mono font-semibold text-accent">{result.score}</span> ·{" "}
                 {result.distance}m run · {result.blocksUsed} blocks used
@@ -124,7 +148,18 @@ export function BridgeRaceSection() {
               {saveError ? (
                 <p className="text-xs text-yellow">Score not saved: {saveError}</p>
               ) : (
-                <p className="text-xs text-green">Saved to the real leaderboard below.</p>
+                <>
+                  <p className="text-xs text-green">Saved to the real leaderboard below.</p>
+                  {rank !== null ? (
+                    <p className="text-sm font-medium text-accent">
+                      You&apos;re #{rank} on the leaderboard!
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-dark">
+                      Outside the top {LEADERBOARD_RANK_LOOKUP_LIMIT} — keep practicing.
+                    </p>
+                  )}
+                </>
               )}
               <button
                 type="button"
