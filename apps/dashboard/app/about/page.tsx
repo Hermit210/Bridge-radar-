@@ -106,10 +106,14 @@ export default async function AboutPage() {
           <p className="text-sm leading-relaxed text-text-secondary">
             Rust cargo workspace for ingestion + scoring + attestation; pnpm
             workspace for API + dashboard; Anchor program for the on-chain
-            oracle. Storage is a Rust trait with two implementations: SQLite
-            is the real backend actually running today (this API reads it
-            directly); a Postgres+Timescale implementation is fully written
-            but not yet wired into the API layer or run end-to-end. See{" "}
+            oracle. Storage has two implementations behind the same
+            interface on both sides — a Rust trait (SQLite / Postgres
+            +Timescale) and a matching TypeScript interface in the API — with
+            SQLite as the zero-setup dev default. Both backends are wired
+            end-to-end and selected by <code>DATABASE_URL</code>: Postgres
+            was verified live on 2026-08-08 (real indexed events, real
+            computed health scores, real API responses, all off a running
+            Timescale container). See{" "}
             <Link className={linkClass} href="https://github.com/Hermit210/Bridge-radar-/blob/master/ARCHITECTURE.md">
               ARCHITECTURE.md
             </Link>
