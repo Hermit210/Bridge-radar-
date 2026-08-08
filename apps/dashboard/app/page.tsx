@@ -4,6 +4,7 @@ import { Reveal } from "@/components/reveal";
 import { DetectorGrid } from "@/components/detector-grid";
 import { OrbitGlow } from "@/components/orbit-glow";
 import { BridgeMarquee } from "@/components/bridge-marquee";
+import { BridgeGlobe } from "@/components/bridge-globe";
 
 const heroCtaClass =
   "cta-glow group inline-flex items-center justify-center gap-2 rounded-full bg-accent px-8 py-4 font-display text-sm font-semibold tracking-[-0.01em] text-bg transition-all duration-200 hover:scale-[1.03] hover:bg-accent-bright hover:shadow-glow-md active:scale-[0.98]";
@@ -61,6 +62,22 @@ export default async function LandingPage() {
           <LiveStatusStrip />
         </Reveal>
       </section>
+
+      {/* Live bridge network */}
+      <Reveal>
+        <section className="space-y-6 text-center">
+          <div>
+            <h2 className="font-display text-3xl font-bold tracking-[-0.02em] text-text">
+              The live bridge network
+            </h2>
+            <p className="mx-auto mt-2 max-w-xl text-sm font-medium text-muted">
+              Every arc is a real, currently-monitored bridge route, colored by its actual
+              current health band. Hover or click an arc for details; drag to look around.
+            </p>
+          </div>
+          <BridgeGlobe />
+        </section>
+      </Reveal>
 
       {/* Live bridge ticker */}
       <Reveal delayMs={80}>

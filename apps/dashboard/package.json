@@ -22,6 +22,7 @@
     "next": "^15.0.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-globe.gl": "^2.38.0",
     "recharts": "^2.13.0"
   },
   "devDependencies": {
