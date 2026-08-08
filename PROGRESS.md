@@ -111,7 +111,7 @@ source is future work); no bridge currently has a real `oracle_stale`
 
 | Page | Redesign pass? |
 |---|---|
-| `/` (homepage) | ✅ Multiple passes, most recently 2026-08-08: warm near-black + amber palette, serif italic accent word, orbit-glow ambient animation (visibility bug fixed — was clipped by the hero section's `overflow-hidden`), real-data bridge marquee, centered navbar, removed the monitoring badge and the "Built with"/v0-preview scaffolding sitewide |
+| `/` (homepage) | ✅ Multiple passes, most recently 2026-08-08: warm near-black + amber palette, serif italic accent word, orbit-glow ambient animation (visibility bug fixed — was clipped by the hero section's `overflow-hidden`), real-data bridge marquee, centered navbar, removed the monitoring badge and the "Built with"/v0-preview scaffolding sitewide, and a real 3D globe (`react-globe.gl`) — one arc per (bridge, monitored chain), colored by real live health band from `/v1/bridges`, polled every 5s; live-verified the arc color genuinely tracks a real DB score change (see "3D globe" below) |
 | `/bridges` (list) | ✅ Dedicated pass + 2026-08-08 density pass: smaller cards (p-5→p-3.5), severity-first default sort, per-card entrance stagger, live count-up/color transitions on score updates, dropped the formula subtext and the JSON link |
 | `/bridges/[id]` (detail) | ✅ Dedicated pass, palette-updated 2026-08-08 |
 | `/bridges/compare` | ✅ Dedicated pass (×2), 2026-08-08: boxes resized to medium (p-6→p-4), dropped intro text and the Share button |
@@ -126,6 +126,49 @@ was unblocked in this sandbox), not just typecheck.
 All hand-built — the 21st.dev MCP component-sourcing tools were never used
 anywhere in this codebase (no trace in source, lockfile, or git history);
 fully abandoned in favor of hand-built components from the start.
+
+## 3D globe (homepage) — real data, added 2026-08-08
+
+`apps/dashboard/components/bridge-globe.tsx`, `react-globe.gl` (MIT,
+three-globe/three.js underneath), loaded via `next/dynamic({ ssr: false })`
+so it never touches the server bundle — a real production build confirms
+the globe/three.js code lands in its own separate chunk, not the homepage's
+113kB First Load JS.
+
+- **Points**: one per chain we actually run an indexer against — Solana +
+  the 6 EVM chains `radar-indexer-evm` polls. Coordinates are explicitly
+  documented in the source as non-geographic (blockchains have no physical
+  location); they're fixed, evenly-spaced anchors chosen only so each chain
+  has a distinct spot on the sphere.
+- **Arcs**: one per (bridge, monitored chain) pair, built from the real
+  bridge registry (`GET /v1/registry`) intersected against the monitored
+  chain set — never an invented chain pair. Color is that bridge's real
+  current health band from `GET /v1/bridges`, the same endpoint
+  `LiveStatusStrip` polls every 5s, so the globe can't drift from what
+  `/bridges` itself shows. Arc flow speed is faster for bridges with a real
+  event in the last hour (`GET /v1/events`), slower otherwise.
+- **Texture**: `earth-night.jpg`, verified real (715KB, 4096×2048, resolves
+  via the unpkg CDN) and self-hosted in `public/globe/` rather than
+  depending on the CDN at runtime.
+- **Interactive**: auto-rotates when idle, pauses on hover (three.js
+  `OrbitControls`), drag/zoom, real tooltips on hover/click showing the
+  bridge's real name/score or the chain's real monitored-bridge count.
+- **Live-verified the arc coloring is genuinely data-driven, not a
+  one-time render**: with the real `radar-scorer` paused, inserted a real
+  `bridge_health_scores` row for Wormhole at a green score, confirmed via a
+  real `GET /v1/bridges/wormhole/health` call, screenshotted the globe with
+  a frozen (hover-paused) camera; inserted a real red-score row,
+  reconfirmed via the same endpoint, took a second screenshot at the
+  identical frozen angle. Wormhole's entire arc bundle visibly changed
+  green→red between the two screenshots — identical geometry, only the
+  color differs — while every other bridge's arcs stayed exactly as they
+  were. Restarted the real scorer immediately after; it overwrote the test
+  rows with genuinely computed values on its very next tick (confirmed via
+  `psql`) — no lingering test data.
+- Also fixed, while testing: a stray home-directory `yarn.lock` (predates
+  this project) was making Next's workspace-root auto-detection walk up
+  past the real monorepo root, breaking the production build's output file
+  tracing. Pinned `outputFileTracingRoot` explicitly in `next.config.mjs`.
 
 ## `/my-activity` — wallet layer, built entirely on our own unique data
 
