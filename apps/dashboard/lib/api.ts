@@ -198,6 +198,40 @@ export async function getWalletTimeline(address: string, opts?: { limit?: number
   return fetchJson<WalletTimelineResult>(`/v1/wallet-timeline/${encodeURIComponent(address)}${q}`);
 }
 
+/** One real "Bridge Race" mini-game run — see apps/api/src/db.ts's
+ * GameScoreEntry doc comment: real client-reported data under a real
+ * connected wallet, no server-side replay verification in v0. */
+export interface GameScoreEntry {
+  walletAddress: string;
+  score: number;
+  blocksUsed: number;
+  distance: number;
+  completedAt: string;
+}
+
+export async function submitGameScore(payload: {
+  wallet_address: string;
+  score: number;
+  blocks_used: number;
+  distance: number;
+}) {
+  const r = await fetch(`${API_URL}/v1/game-scores`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) {
+    const body = await r.json().catch(() => null);
+    const detail = body && typeof body === "object" && "error" in body ? ` — ${(body as { error: unknown }).error}` : "";
+    throw new Error(`submit game score failed: ${r.status}${detail}`);
+  }
+  return r.json() as Promise<{ saved: boolean; entry: GameScoreEntry }>;
+}
+
+export async function getGameLeaderboard(limit = 10) {
+  return fetchJson<{ entries: GameScoreEntry[] }>(`/v1/game-scores/leaderboard?limit=${limit}`);
+}
+
 export const apiUrls = {
   base: API_URL,
   ws: process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:3001/v1/ws",

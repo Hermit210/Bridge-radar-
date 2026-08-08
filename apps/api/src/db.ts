@@ -35,6 +35,21 @@ export interface CursoredEvent {
   event: BridgeEvent;
 }
 
+/** A "Bridge Race" mini-game run, as reported by the client after a real
+ * playthrough. There is no server-side replay verification in v0 — only
+ * sane-bounds validation at the API layer (see index.ts) — so this is real
+ * data from a real client, honestly not tamper-proof. */
+export interface GameScoreEntry {
+  walletAddress: string;
+  score: number;
+  blocksUsed: number;
+  distance: number;
+}
+
+export interface GameScoreRow extends GameScoreEntry {
+  completedAt: string;
+}
+
 export interface RadarDb {
   listBridges(): Promise<BridgeRow[]>;
   latestScores(): Promise<HealthScore[]>;
@@ -56,6 +71,8 @@ export interface RadarDb {
   countEvents(): Promise<number>;
   defillamaList(category: string): Promise<DefiLlamaRow[]>;
   defillamaGet(category: string, key: string): Promise<DefiLlamaRow | undefined>;
+  insertGameScore(entry: GameScoreEntry): Promise<GameScoreRow>;
+  topGameScores(limit: number): Promise<GameScoreRow[]>;
   close(): Promise<void>;
 }
 
@@ -186,6 +203,15 @@ class SqliteRadarDb implements RadarDb {
         fetched_at  TEXT NOT NULL,
         PRIMARY KEY (category, key)
       );
+      CREATE TABLE IF NOT EXISTS game_scores (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        wallet_address TEXT NOT NULL,
+        score          INTEGER NOT NULL,
+        blocks_used    INTEGER NOT NULL,
+        distance       INTEGER NOT NULL,
+        completed_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      );
+      CREATE INDEX IF NOT EXISTS game_scores_score_idx ON game_scores (score DESC);
       INSERT OR IGNORE INTO bridges (id, display_name, homepage) VALUES
         ('wormhole','Wormhole','https://wormhole.com'),
         ('allbridge','Allbridge','https://allbridge.io'),
@@ -386,6 +412,41 @@ class SqliteRadarDb implements RadarDb {
         "SELECT category, key, payload, fetched_at FROM defillama_cache WHERE category = ? AND key = ?",
       )
       .get(category, key) as DefiLlamaRow | undefined;
+  }
+
+  async insertGameScore(entry: GameScoreEntry): Promise<GameScoreRow> {
+    const completedAt = new Date().toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO game_scores (wallet_address, score, blocks_used, distance, completed_at)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(entry.walletAddress, entry.score, entry.blocksUsed, entry.distance, completedAt);
+    return { ...entry, completedAt };
+  }
+
+  async topGameScores(limit: number): Promise<GameScoreRow[]> {
+    const rows = this.db
+      .prepare(
+        `SELECT wallet_address, score, blocks_used, distance, completed_at
+           FROM game_scores
+           ORDER BY score DESC, completed_at ASC
+           LIMIT ?`,
+      )
+      .all(limit) as {
+      wallet_address: string;
+      score: number;
+      blocks_used: number;
+      distance: number;
+      completed_at: string;
+    }[];
+    return rows.map((r) => ({
+      walletAddress: r.wallet_address,
+      score: r.score,
+      blocksUsed: r.blocks_used,
+      distance: r.distance,
+      completedAt: r.completed_at,
+    }));
   }
 
   async close(): Promise<void> {
@@ -604,6 +665,39 @@ class PostgresRadarDb implements RadarDb {
     const r = rows[0];
     if (!r) return undefined;
     return { category: r.category, key: r.key, payload: JSON.stringify(r.payload), fetched_at: isoOf(r.fetched_at) };
+  }
+
+  async insertGameScore(entry: GameScoreEntry): Promise<GameScoreRow> {
+    const { rows } = await this.pool.query<{ completed_at: string | Date }>(
+      `INSERT INTO game_scores (wallet_address, score, blocks_used, distance)
+       VALUES ($1, $2, $3, $4)
+       RETURNING completed_at`,
+      [entry.walletAddress, entry.score, entry.blocksUsed, entry.distance],
+    );
+    return { ...entry, completedAt: isoOf(rows[0]!.completed_at) };
+  }
+
+  async topGameScores(limit: number): Promise<GameScoreRow[]> {
+    const { rows } = await this.pool.query<{
+      wallet_address: string;
+      score: number;
+      blocks_used: number;
+      distance: number;
+      completed_at: string | Date;
+    }>(
+      `SELECT wallet_address, score, blocks_used, distance, completed_at
+         FROM game_scores
+         ORDER BY score DESC, completed_at ASC
+         LIMIT $1`,
+      [limit],
+    );
+    return rows.map((r) => ({
+      walletAddress: r.wallet_address,
+      score: r.score,
+      blocksUsed: r.blocks_used,
+      distance: r.distance,
+      completedAt: isoOf(r.completed_at),
+    }));
   }
 
   async close(): Promise<void> {
