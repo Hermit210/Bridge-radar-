@@ -21,7 +21,7 @@ Outputs:
 
 ## Status
 
-v1 shipped. 8 cargo crates + 2 Node apps + 1 Anchor program + a minimal dApp SDK (`packages/sdk`) — full ingestion → detection → scoring → attestation → alerting → dashboard pipeline. All 14 bridge adapters and all 5 health-score detectors are real and live-verified against mainnet. The alerter (Telegram/Discord/webhook) is real, code-complete, and proven against real events in live dry-run. Discord delivery is live-confirmed (real HTTP 204 from Discord's own servers); Telegram delivery is still unconfirmed — real bot token, but no real chat ID yet (see [PROGRESS.md](./PROGRESS.md) for exactly what's proven vs. still pending). Grant application in progress with Solana Foundation India ($5,000, 12-week build).
+v1 shipped. 8 cargo crates + 2 Node apps + 1 Anchor program + a minimal dApp SDK (`packages/sdk`) — full ingestion → detection → scoring → attestation → alerting → dashboard pipeline, running end-to-end on real Postgres+Timescale. All 14 bridge adapters and all 5 health-score detectors are real and live-verified against mainnet. The alerter (Telegram/Discord/webhook) is real and live-confirmed on both Discord (real HTTP 204 from Discord's own servers) and Telegram (real `sendMessage` reply with a real `message_id`, delivered to a real chat) — including a real Telegram bot (`@bruhalert_bot`) that answers `/start`, `/status`, and `/help` (see [PROGRESS.md](./PROGRESS.md) for exactly what's proven vs. still pending). Grant application in progress with Solana Foundation India ($5,000, 12-week build).
 
 ## Quick start
 
