@@ -18,6 +18,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useAutoAnimate } from "@formkit/auto-animate/react";
 import { listBridges } from "@/lib/api";
 import { bandFor, type HealthBand } from "@radar/shared";
 
@@ -62,6 +63,7 @@ export function BridgeScoreNotifications({ bridgesUsed }: { bridgesUsed: BridgeU
   const [opted, setOpted] = useState<Record<string, NotifyEntry>>({});
   const [events, setEvents] = useState<ChangeEvent[]>([]);
   const [hydrated, setHydrated] = useState(false);
+  const [changesRef] = useAutoAnimate<HTMLDivElement>({ duration: 250 });
   const optedRef = useRef(opted);
   optedRef.current = opted;
 
@@ -231,7 +233,7 @@ export function BridgeScoreNotifications({ bridgesUsed }: { bridgesUsed: BridgeU
       </div>
 
       {events.length > 0 && (
-        <div className="space-y-2 border-t border-border/30 pt-3">
+        <div ref={changesRef} className="space-y-2 border-t border-border/30 pt-3">
           <p className="text-xs font-medium text-text-secondary">Detected changes, this session</p>
           {events.map((e, i) => (
             <p key={`${e.bridgeId}-${e.at}-${i}`} className="text-xs leading-relaxed text-text-secondary">

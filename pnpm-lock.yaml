@@ -57,6 +57,9 @@ importers:
 
   apps/dashboard:
     dependencies:
+      '@formkit/auto-animate':
+        specifier: ^0.10.0
+        version: 0.10.0
       '@radar/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -385,6 +388,9 @@ packages:
   '@ethereumjs/util@9.1.0':
     resolution: {integrity: sha512-XBEKsYqLGXLah9PNJbgdkigthkG7TAGvlD/sH12beMXEyHDyigfcbdvHhmLyDWgDyOJn4QwiQUaF7yeuhnjdog==}
     engines: {node: '>=18'}
+
+  '@formkit/auto-animate@0.10.0':
+    resolution: {integrity: sha512-KGomRttjUfORuPUaR/ZGQw+6xfMrTM+sxnILv7JAd9AmabU9rg9i6gF/iC0Ih+QpKCubJpCA/1DX9UHKE8cX+A==}
 
   '@hono/node-server@1.19.14':
     resolution: {integrity: sha512-GwtvgtXxnWsucXvbQXkRgqksiH2Qed37H9xHZocE5sA3N8O8O8/8FA3uclQXxXVzc9XBZuEOMK7+r02FmSpHtw==}
@@ -3665,6 +3671,8 @@ snapshots:
     dependencies:
       '@ethereumjs/rlp': 5.0.2
       ethereum-cryptography: 2.2.1
+
+  '@formkit/auto-animate@0.10.0': {}
 
   '@hono/node-server@1.19.14(hono@4.12.15)':
     dependencies:
