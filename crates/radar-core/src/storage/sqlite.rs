@@ -77,6 +77,16 @@ CREATE TABLE IF NOT EXISTS defillama_cache (
 CREATE INDEX IF NOT EXISTS defillama_cache_category_idx
     ON defillama_cache (category, fetched_at DESC);
 
+-- Real wallet <-> Telegram chat links, one row per wallet — see
+-- migrations/0010_telegram_subscriptions.sql for the Postgres schema this
+-- mirrors.
+CREATE TABLE IF NOT EXISTS telegram_subscriptions (
+    wallet_address  TEXT NOT NULL PRIMARY KEY,
+    chat_id         INTEGER NOT NULL,
+    subscribed_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS telegram_subscriptions_chat_id_idx ON telegram_subscriptions (chat_id);
+
 INSERT OR IGNORE INTO bridges (id, display_name, homepage) VALUES
     ('wormhole',  'Wormhole',  'https://wormhole.com'),
     ('allbridge', 'Allbridge', 'https://allbridge.io'),
@@ -427,6 +437,21 @@ impl Storage for SqliteStorage {
         .fetch_optional(&self.pool)
         .await?;
         row.map(row_to_defillama).transpose()
+    }
+
+    async fn upsert_telegram_subscription(&self, wallet_address: &str, chat_id: i64) -> Result<()> {
+        sqlx::query(
+            r#"INSERT INTO telegram_subscriptions (wallet_address, chat_id, subscribed_at)
+               VALUES (?, ?, ?)
+               ON CONFLICT(wallet_address) DO UPDATE SET
+                  chat_id = excluded.chat_id"#,
+        )
+        .bind(wallet_address)
+        .bind(chat_id)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&self.pool)
+        .await?;
+        Ok(())
     }
 }
 

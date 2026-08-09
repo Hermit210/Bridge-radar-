@@ -88,6 +88,13 @@ pub trait Storage: Send + Sync {
 
     /// The single cached row for `category`/`key`, if present.
     async fn defillama_get(&self, category: &str, key: &str) -> Result<Option<DefiLlamaRecord>>;
+
+    /// Real-links a wallet to the real Telegram chat that sent the deep-link
+    /// `/start <wallet_address>` command — one row per wallet (a wallet
+    /// re-linking from a different chat updates `chat_id` rather than
+    /// creating a second subscription). Written by the alerter's command
+    /// handler; read by the Node API's weekly-digest scheduler.
+    async fn upsert_telegram_subscription(&self, wallet_address: &str, chat_id: i64) -> Result<()>;
 }
 
 #[derive(Debug, Clone)]

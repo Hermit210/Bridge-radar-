@@ -20,6 +20,7 @@ dotenvy = { workspace = true }
 reqwest = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true }
+bs58 = "0.5"
 
 [[bin]]
 name = "radar-alerter"

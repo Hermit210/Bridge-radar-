@@ -13,6 +13,7 @@ import { BridgeUsageSummary } from "@/components/bridge-usage-summary";
 // near the bottom of this file where it used to mount. The game code,
 // its API routes, and the game_scores table are all left in place.
 import {
+  getTelegramSubscriptionStatus,
   getWalletActivity,
   getWalletHoldings,
   getWalletTimeline,
@@ -20,6 +21,7 @@ import {
   recordStreakActivity,
   type ScoreTrend,
   type StreakEntry,
+  type TelegramSubscription,
   type TimelineCategory,
   type WalletActivityMatch,
   type WalletHoldingsResult,
@@ -319,6 +321,52 @@ function StreakCard({ streak }: { streak: StreakEntry }) {
   );
 }
 
+/** Real Telegram weekly-digest subscription status + the real deep-link
+ * button that starts it. The link itself
+ * (https://t.me/bruhalert_bot?start=<wallet>) is real Telegram deep-linking
+ * (https://core.telegram.org/bots/features#deep-linking) -- Telegram hands
+ * the wallet address to the bot as the /start command's argument, and the
+ * bot's real handler (crates/radar-alerter/src/commands.rs) writes the real
+ * chat_id/wallet_address link. Nothing here writes the subscription itself;
+ * this component only displays whatever real row that flow produced. */
+function TelegramLinkCard({
+  walletAddress,
+  subscription,
+}: {
+  walletAddress: string;
+  subscription: TelegramSubscription | null | undefined;
+}) {
+  const deepLink = `https://t.me/bruhalert_bot?start=${walletAddress}`;
+  return (
+    <section className="glass-card-elevated flex flex-wrap items-center justify-between gap-4 p-6">
+      <div>
+        <h2 className="text-sm font-semibold text-text">Weekly Summaries on Telegram</h2>
+        <p className="mt-1 text-xs text-muted-dark">
+          {subscription === undefined
+            ? "Checking real subscription status…"
+            : subscription
+              ? `Linked to a real Telegram chat since ${new Date(subscription.subscribedAt).toLocaleDateString()} — the real weekly digest goes out every Sunday.`
+              : "Not linked yet — get the real weekly digest (anomaly events, bridge health) delivered to Telegram."}
+        </p>
+      </div>
+      {subscription === undefined ? (
+        <div className="skeleton h-8 w-24 rounded-full" />
+      ) : subscription ? (
+        <span className="badge text-xs text-green">✓ Subscribed</span>
+      ) : (
+        <a
+          href={deepLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="badge shrink-0 text-xs transition-colors hover:text-text"
+        >
+          Link Telegram →
+        </a>
+      )}
+    </section>
+  );
+}
+
 /** Real trailing-7-real-day summary. Factual only, matching the existing
  * risk-flag feature's tone -- counts and dates, no "you should" language. */
 function WeeklyDigestCard({ digest, walletTxThisWeek }: { digest: WeeklyDigest; walletTxThisWeek: number | null }) {
@@ -502,6 +550,8 @@ export default function MyActivityPage() {
   const [holdingsError, setHoldingsError] = useState<string | null>(null);
   const [streak, setStreak] = useState<StreakEntry | null>(null);
   const [streakError, setStreakError] = useState<string | null>(null);
+  const [telegramSub, setTelegramSub] = useState<TelegramSubscription | null | undefined>(undefined);
+  const [telegramSubError, setTelegramSubError] = useState<string | null>(null);
   const [digest, setDigest] = useState<WeeklyDigest | null>(null);
   const [digestError, setDigestError] = useState<string | null>(null);
   const [timeline, setTimeline] = useState<TimelineScanState | null>(null);
@@ -572,6 +622,28 @@ export default function MyActivityPage() {
       })
       .catch((e) => {
         if (!cancelled) setStreakError(e instanceof Error ? e.message : String(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [publicKey]);
+
+  // Real read-only status check -- never writes. The row this reads is
+  // written only by the real Telegram bot's /start deep-link handler (see
+  // the "Link Telegram" button below), not by this effect.
+  useEffect(() => {
+    if (!publicKey) {
+      setTelegramSub(undefined);
+      setTelegramSubError(null);
+      return;
+    }
+    let cancelled = false;
+    getTelegramSubscriptionStatus(publicKey.toBase58())
+      .then((r) => {
+        if (!cancelled) setTelegramSub(r.subscription);
+      })
+      .catch((e) => {
+        if (!cancelled) setTelegramSubError(e instanceof Error ? e.message : String(e));
       });
     return () => {
       cancelled = true;
@@ -831,6 +903,16 @@ export default function MyActivityPage() {
           ) : (
             <div className="skeleton h-24 w-full rounded-2xl"></div>
           )}
+
+          {telegramSubError ? (
+            <div className="glass-card-elevated p-6 text-center">
+              <p className="text-sm text-muted">Couldn't check your Telegram link status. {telegramSubError}</p>
+            </div>
+          ) : publicKey ? (
+            <Reveal delayMs={90}>
+              <TelegramLinkCard walletAddress={publicKey.toBase58()} subscription={telegramSub} />
+            </Reveal>
+          ) : null}
         </>
       )}
 

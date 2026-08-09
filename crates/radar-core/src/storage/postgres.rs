@@ -298,6 +298,20 @@ impl Storage for PostgresStorage {
         .await?;
         row.map(row_to_defillama).transpose()
     }
+
+    async fn upsert_telegram_subscription(&self, wallet_address: &str, chat_id: i64) -> Result<()> {
+        sqlx::query(
+            r#"INSERT INTO telegram_subscriptions (wallet_address, chat_id, subscribed_at)
+               VALUES ($1, $2, NOW())
+               ON CONFLICT (wallet_address) DO UPDATE SET
+                  chat_id = excluded.chat_id"#,
+        )
+        .bind(wallet_address)
+        .bind(chat_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
 }
 
 fn row_to_defillama(row: PgRow) -> Result<DefiLlamaRecord> {

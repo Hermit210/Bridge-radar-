@@ -257,6 +257,22 @@ export async function getWeeklyDigest() {
   return fetchJson<WeeklyDigest>("/v1/weekly-digest");
 }
 
+/** Real wallet <-> Telegram chat link status — written only by the real
+ * Telegram bot's /start deep-link handler (Rust, crates/radar-alerter), read
+ * here for display only. See apps/api/src/telegram-digest.ts for the real
+ * weekly send this powers. */
+export interface TelegramSubscription {
+  walletAddress: string;
+  chatId: string;
+  subscribedAt: string;
+}
+
+export async function getTelegramSubscriptionStatus(walletAddress: string) {
+  return fetchJson<{ subscribed: boolean; subscription: TelegramSubscription | null }>(
+    `/v1/telegram-subscription/${encodeURIComponent(walletAddress)}`,
+  );
+}
+
 export async function recordStreakActivity(walletAddress: string) {
   const r = await fetch(`${API_URL}/v1/streak`, {
     method: "POST",
