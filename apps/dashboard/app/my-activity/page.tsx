@@ -363,6 +363,106 @@ function WeeklyDigestCard({ digest, walletTxThisWeek }: { digest: WeeklyDigest; 
   );
 }
 
+/** Capstone summary, placed at the end of the page since it synthesizes
+ * data from every section above it (bridge usage, Feature 1's streak,
+ * the existing per-match score-trend risk flag, and the scan's own
+ * activity-window stats) rather than fetching anything new itself.
+ * Strictly factual — real counts and real dates, never a subjective
+ * "safety grade" the way the digest above it avoids advisory language too. */
+function ReportCard({
+  activityAddress,
+  isOwnWallet,
+  uniqueBridgeCount,
+  monitoredBridgeCount,
+  streak,
+  scoreDropCount,
+  matchCount,
+  scan,
+}: {
+  activityAddress: string;
+  isOwnWallet: boolean;
+  uniqueBridgeCount: number;
+  monitoredBridgeCount: number | null;
+  streak: StreakEntry | null;
+  scoreDropCount: number | null;
+  matchCount: number;
+  scan: { signatureCount: number; oldest: string | null; newest: string | null };
+}) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleShare() {
+    const url = `${window.location.origin}/my-activity?wallet=${activityAddress}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Real clipboard permission can be denied by the browser — an honest
+      // no-op is better than pretending it copied.
+    }
+  }
+
+  return (
+    <section className="glass-card-elevated space-y-5 p-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <h2 className="font-display text-lg font-semibold text-text">Bridge Radar Report Card</h2>
+          <p className="mt-1 text-xs text-muted-dark">
+            {activityAddress.slice(0, 4)}…{activityAddress.slice(-4)} — real counts, no subjective grade.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleShare}
+          className="badge shrink-0 text-xs transition-colors hover:text-text"
+        >
+          {copied ? "Copied!" : "Share"}
+        </button>
+      </div>
+
+      <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div>
+          <dt className="text-[11px] uppercase tracking-wide text-muted-dark">Bridges used</dt>
+          <dd className="font-mono text-lg font-semibold text-text">
+            {uniqueBridgeCount}
+            {monitoredBridgeCount !== null && <span className="text-muted-dark"> / {monitoredBridgeCount}</span>}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-[11px] uppercase tracking-wide text-muted-dark">Transactions scanned</dt>
+          <dd className="font-mono text-lg font-semibold text-text">{scan.signatureCount}</dd>
+        </div>
+        <div>
+          <dt className="text-[11px] uppercase tracking-wide text-muted-dark">Activity window</dt>
+          <dd className="font-mono text-xs font-semibold text-text">
+            {scan.oldest ? new Date(scan.oldest).toLocaleDateString() : "—"}
+            {" – "}
+            {scan.newest ? new Date(scan.newest).toLocaleDateString() : "—"}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-[11px] uppercase tracking-wide text-muted-dark">
+            {isOwnWallet ? "Current streak" : "Streak"}
+          </dt>
+          <dd className="font-mono text-lg font-semibold text-text">
+            {isOwnWallet ? (streak ? `🔥 ${streak.currentStreak}` : "—") : "own wallet only"}
+          </dd>
+        </div>
+      </dl>
+
+      {scoreDropCount !== null && (
+        <p className="border-t border-border/30 pt-3 text-xs text-muted-dark">
+          {scoreDropCount === 0
+            ? matchCount === 0
+              ? "No matched bridge transactions in the scanned window to check for a following score drop."
+              : `None of the ${matchCount} matched bridge transaction${matchCount === 1 ? "" : "s"} in the scanned window were followed by a real health-score drop below the green band.`
+            : `${scoreDropCount} of ${matchCount} matched bridge transaction${matchCount === 1 ? "" : "s"} in the scanned window were followed by a real health-score drop below the green band — see Full Transaction Timeline above for which ones.`}
+        </p>
+      )}
+    </section>
+  );
+}
+
 /** Accumulated scan state across one or more "scan further back" pages —
  * each page covers an older slice of the wallet's real history than the
  * last, never re-scanning the same window. */
@@ -415,7 +515,22 @@ export default function MyActivityPage() {
    * bridge transaction history of its own. Never affects holdings or the
    * full timeline, which stay tied to the actually-connected wallet. */
   const [previewMode, setPreviewMode] = useState(false);
-  const activityAddress = previewMode ? EXAMPLE_WALLET_ADDRESS : (publicKey?.toBase58() ?? null);
+  /** Real read-only support for the Report Card's Share button: a
+   * `?wallet=` link (see reportCardShareUrl below) resolves here on any
+   * visitor's load, so a shared link genuinely shows that wallet's real
+   * bridge-usage-derived sections without the visitor connecting anything —
+   * same "read-only, nothing signed or stored" framing already used
+   * elsewhere on this page. Deliberately NOT threaded into holdings, the
+   * full timeline, or the streak effect below (all three stay hard-tied to
+   * `publicKey`, matching their existing scope) — a shared link must never
+   * record a check-in against someone else's real streak.
+   */
+  const [sharedWallet, setSharedWallet] = useState<string | null>(null);
+  useEffect(() => {
+    const w = new URLSearchParams(window.location.search).get("wallet");
+    if (w) setSharedWallet(w);
+  }, []);
+  const activityAddress = previewMode ? EXAMPLE_WALLET_ADDRESS : (publicKey?.toBase58() ?? sharedWallet);
 
   useEffect(() => {
     if (!publicKey) {
@@ -611,6 +726,22 @@ export default function MyActivityPage() {
     return scan.matches.filter((m) => m.blockTime && new Date(m.blockTime).getTime() >= cutoff).length;
   }, [scan]);
 
+  /** Reuses the same real per-match ScoreTrend data the ActivityRow/
+   * describeScoreTrend risk-flag feature already renders (built server-side
+   * from real bridge_health_scores rows, see wallet-activity.ts) — counts
+   * how many of this wallet's real matched transactions were followed by a
+   * real health-score drop below the green band (80), purely factual. */
+  const scoreDropCount = useMemo(() => {
+    if (!scan) return null;
+    let count = 0;
+    for (const m of scan.matches) {
+      if (m.bridges.some((b) => b.scoreTrend?.minScore !== null && b.scoreTrend?.minScore !== undefined && b.scoreTrend.minScore < 80)) {
+        count += 1;
+      }
+    }
+    return count;
+  }, [scan]);
+
   async function scanFurtherBack() {
     if (!activityAddress || !scan?.nextBefore || loadingMore) return;
     setLoadingMore(true);
@@ -703,7 +834,7 @@ export default function MyActivityPage() {
         </>
       )}
 
-      {!connected && !previewMode ? (
+      {!connected && !previewMode && !sharedWallet ? (
         <div className="grid overflow-hidden rounded-3xl border border-border-subtle shadow-card sm:grid-cols-2">
           <div className="relative flex flex-col justify-center gap-4 overflow-hidden bg-surface-0/80 p-8 sm:p-10">
             <div aria-hidden className="absolute inset-0 opacity-50">
@@ -771,6 +902,18 @@ export default function MyActivityPage() {
               >
                 Exit example
               </button>
+            </div>
+          )}
+
+          {!previewMode && sharedWallet && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/30 bg-accent-glow/40 px-4 py-3 text-xs text-accent-bright">
+              <span>
+                Shared read-only view of {sharedWallet.slice(0, 4)}…{sharedWallet.slice(-4)}'s real bridge activity
+                — via a Report Card share link. Nothing is signed or stored.
+              </span>
+              <Link href="/my-activity" className="shrink-0 underline transition-colors hover:text-text">
+                View your own
+              </Link>
             </div>
           )}
 
@@ -996,6 +1139,21 @@ export default function MyActivityPage() {
             </div>
           )}
         </div>
+      )}
+
+      {scan && activityAddress && (
+        <Reveal>
+          <ReportCard
+            activityAddress={activityAddress}
+            isOwnWallet={!!publicKey && !previewMode && activityAddress === publicKey.toBase58()}
+            uniqueBridgeCount={summaryStats.uniqueBridgeCount}
+            monitoredBridgeCount={digest?.monitoredBridgeCount ?? null}
+            streak={streak}
+            scoreDropCount={scoreDropCount}
+            matchCount={scan.matches.length}
+            scan={{ signatureCount: scan.signatureCount, oldest: scan.oldest, newest: scan.newest }}
+          />
+        </Reveal>
       )}
 
       {/* Bridge Race removed from the visible page (2026-08-09) -- the game
