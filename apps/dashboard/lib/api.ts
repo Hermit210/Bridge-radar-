@@ -232,6 +232,30 @@ export async function getGameLeaderboard(limit = 10) {
   return fetchJson<{ entries: GameScoreEntry[] }>(`/v1/game-scores/leaderboard?limit=${limit}`);
 }
 
+/** Real daily check-in streak for a wallet — see apps/api/src/db.ts's
+ * recordActivity doc comment for the real increment/reset rule. `today` is
+ * computed server-side from the real UTC clock, never trusted from here. */
+export interface StreakEntry {
+  walletAddress: string;
+  lastActiveDate: string;
+  currentStreak: number;
+  longestStreak: number;
+}
+
+export async function recordStreakActivity(walletAddress: string) {
+  const r = await fetch(`${API_URL}/v1/streak`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ wallet_address: walletAddress }),
+  });
+  if (!r.ok) {
+    const body = await r.json().catch(() => null);
+    const detail = body && typeof body === "object" && "error" in body ? ` — ${(body as { error: unknown }).error}` : "";
+    throw new Error(`record streak failed: ${r.status}${detail}`);
+  }
+  return r.json() as Promise<{ streak: StreakEntry }>;
+}
+
 export const apiUrls = {
   base: API_URL,
   ws: process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:3001/v1/ws",

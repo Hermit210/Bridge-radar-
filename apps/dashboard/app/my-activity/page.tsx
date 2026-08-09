@@ -16,7 +16,9 @@ import {
   getWalletActivity,
   getWalletHoldings,
   getWalletTimeline,
+  recordStreakActivity,
   type ScoreTrend,
+  type StreakEntry,
   type TimelineCategory,
   type WalletActivityMatch,
   type WalletHoldingsResult,
@@ -287,6 +289,34 @@ function WalletHoldingsCard({ holdings }: { holdings: WalletHoldingsResult }) {
   );
 }
 
+/** Real daily check-in streak, recorded by the effect above on every real
+ * page load — see recordStreakActivity's doc comment for the increment/
+ * reset rule this reflects. */
+function StreakCard({ streak }: { streak: StreakEntry }) {
+  return (
+    <section className="glass-card-elevated flex flex-wrap items-center justify-between gap-4 p-6">
+      <div>
+        <h2 className="text-sm font-semibold text-text">Bridge Health Streak</h2>
+        <p className="mt-1 text-xs text-muted-dark">
+          Real daily check-ins for this wallet — resets on any missed real calendar day.
+        </p>
+      </div>
+      <div className="flex items-center gap-6">
+        <div className="text-right">
+          <p className="font-display text-2xl font-bold tracking-[-0.02em] text-text">
+            🔥 {streak.currentStreak} day{streak.currentStreak === 1 ? "" : "s"}
+          </p>
+          <p className="text-[11px] uppercase tracking-wide text-muted-dark">Current streak</p>
+        </div>
+        <div className="text-right">
+          <p className="font-mono text-lg font-semibold text-text-secondary">{streak.longestStreak}</p>
+          <p className="text-[11px] uppercase tracking-wide text-muted-dark">Longest streak</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /** Accumulated scan state across one or more "scan further back" pages —
  * each page covers an older slice of the wallet's real history than the
  * last, never re-scanning the same window. */
@@ -324,6 +354,8 @@ export default function MyActivityPage() {
   const [error, setError] = useState<string | null>(null);
   const [holdings, setHoldings] = useState<WalletHoldingsResult | null>(null);
   const [holdingsError, setHoldingsError] = useState<string | null>(null);
+  const [streak, setStreak] = useState<StreakEntry | null>(null);
+  const [streakError, setStreakError] = useState<string | null>(null);
   const [timeline, setTimeline] = useState<TimelineScanState | null>(null);
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [timelineLoadingMore, setTimelineLoadingMore] = useState(false);
@@ -352,6 +384,31 @@ export default function MyActivityPage() {
       })
       .catch((e) => {
         if (!cancelled) setHoldingsError(e instanceof Error ? e.message : String(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [publicKey]);
+
+  // Records one real check-in for the real connected wallet each time this
+  // page loads — the server decides same-day/consecutive-day/gap from its
+  // own clock (see recordStreakActivity's doc comment); this effect just
+  // fires the real request and displays whatever real state comes back.
+  // Never runs for previewMode — the streak tracks real visits by the real
+  // connected wallet, not the demo.
+  useEffect(() => {
+    if (!publicKey) {
+      setStreak(null);
+      setStreakError(null);
+      return;
+    }
+    let cancelled = false;
+    recordStreakActivity(publicKey.toBase58())
+      .then((r) => {
+        if (!cancelled) setStreak(r.streak);
+      })
+      .catch((e) => {
+        if (!cancelled) setStreakError(e instanceof Error ? e.message : String(e));
       });
     return () => {
       cancelled = true;
@@ -553,6 +610,18 @@ export default function MyActivityPage() {
             </Reveal>
           ) : (
             <div className="skeleton h-32 w-full rounded-2xl"></div>
+          )}
+
+          {streakError ? (
+            <div className="glass-card-elevated p-6 text-center">
+              <p className="text-sm text-muted">Couldn't load your streak. {streakError}</p>
+            </div>
+          ) : streak ? (
+            <Reveal delayMs={60}>
+              <StreakCard streak={streak} />
+            </Reveal>
+          ) : (
+            <div className="skeleton h-24 w-full rounded-2xl"></div>
           )}
         </>
       )}

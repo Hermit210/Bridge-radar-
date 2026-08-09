@@ -50,6 +50,15 @@ export interface GameScoreRow extends GameScoreEntry {
   completedAt: string;
 }
 
+/** A wallet's real daily check-in streak, keyed by real UTC calendar day —
+ * see `recordActivity`'s doc comment for the increment/reset rule. */
+export interface StreakRow {
+  walletAddress: string;
+  lastActiveDate: string;
+  currentStreak: number;
+  longestStreak: number;
+}
+
 export interface RadarDb {
   listBridges(): Promise<BridgeRow[]>;
   latestScores(): Promise<HealthScore[]>;
@@ -73,6 +82,11 @@ export interface RadarDb {
   defillamaGet(category: string, key: string): Promise<DefiLlamaRow | undefined>;
   insertGameScore(entry: GameScoreEntry): Promise<GameScoreRow>;
   topGameScores(limit: number): Promise<GameScoreRow[]>;
+  /** Records one real check-in for `walletAddress` on real UTC calendar day
+   * `todayUtc` (YYYY-MM-DD) and returns the resulting streak state. Same-day
+   * repeat calls are a no-op (idempotent). See implementations for the real
+   * increment/reset rule. */
+  recordActivity(walletAddress: string, todayUtc: string): Promise<StreakRow>;
   close(): Promise<void>;
 }
 
@@ -212,6 +226,13 @@ class SqliteRadarDb implements RadarDb {
         completed_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
       );
       CREATE INDEX IF NOT EXISTS game_scores_score_idx ON game_scores (score DESC);
+      CREATE TABLE IF NOT EXISTS user_streaks (
+        wallet_address    TEXT PRIMARY KEY,
+        last_active_date  TEXT NOT NULL,
+        current_streak    INTEGER NOT NULL DEFAULT 1,
+        longest_streak    INTEGER NOT NULL DEFAULT 1,
+        updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      );
       INSERT OR IGNORE INTO bridges (id, display_name, homepage) VALUES
         ('wormhole','Wormhole','https://wormhole.com'),
         ('allbridge','Allbridge','https://allbridge.io'),
@@ -447,6 +468,52 @@ class SqliteRadarDb implements RadarDb {
       distance: r.distance,
       completedAt: r.completed_at,
     }));
+  }
+
+  /** Real streak increment/reset rule, evaluated against the row's previous
+   * `last_active_date` before this call overwrites it:
+   *   - same as `todayUtc` already -> no-op (repeat visit same real day)
+   *   - exactly one real day before `todayUtc` -> current_streak + 1
+   *   - anything else (a real gap, or the very first visit) -> reset to 1
+   * `longest_streak` is the real running max, never decreases. */
+  async recordActivity(walletAddress: string, todayUtc: string): Promise<StreakRow> {
+    const now = new Date().toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO user_streaks (wallet_address, last_active_date, current_streak, longest_streak, updated_at)
+         VALUES (?, ?, 1, 1, ?)
+         ON CONFLICT(wallet_address) DO UPDATE SET
+           current_streak = CASE
+             WHEN last_active_date = excluded.last_active_date THEN current_streak
+             WHEN date(last_active_date, '+1 day') = excluded.last_active_date THEN current_streak + 1
+             ELSE 1
+           END,
+           longest_streak = MAX(longest_streak, CASE
+             WHEN last_active_date = excluded.last_active_date THEN current_streak
+             WHEN date(last_active_date, '+1 day') = excluded.last_active_date THEN current_streak + 1
+             ELSE 1
+           END),
+           last_active_date = excluded.last_active_date,
+           updated_at = excluded.updated_at`,
+      )
+      .run(walletAddress, todayUtc, now);
+    const row = this.db
+      .prepare(
+        `SELECT wallet_address, last_active_date, current_streak, longest_streak
+           FROM user_streaks WHERE wallet_address = ?`,
+      )
+      .get(walletAddress) as {
+      wallet_address: string;
+      last_active_date: string;
+      current_streak: number;
+      longest_streak: number;
+    };
+    return {
+      walletAddress: row.wallet_address,
+      lastActiveDate: row.last_active_date,
+      currentStreak: row.current_streak,
+      longestStreak: row.longest_streak,
+    };
   }
 
   async close(): Promise<void> {
@@ -698,6 +765,48 @@ class PostgresRadarDb implements RadarDb {
       distance: r.distance,
       completedAt: isoOf(r.completed_at),
     }));
+  }
+
+  /** Same real increment/reset rule as the SQLite implementation above —
+   * see that method's doc comment. A single atomic upsert (ON CONFLICT DO
+   * UPDATE referencing the pre-update row via the table name, matching
+   * Postgres's real semantics for excluded/target-row references within an
+   * UPSERT) so concurrent requests for the same wallet can't race. */
+  async recordActivity(walletAddress: string, todayUtc: string): Promise<StreakRow> {
+    const { rows } = await this.pool.query<{
+      wallet_address: string;
+      last_active_date: string | Date;
+      current_streak: number;
+      longest_streak: number;
+    }>(
+      `INSERT INTO user_streaks (wallet_address, last_active_date, current_streak, longest_streak, updated_at)
+       VALUES ($1, $2::date, 1, 1, NOW())
+       ON CONFLICT (wallet_address) DO UPDATE SET
+         current_streak = CASE
+           WHEN user_streaks.last_active_date = $2::date THEN user_streaks.current_streak
+           WHEN user_streaks.last_active_date = $2::date - INTERVAL '1 day' THEN user_streaks.current_streak + 1
+           ELSE 1
+         END,
+         longest_streak = GREATEST(
+           user_streaks.longest_streak,
+           CASE
+             WHEN user_streaks.last_active_date = $2::date THEN user_streaks.current_streak
+             WHEN user_streaks.last_active_date = $2::date - INTERVAL '1 day' THEN user_streaks.current_streak + 1
+             ELSE 1
+           END
+         ),
+         last_active_date = $2::date,
+         updated_at = NOW()
+       RETURNING wallet_address, last_active_date, current_streak, longest_streak`,
+      [walletAddress, todayUtc],
+    );
+    const r = rows[0]!;
+    return {
+      walletAddress: r.wallet_address,
+      lastActiveDate: isoOf(r.last_active_date).slice(0, 10),
+      currentStreak: r.current_streak,
+      longestStreak: r.longest_streak,
+    };
   }
 
   async close(): Promise<void> {

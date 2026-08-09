@@ -108,6 +108,7 @@ app.get("/", (c) =>
       "GET /v1/defillama/price/:mint",
       "POST /v1/game-scores",
       "GET /v1/game-scores/leaderboard",
+      "POST /v1/streak",
       "GET /v1/ws",
     ],
   }),
@@ -533,6 +534,27 @@ app.get("/v1/game-scores/leaderboard", async (c) => {
   const limit = Math.min(Math.max(limitParam ? Number(limitParam) : 10, 1), 100);
   const entries = await db.topGameScores(limit);
   return c.json({ entries });
+});
+
+// ── "Bridge Health Streak" — real daily check-in habit loop ────────────────
+//
+// Called once per real page load of /my-activity for a connected wallet.
+// `today` is computed server-side (real UTC calendar date), never trusted
+// from the client, so a wallet can't fake its own streak by lying about
+// what day it is. See db.ts's recordActivity doc comment for the real
+// increment/reset rule.
+app.post("/v1/streak", async (c) => {
+  const body = await c.req.json().catch(() => null);
+  if (!body || typeof body !== "object") {
+    return c.json({ error: "invalid JSON body" }, 400);
+  }
+  const { wallet_address } = body as Record<string, unknown>;
+  if (typeof wallet_address !== "string" || !isValidSolanaAddress(wallet_address)) {
+    return c.json({ error: "wallet_address must be a real, valid Solana address" }, 400);
+  }
+  const todayUtc = new Date().toISOString().slice(0, 10);
+  const streak = await db.recordActivity(wallet_address, todayUtc);
+  return c.json({ streak });
 });
 
 // ── WebSocket live stream ────────────────────────────────────────────────────
