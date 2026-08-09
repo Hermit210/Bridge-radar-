@@ -242,6 +242,21 @@ export interface StreakEntry {
   longestStreak: number;
 }
 
+/** Real trailing-7-real-day summary — wallet-independent (see
+ * apps/api/src/index.ts's /v1/weekly-digest doc comment). Computed fresh on
+ * every request, no caching. */
+export interface WeeklyDigest {
+  windowStart: string;
+  windowEnd: string;
+  anomalyEventCount: number;
+  monitoredBridgeCount: number;
+  bridgeHealthTally: { healthy: number; watch: number; alert: number; unmonitored: number };
+}
+
+export async function getWeeklyDigest() {
+  return fetchJson<WeeklyDigest>("/v1/weekly-digest");
+}
+
 export async function recordStreakActivity(walletAddress: string) {
   const r = await fetch(`${API_URL}/v1/streak`, {
     method: "POST",

@@ -78,6 +78,11 @@ export interface RadarDb {
   latestEventCursor(): Promise<string>;
   eventsSince(cursor: string, limit?: number): Promise<CursoredEvent[]>;
   countEvents(): Promise<number>;
+  /** Real count of events of the given kinds at or after `sinceIso`, across
+   * every bridge — used for the weekly digest's anomaly-event tally. A real
+   * COUNT query, not `listEvents(...).length` against a capped/limited
+   * result set, so it stays accurate regardless of volume. */
+  countEventsSince(sinceIso: string, kinds: BridgeEventKind[]): Promise<number>;
   defillamaList(category: string): Promise<DefiLlamaRow[]>;
   defillamaGet(category: string, key: string): Promise<DefiLlamaRow | undefined>;
   insertGameScore(entry: GameScoreEntry): Promise<GameScoreRow>;
@@ -419,6 +424,15 @@ class SqliteRadarDb implements RadarDb {
     return r.c;
   }
 
+  async countEventsSince(sinceIso: string, kinds: BridgeEventKind[]): Promise<number> {
+    if (kinds.length === 0) return 0;
+    const placeholders = kinds.map(() => "?").join(",");
+    const r = this.db
+      .prepare(`SELECT COUNT(*) AS c FROM bridge_events WHERE event_time >= ? AND event_type IN (${placeholders})`)
+      .get(sinceIso, ...kinds) as { c: number };
+    return r.c;
+  }
+
   async defillamaList(category: string): Promise<DefiLlamaRow[]> {
     return this.db
       .prepare(
@@ -708,6 +722,15 @@ class PostgresRadarDb implements RadarDb {
 
   async countEvents(): Promise<number> {
     const { rows } = await this.pool.query<{ c: string }>("SELECT COUNT(*) AS c FROM bridge_events");
+    return Number(rows[0]?.c ?? 0);
+  }
+
+  async countEventsSince(sinceIso: string, kinds: BridgeEventKind[]): Promise<number> {
+    if (kinds.length === 0) return 0;
+    const { rows } = await this.pool.query<{ c: string }>(
+      "SELECT COUNT(*) AS c FROM bridge_events WHERE event_time >= $1 AND event_type = ANY($2::text[])",
+      [sinceIso, kinds],
+    );
     return Number(rows[0]?.c ?? 0);
   }
 
