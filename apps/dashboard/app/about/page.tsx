@@ -49,7 +49,11 @@ export default async function AboutPage() {
           <div className="space-y-2.5">
             {[
               <>This dashboard.</>,
-              <>REST + WebSocket API — free, open, rate-limited.</>,
+              <>
+                REST + WebSocket API — free, open, no rate limiting currently enforced. See{" "}
+                <Link className={linkClass} href="/developers">/developers</Link> for real endpoints, curl
+                examples, and an embeddable widget.
+              </>,
               <>
                 On-chain Anchor program{" "}
                 <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-accent">radar-oracle</code>{" "}
