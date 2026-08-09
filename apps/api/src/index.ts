@@ -7,6 +7,7 @@ import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import type { BridgeEventKind, BridgeWithHealth, WsMessage } from "@radar/shared";
+import { bandFor } from "@radar/shared";
 import { createDb, type RadarDb } from "./db.js";
 import { getImplementedBridges, getPlannedBridges, BRIDGE_REGISTRY } from "./bridges.js";
 import { fetchDefiLlamaPrice } from "./defillama-store.js";
@@ -19,6 +20,7 @@ import {
 import { fetchWalletHoldings } from "./wallet-holdings.js";
 import { computeWeeklyDigest } from "./weekly-digest.js";
 import { scheduleWeeklyDigest } from "./telegram-digest.js";
+import { WIDGET_JS } from "./widget.js";
 import {
   extractHeliusApiKey,
   fetchWalletTransactionTimeline,
@@ -83,12 +85,37 @@ const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 app.use("*", logger());
 app.use("/v1/*", cors({ origin: corsOrigins }));
 
+// ── Embeddable health badge (apps/dashboard/app/developers) ────────────────
+//
+// Deliberately outside /v1/* and its restrictive origin allowlist above --
+// this is meant to be fetched from arbitrary third-party sites embedding
+// the widget, so it gets its own explicit open CORS rather than loosening
+// the allowlist every other /v1 route (wallet lookups, etc.) relies on.
+app.get("/widget.js", (c) => c.text(WIDGET_JS, 200, { "Content-Type": "application/javascript; charset=utf-8" }));
+
+app.get("/widget/health/:bridgeId", cors({ origin: "*" }), async (c) => {
+  const bridgeId = c.req.param("bridgeId");
+  const [bridges, scores] = await Promise.all([db.listBridges(), db.latestScores()]);
+  const bridge = bridges.find((b) => b.id === bridgeId);
+  if (!bridge) return c.json({ error: `unknown bridge "${bridgeId}"` }, 404);
+  const score = scores.find((s) => s.bridge_id === bridgeId);
+  return c.json({
+    bridgeId: bridge.id,
+    displayName: bridge.display_name,
+    score: score?.score ?? null,
+    band: bandFor({ enabled: bridge.enabled, health: score }),
+    computedAt: score?.computed_at ?? null,
+  });
+});
+
 app.get("/", (c) =>
   c.json({
     name: "bridge-radar",
     version: "0.1.0",
     docs: "https://github.com/Hermit210/Bridge-radar-/blob/main/ARCHITECTURE.md",
     endpoints: [
+      "GET /widget.js",
+      "GET /widget/health/:bridgeId",
       "GET /v1/bridges",
       "GET /v1/bridges/:id",
       "GET /v1/bridges/:id/health",
