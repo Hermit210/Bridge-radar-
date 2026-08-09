@@ -7,6 +7,7 @@ import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import type { BridgeEventKind, BridgeWithHealth, WsMessage } from "@radar/shared";
+import { bandFor } from "@radar/shared";
 import { createDb, type RadarDb } from "./db.js";
 import { getImplementedBridges, getPlannedBridges, BRIDGE_REGISTRY } from "./bridges.js";
 import { fetchDefiLlamaPrice } from "./defillama-store.js";
@@ -109,6 +110,7 @@ app.get("/", (c) =>
       "POST /v1/game-scores",
       "GET /v1/game-scores/leaderboard",
       "POST /v1/streak",
+      "GET /v1/weekly-digest",
       "GET /v1/ws",
     ],
   }),
@@ -555,6 +557,50 @@ app.post("/v1/streak", async (c) => {
   const todayUtc = new Date().toISOString().slice(0, 10);
   const streak = await db.recordActivity(wallet_address, todayUtc);
   return c.json({ streak });
+});
+
+// ── "Weekly Activity Digest" — real trailing-7-real-day summary ────────────
+//
+// Wallet-independent: anomaly-event count (signer_change/frontend_change/
+// oracle_stale -- the real detector-flagged kinds, not routine lock/mint/
+// burn/unlock transfer events) across every monitored bridge, plus real
+// live healthy/watch/alert tallies from the same bandFor(...) logic
+// /v1/bridges itself uses. Computed fresh on every request -- no caching,
+// no static numbers.
+const ANOMALY_EVENT_KINDS: BridgeEventKind[] = ["signer_change", "frontend_change", "oracle_stale"];
+const DIGEST_WINDOW_DAYS = 7;
+
+app.get("/v1/weekly-digest", async (c) => {
+  const windowEnd = new Date();
+  const windowStart = new Date(windowEnd.getTime() - DIGEST_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+
+  const [anomalyEventCount, bridges, allScores] = await Promise.all([
+    db.countEventsSince(windowStart.toISOString(), ANOMALY_EVENT_KINDS),
+    db.listBridges(),
+    db.latestScores(),
+  ]);
+  const scores = new Map(allScores.map((s) => [s.bridge_id, s]));
+
+  const tally = { healthy: 0, watch: 0, alert: 0, unmonitored: 0 };
+  for (const b of bridges) {
+    const band = bandFor({ enabled: b.enabled, health: scores.get(b.id) });
+    if (band === "green") tally.healthy += 1;
+    else if (band === "yellow") tally.watch += 1;
+    else if (band === "red") tally.alert += 1;
+    else tally.unmonitored += 1;
+  }
+
+  return c.json({
+    windowStart: windowStart.toISOString(),
+    windowEnd: windowEnd.toISOString(),
+    anomalyEventCount,
+    // Real, enabled bridges only -- excludes seeded-but-disabled rows
+    // (e.g. cctp/hyperlane: real bridges, no adapter watching them yet)
+    // from the "monitored" count, matching what /v1/bridges' own scan
+    // actually watches.
+    monitoredBridgeCount: bridges.filter((b) => b.enabled).length,
+    bridgeHealthTally: tally,
+  });
 });
 
 // ── WebSocket live stream ────────────────────────────────────────────────────

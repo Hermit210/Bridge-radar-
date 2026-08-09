@@ -16,6 +16,7 @@ import {
   getWalletActivity,
   getWalletHoldings,
   getWalletTimeline,
+  getWeeklyDigest,
   recordStreakActivity,
   type ScoreTrend,
   type StreakEntry,
@@ -23,6 +24,7 @@ import {
   type WalletActivityMatch,
   type WalletHoldingsResult,
   type WalletTimelineEntry,
+  type WeeklyDigest,
 } from "@/lib/api";
 import { bandOf, formatUsd } from "@radar/shared";
 
@@ -317,6 +319,50 @@ function StreakCard({ streak }: { streak: StreakEntry }) {
   );
 }
 
+/** Real trailing-7-real-day summary. Factual only, matching the existing
+ * risk-flag feature's tone -- counts and dates, no "you should" language. */
+function WeeklyDigestCard({ digest, walletTxThisWeek }: { digest: WeeklyDigest; walletTxThisWeek: number | null }) {
+  const { bridgeHealthTally: tally } = digest;
+  return (
+    <section className="glass-card-elevated space-y-4 p-6">
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-sm font-semibold text-text">This Week</h2>
+        <span className="font-mono text-[11px] text-muted-dark">
+          {new Date(digest.windowStart).toLocaleDateString()} – {new Date(digest.windowEnd).toLocaleDateString()}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <div>
+          <p className="font-mono text-xl font-semibold text-text">{digest.anomalyEventCount}</p>
+          <p className="text-[11px] text-muted-dark">
+            anomaly event{digest.anomalyEventCount === 1 ? "" : "s"} across {digest.monitoredBridgeCount} monitored
+            bridges
+          </p>
+        </div>
+        <div>
+          <p className="font-mono text-xl font-semibold text-text">
+            <span className="text-green">{tally.healthy}</span>
+            <span className="text-muted-dark"> / </span>
+            <span className="text-yellow">{tally.watch}</span>
+            <span className="text-muted-dark"> / </span>
+            <span className="text-red">{tally.alert}</span>
+          </p>
+          <p className="text-[11px] text-muted-dark">healthy / watch / alert right now</p>
+        </div>
+        {walletTxThisWeek !== null && (
+          <div>
+            <p className="font-mono text-xl font-semibold text-text">{walletTxThisWeek}</p>
+            <p className="text-[11px] text-muted-dark">
+              of your real bridge transaction{walletTxThisWeek === 1 ? "" : "s"} this window
+            </p>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 /** Accumulated scan state across one or more "scan further back" pages —
  * each page covers an older slice of the wallet's real history than the
  * last, never re-scanning the same window. */
@@ -356,6 +402,8 @@ export default function MyActivityPage() {
   const [holdingsError, setHoldingsError] = useState<string | null>(null);
   const [streak, setStreak] = useState<StreakEntry | null>(null);
   const [streakError, setStreakError] = useState<string | null>(null);
+  const [digest, setDigest] = useState<WeeklyDigest | null>(null);
+  const [digestError, setDigestError] = useState<string | null>(null);
   const [timeline, setTimeline] = useState<TimelineScanState | null>(null);
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [timelineLoadingMore, setTimelineLoadingMore] = useState(false);
@@ -414,6 +462,23 @@ export default function MyActivityPage() {
       cancelled = true;
     };
   }, [publicKey]);
+
+  // Real, wallet-independent -- fetched fresh every real page load, no
+  // caching. Runs once on mount regardless of wallet-connection state
+  // since anomaly events / bridge health are global facts, not per-wallet.
+  useEffect(() => {
+    let cancelled = false;
+    getWeeklyDigest()
+      .then((r) => {
+        if (!cancelled) setDigest(r);
+      })
+      .catch((e) => {
+        if (!cancelled) setDigestError(e instanceof Error ? e.message : String(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!publicKey) {
@@ -533,6 +598,18 @@ export default function MyActivityPage() {
     }
     return counts;
   }, [scan?.matches]);
+
+  /** Real count of this wallet's own real bridge-matched transactions whose
+   * blockTime falls in the same trailing-7-real-day window the digest
+   * reports for -- derived from the already-fetched real scan matches (the
+   * same scan the page's own bridge-usage section uses), not a second RPC
+   * scan. Only within the window the scan above has actually reached, same
+   * honesty caveat as the rest of the scan UI. */
+  const walletTxThisWeek = useMemo(() => {
+    if (!scan) return null;
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    return scan.matches.filter((m) => m.blockTime && new Date(m.blockTime).getTime() >= cutoff).length;
+  }, [scan]);
 
   async function scanFurtherBack() {
     if (!activityAddress || !scan?.nextBefore || loadingMore) return;
@@ -749,6 +826,18 @@ export default function MyActivityPage() {
           <Reveal>
             <BridgeUsageSummary usageCounts={usageCounts} />
           </Reveal>
+
+          {digestError ? (
+            <div className="glass-card-elevated p-6 text-center">
+              <p className="text-sm text-muted">Couldn't load this week's digest. {digestError}</p>
+            </div>
+          ) : digest ? (
+            <Reveal delayMs={60}>
+              <WeeklyDigestCard digest={digest} walletTxThisWeek={walletTxThisWeek} />
+            </Reveal>
+          ) : (
+            <div className="skeleton h-24 w-full rounded-2xl"></div>
+          )}
 
           {scan.matches.length > 0 && (
             <Reveal>
