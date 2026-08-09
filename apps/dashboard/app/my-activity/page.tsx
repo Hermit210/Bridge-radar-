@@ -9,7 +9,9 @@ import { OrbitGlow } from "@/components/orbit-glow";
 import { StatBar, type StatBarSegment } from "@/components/stat-bar";
 import { BridgeScoreNotifications } from "@/components/bridge-score-notifications";
 import { BridgeUsageSummary } from "@/components/bridge-usage-summary";
-import { BridgeRaceSection } from "@/components/bridge-race/bridge-race-section";
+// Bridge Race is intentionally not rendered here -- see the removal note
+// near the bottom of this file where it used to mount. The game code,
+// its API routes, and the game_scores table are all left in place.
 import {
   getWalletActivity,
   getWalletHoldings,
@@ -838,12 +840,14 @@ export default function MyActivityPage() {
         </div>
       )}
 
-      {/* Belt-and-suspenders: gate on a real, non-null publicKey too, not
-          just the `connected` boolean alone — a real wallet must genuinely
-          be attached before Bridge Race (or its score-saving path) ever
-          mounts. `connected` without a `publicKey` should never happen in
-          practice, but this makes it structurally impossible either way. */}
-      {connected && publicKey && <BridgeRaceSection />}
+      {/* Bridge Race removed from the visible page (2026-08-09) -- the game
+          repeatedly fell short of acceptable visual/gameplay quality across
+          several rebuild attempts. Intentionally not deleted: the component
+          (components/bridge-race/*), its API routes, and the game_scores
+          table are all left in place in case this gets revisited. This was
+          previously:
+            {connected && publicKey && <BridgeRaceSection />}
+      */}
     </div>
   );
 }
