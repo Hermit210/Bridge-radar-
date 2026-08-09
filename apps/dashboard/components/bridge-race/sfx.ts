@@ -48,12 +48,12 @@ export class Sfx {
     this.tone(180, 0, 0.15, 0.07, "sawtooth");
   }
 
+  buildDenied() {
+    this.tone(140, 0, 0.09, 0.05, "square");
+  }
+
   gameOverFell() {
     this.tone(300, 0, 0.15, 0.06, "sawtooth");
     this.tone(180, 0.12, 0.25, 0.06, "sawtooth");
-  }
-
-  gameOverFinished() {
-    [660, 880, 1100, 1320, 1560].forEach((f, i) => this.tone(f, i * 0.08, 0.14, 0.055, "triangle"));
   }
 }
