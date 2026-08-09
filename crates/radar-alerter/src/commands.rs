@@ -103,7 +103,7 @@ async fn handle_update(http: &reqwest::Client, base: &str, storage: &dyn Storage
 
     debug!(%chat_id, %command, "telegram command received");
     let reply = match command {
-        "/start" => start_message(),
+        "/start" => start_reply(storage, chat_id, text).await,
         "/help" => help_message(),
         "/status" => status_message(storage).await,
         _ => format!("Unknown command: {command}\n\n{}", help_message()),
@@ -134,6 +134,59 @@ async fn send_message(http: &reqwest::Client, base: &str, chat_id: &Value, text:
         anyhow::bail!("sendMessage returned {status}: {raw}");
     }
     Ok(raw)
+}
+
+/// Handles both plain `/start` and the real deep-link form
+/// `/start <wallet_address>` that `https://t.me/bruhalert_bot?start=<wallet>`
+/// produces (Telegram appends the link's payload as the command's argument —
+/// see https://core.telegram.org/bots/features#deep-linking). A real,
+/// well-formed wallet payload gets real-linked to this chat via
+/// `upsert_telegram_subscription`; anything else falls back to the plain
+/// welcome message.
+async fn start_reply(storage: &dyn Storage, chat_id: &Value, text: &str) -> String {
+    let payload = text
+        .splitn(2, char::is_whitespace)
+        .nth(1)
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    let Some(wallet) = payload else {
+        return start_message();
+    };
+    if !is_valid_solana_pubkey(wallet) {
+        return format!(
+            "⚠️ \"{wallet}\" doesn't look like a real Solana wallet address, so I didn't link it. \
+             Use the \"Link Telegram\" button on Bridge Radar's /my-activity page to get a real, \
+             correctly-formed link instead.\n\n{}",
+            start_message()
+        );
+    }
+    let Some(chat_id_num) = chat_id.as_i64() else {
+        return "⚠️ couldn't read this chat's real id — try again.".to_string();
+    };
+    match storage
+        .upsert_telegram_subscription(wallet, chat_id_num)
+        .await
+    {
+        Ok(()) => format!(
+            "✅ Linked! This chat is now subscribed to the real weekly digest for {}…{} — \
+             real anomaly-event counts and real bridge health, once a week, no advisory language.\n\n\
+             You'll keep getting the real-time alerts above too. /status any time for a live snapshot.",
+            &wallet[..4.min(wallet.len())],
+            &wallet[wallet.len().saturating_sub(4)..],
+        ),
+        Err(e) => format!("⚠️ couldn't save this link right now: {e}"),
+    }
+}
+
+/// Real, minimal Solana pubkey shape check: valid base58 that decodes to
+/// exactly 32 bytes — the same bar `new PublicKey(...)` construction on the
+/// TypeScript side (`isValidSolanaAddress`) applies. Doesn't verify the
+/// address has ever been used on-chain, only that it's well-formed.
+fn is_valid_solana_pubkey(s: &str) -> bool {
+    bs58::decode(s)
+        .into_vec()
+        .map(|bytes| bytes.len() == 32)
+        .unwrap_or(false)
 }
 
 fn start_message() -> String {

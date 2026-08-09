@@ -59,6 +59,16 @@ export interface StreakRow {
   longestStreak: number;
 }
 
+/** A real wallet <-> Telegram chat link, written by the alerter's
+ * `/start <wallet_address>` deep-link handler (see
+ * crates/radar-alerter/src/commands.rs) -- never written from Node, only
+ * read here (subscription-status endpoint, weekly-digest sender). */
+export interface TelegramSubscriptionRow {
+  walletAddress: string;
+  chatId: string;
+  subscribedAt: string;
+}
+
 export interface RadarDb {
   listBridges(): Promise<BridgeRow[]>;
   latestScores(): Promise<HealthScore[]>;
@@ -92,6 +102,13 @@ export interface RadarDb {
    * repeat calls are a no-op (idempotent). See implementations for the real
    * increment/reset rule. */
   recordActivity(walletAddress: string, todayUtc: string): Promise<StreakRow>;
+  /** Real subscription row for `walletAddress`, or null if never linked.
+   * Read-only from Node -- the row is written by the Telegram bot's /start
+   * handler (Rust), not here. */
+  getTelegramSubscription(walletAddress: string): Promise<TelegramSubscriptionRow | null>;
+  /** Every real subscription row -- used by the weekly-digest sender to
+   * fan a single computed digest out to every real subscriber. */
+  listTelegramSubscriptions(): Promise<TelegramSubscriptionRow[]>;
   close(): Promise<void>;
 }
 
@@ -238,6 +255,12 @@ class SqliteRadarDb implements RadarDb {
         longest_streak    INTEGER NOT NULL DEFAULT 1,
         updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
       );
+      CREATE TABLE IF NOT EXISTS telegram_subscriptions (
+        wallet_address  TEXT PRIMARY KEY,
+        chat_id         INTEGER NOT NULL,
+        subscribed_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      );
+      CREATE INDEX IF NOT EXISTS telegram_subscriptions_chat_id_idx ON telegram_subscriptions (chat_id);
       INSERT OR IGNORE INTO bridges (id, display_name, homepage) VALUES
         ('wormhole','Wormhole','https://wormhole.com'),
         ('allbridge','Allbridge','https://allbridge.io'),
@@ -528,6 +551,21 @@ class SqliteRadarDb implements RadarDb {
       currentStreak: row.current_streak,
       longestStreak: row.longest_streak,
     };
+  }
+
+  async getTelegramSubscription(walletAddress: string): Promise<TelegramSubscriptionRow | null> {
+    const row = this.db
+      .prepare(`SELECT wallet_address, chat_id, subscribed_at FROM telegram_subscriptions WHERE wallet_address = ?`)
+      .get(walletAddress) as { wallet_address: string; chat_id: number; subscribed_at: string } | undefined;
+    if (!row) return null;
+    return { walletAddress: row.wallet_address, chatId: String(row.chat_id), subscribedAt: row.subscribed_at };
+  }
+
+  async listTelegramSubscriptions(): Promise<TelegramSubscriptionRow[]> {
+    const rows = this.db
+      .prepare(`SELECT wallet_address, chat_id, subscribed_at FROM telegram_subscriptions ORDER BY subscribed_at ASC`)
+      .all() as { wallet_address: string; chat_id: number; subscribed_at: string }[];
+    return rows.map((r) => ({ walletAddress: r.wallet_address, chatId: String(r.chat_id), subscribedAt: r.subscribed_at }));
   }
 
   async close(): Promise<void> {
@@ -830,6 +868,23 @@ class PostgresRadarDb implements RadarDb {
       currentStreak: r.current_streak,
       longestStreak: r.longest_streak,
     };
+  }
+
+  async getTelegramSubscription(walletAddress: string): Promise<TelegramSubscriptionRow | null> {
+    const { rows } = await this.pool.query<{ wallet_address: string; chat_id: string; subscribed_at: string | Date }>(
+      `SELECT wallet_address, chat_id, subscribed_at FROM telegram_subscriptions WHERE wallet_address = $1`,
+      [walletAddress],
+    );
+    const r = rows[0];
+    if (!r) return null;
+    return { walletAddress: r.wallet_address, chatId: r.chat_id, subscribedAt: isoOf(r.subscribed_at) };
+  }
+
+  async listTelegramSubscriptions(): Promise<TelegramSubscriptionRow[]> {
+    const { rows } = await this.pool.query<{ wallet_address: string; chat_id: string; subscribed_at: string | Date }>(
+      `SELECT wallet_address, chat_id, subscribed_at FROM telegram_subscriptions ORDER BY subscribed_at ASC`,
+    );
+    return rows.map((r) => ({ walletAddress: r.wallet_address, chatId: r.chat_id, subscribedAt: isoOf(r.subscribed_at) }));
   }
 
   async close(): Promise<void> {
