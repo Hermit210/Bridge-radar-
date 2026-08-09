@@ -20,7 +20,6 @@ const LEADERBOARD_DISPLAY_LIMIT = 10;
 const LEADERBOARD_RANK_LOOKUP_LIMIT = 100;
 
 const outcomeLabel: Record<RunResult["outcome"], string> = {
-  finished: "🏁 Finished!",
   fell: "💥 Fell short",
   hit: "⚠️ Hit too many hazards",
 };
@@ -101,8 +100,10 @@ export function BridgeRaceSection() {
         <div className="space-y-2">
           <h2 className="text-sm font-semibold text-text">Bridge Race</h2>
           <p className="text-sm text-text-secondary">
-            Run, dodge real detector-themed hazards, collect real blocks, and bridge every gap
-            before you run out. Real scores save to a real leaderboard under your connected wallet.
+            An endless run with no finish line — it only ends when you do. Jump real
+            detector-themed hazards, time your jumps to collect real blocks, and press build at
+            every gap before you run out of room. Difficulty only ever climbs. Real scores save to
+            a real leaderboard under your connected wallet.
           </p>
         </div>
       </Reveal>
@@ -112,11 +113,15 @@ export function BridgeRaceSection() {
           {phase === "idle" && (
             <div className="flex flex-col items-center gap-4 py-10 text-center">
               <p className="max-w-md text-sm text-muted">
-                You run automatically — press <span className="text-text-secondary">↑</span> or{" "}
-                <span className="text-text-secondary">Space</span> to jump. Dodge the red{" "}
-                <span className="text-red">signer-change</span> and amber{" "}
-                <span className="text-yellow">frontend-hijack</span> hazards, and collect enough
-                real blocks before each gap — come up short and you fall.
+                You run automatically — tap <span className="text-text-secondary">↑</span> or{" "}
+                <span className="text-text-secondary">Space</span> for a short hop, hold for a full
+                jump. Dodge the red <span className="text-red">signer-change</span> and amber{" "}
+                <span className="text-yellow">frontend-hijack</span> hazards, and jump to collect
+                real blocks along the way — some sit low, some need a full jump to reach. At each
+                gap, press <span className="text-text-secondary">↓</span> or{" "}
+                <span className="text-text-secondary">S</span> to build a bridge once you're close
+                enough and carrying enough blocks. Miss the window or run out of blocks, and you
+                fall.
               </p>
               <button
                 type="button"
