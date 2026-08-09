@@ -1,129 +1,128 @@
 import Phaser from "phaser";
 import { Sfx } from "./sfx";
+import {
+  speedAtDistance,
+  gapWidthAtDistance,
+  gapCostForWidth,
+  hazardCountAtDistance,
+  blocksOfferedForGap,
+  highTierChanceAtDistance,
+  trailingHazardChanceAtDistance,
+} from "./difficulty";
 
 /** Real result of one playthrough, handed back to React via the
- * `onGameOver` callback passed into the scene's init data. */
+ * `onGameOver` callback passed into the scene's init data. There is no
+ * "finished" outcome — this is an endless runner with no win condition; a
+ * run only ever ends because the player failed. */
 export interface RunResult {
   score: number;
   blocksUsed: number;
   distance: number;
-  outcome: "finished" | "fell" | "hit";
+  outcome: "fell" | "hit";
 }
 
 export interface SceneInitData {
   onGameOver: (result: RunResult) => void;
 }
 
-interface GapDef {
-  x: number;
-  width: number;
-  cost: number;
+/** Read-only run telemetry, mirrored to `window.__bridgeRaceDebug` every
+ * frame. Never written back into by anything — it exists purely so the
+ * real run state (distance, speed, the next gap's real position/cost) is
+ * externally observable for QA/playtesting without adding any way to
+ * influence the game other than the real keyboard input path. */
+export interface BridgeRaceDebugState {
+  distance: number;
+  speed: number;
+  blocksHeld: number;
+  lives: number;
+  ended: boolean;
+  outcome?: "fell" | "hit";
+  nextGap: { x: number; width: number; cost: number; built: boolean; buildZoneStart: number } | null;
+  /** Hazards currently on screen ahead of the player — the same
+   * information a sighted player reads directly off the rendered sprites;
+   * exposing it doesn't add any way to affect the game, only to observe
+   * what's already visible. */
+  upcomingHazards: number[];
+  upcomingBlocks: { x: number; tier: "low" | "high" }[];
+}
+
+declare global {
+  interface Window {
+    __bridgeRaceDebug?: BridgeRaceDebugState;
+  }
 }
 
 type HazardKind = "signer" | "frontend";
+type BlockTier = "low" | "high";
 
-interface HazardDef {
+interface GapState {
   x: number;
-  kind: HazardKind;
+  width: number;
+  cost: number;
+  built: boolean;
+  label: Phaser.GameObjects.Text;
+  marker: Phaser.GameObjects.Rectangle;
 }
 
-const PLAYER_SPEED = 220;
-const JUMP_VELOCITY = -430;
-const GRAVITY_Y = 950;
-// Max horizontal distance coverable by a single jump at the speed/gravity
-// above is ~200px — every gap is wider than that on purpose, so bridging
-// with collected blocks is the only way across, never jumping.
-const MAX_JUMP_DISTANCE = 200;
+const GRAVITY_Y = 1000;
+// Mario-style variable jump height: pressing jump always launches at full
+// magnitude; releasing early while still ascending clamps the upward
+// velocity down to JUMP_CUTOFF_VELOCITY, cutting the rest of the ascent
+// short. Held through the full ascent (~0.56s) reaches ~157px above the
+// player's resting height; the instant-release floor is ~33px (there's
+// always at least one physics tick at full velocity before a same-frame
+// release can clamp it) — LOW_BLOCK_Y is deliberately set well above that
+// floor (a real tested run against an earlier ~44px-rise value showed a
+// short hop can never actually reach it, since even the fastest possible
+// release already overshoots ~33px and there's no way to land exactly on
+// a target *below* the achievable minimum). Both cases are checked every
+// frame directly against live key state — no input buffering.
+const JUMP_VELOCITY = -560;
+const JUMP_CUTOFF_VELOCITY = -220;
 const GROUND_Y = 320;
 const WORLD_HEIGHT = 760;
 const FALL_THRESHOLD_Y = GROUND_Y + 260;
 const GROUND_TILE_W = 64;
-// Hazards cost a life, never a block — blocks are purely the
-// bridge-building resource. A shared-resource design (hazards also costing
-// blocks) was tried and found genuinely unfair in testing: hitting the very
-// first hazard before collecting any blocks at all was an instant game
-// over. A separate small life pool keeps "dodge hazards" and "manage your
-// block economy" as two distinct skills, matching the brief's own "jump
-// over or lose a life" framing.
+// Block pickup height tiers: LOW sits within a natural short-hop's real
+// achievable range (comfortably above the floor above, comfortably below
+// a full jump), HIGH sits near the apex of a fully-held jump — collecting
+// either one requires the player to actually be airborne, at the right x,
+// at the right moment. There is no ground-level auto-collect path.
+const LOW_BLOCK_Y = GROUND_Y - 79;
+const HIGH_BLOCK_Y = GROUND_Y - 140;
+// Real signer-change/frontend-hijack hazards sit at running height and
+// must be jumped over; a full-height jump covers more horizontal ground
+// (longer airtime) than a tap, which matters once hazards are packed
+// close together late-game — holding jump to clear one hazard can carry a
+// player straight into the next one, since horizontal speed can't be
+// cancelled mid-air. That tension is the point, not a bug.
+const HAZARD_Y = GROUND_Y - 14;
 const STARTING_LIVES = 3;
 
-/** Difficulty ramps with distance: gaps get wider (more blocks required)
- * and spaced with proportionally more run-up room for the extra blocks
- * they cost — six gaps, widths 260 -> 435px, costs 3 -> 13. */
-function generateGaps(): GapDef[] {
-  const gaps: GapDef[] = [];
-  let x = 900;
-  for (let i = 0; i < 6; i++) {
-    const width = 260 + i * 35;
-    const cost = 3 + i * 2;
-    gaps.push({ x, width, cost });
-    x += width + 620 + i * 70;
-  }
-  return gaps;
-}
-
-const GAPS = generateGaps();
-const WORLD_WIDTH = GAPS[GAPS.length - 1]!.x + GAPS[GAPS.length - 1]!.width + 500;
-const FINISH_X = WORLD_WIDTH - 100;
-
-// Hazards live in a fixed-length "reflex zone" right after landing from the
-// previous gap; block clusters start only once that zone has fully ended.
-// Keeping the two zones strictly non-overlapping means a hazard can never
-// eat into the block buffer a player needs for the very next gap — hazards
-// test reflexes, blocks test resource planning, deliberately not the same
-// moment. Escalating hazard count inside a *fixed*-length zone (not a
-// widening one) is what actually makes later zones harder: same real
-// estate, tighter timing.
-const HAZARD_ZONE_START_OFFSET = 90;
-const HAZARD_ZONE_LEN = 210;
-const BLOCK_ZONE_START_OFFSET = HAZARD_ZONE_START_OFFSET + HAZARD_ZONE_LEN + 70;
-
-/** Hazards sit in the dedicated reflex zone after each landing, alternating
- * the two detector-themed kinds, with density increasing on later (harder)
- * segments — real difficulty progression, not a flat repeat. */
-function generateHazards(): HazardDef[] {
-  const hazards: HazardDef[] = [];
-  let prevGapEnd = 40;
-  GAPS.forEach((gap, i) => {
-    const zoneStart = prevGapEnd + HAZARD_ZONE_START_OFFSET;
-    const count = 1 + Math.floor(i / 2); // 1,1,2,2,3,3 — gentler, still escalating
-    for (let j = 0; j < count; j++) {
-      hazards.push({
-        x: zoneStart + (HAZARD_ZONE_LEN / (count + 1)) * (j + 1),
-        kind: (i + j) % 2 === 0 ? "signer" : "frontend",
-      });
-    }
-    prevGapEnd = gap.x + gap.width;
-  });
-  return hazards;
-}
-
-const HAZARDS = generateHazards();
-
-/** One cluster of block pickups on the real run-up before each gap, starting
- * only after the hazard reflex zone has fully ended — `cost + 3` blocks per
- * cluster (a real buffer that survives one hazard hit), spaced across the
- * available approach distance, positioned low enough to auto-collect while
- * running (no jump required — collecting is the strategic-resource loop;
- * jumping is reserved for dodging hazards). */
-function buildBlockPositions(): { x: number; y: number }[] {
-  const positions: { x: number; y: number }[] = [];
-  let prevGapEnd = 40;
-  for (const gap of GAPS) {
-    const count = gap.cost + 3;
-    const start = prevGapEnd + BLOCK_ZONE_START_OFFSET;
-    const end = gap.x - 60;
-    const span = Math.max(end - start, count * 40);
-    for (let i = 0; i < count; i++) {
-      // Player rests with its circle body centered at GROUND_Y - 14 (14 =
-      // its collision radius) — blocks must sit at that same height to
-      // actually overlap the player while running, not float above it.
-      positions.push({ x: start + (span / count) * i, y: GROUND_Y - 14 });
-    }
-    prevGapEnd = gap.x + gap.width;
-  }
-  return positions;
-}
+// --- Procedural segment layout (fixed spacing constants; the *content*
+// inside each segment — hazard count, gap width, block scarcity — comes
+// from the distance-based formulas in ./difficulty) ----------------------
+const REFLEX_LEAD_IN = 70; // flat ground before each segment's hazards start
+const HAZARD_ZONE_LEN = 220; // fixed-length reflex zone; density escalates, not length
+const BLOCK_ZONE_LEAD_IN = 60; // gap between hazard zone and block zone — kept non-overlapping
+// Blocks spawn in small clusters rather than one long evenly-spaced line:
+// a single held-apex pass through a jump arc has a real, non-zero window
+// at pickup height, wide enough to sweep a tight cluster but not a whole
+// zone — so blocks 70px apart (roughly one full hop's ground track) would
+// mean at best one pickup per jump, and jump airtime alone caps how many
+// jumps fit in the zone at all: not nearly enough to hit a gap's block
+// cost. Clustering (a few blocks ~24px apart, one cluster per jump) is
+// what actually makes "jump to collect" a completable resource loop
+// instead of a physically-impossible one — found by literally testing a
+// scripted playthrough against the cost curve, not by inspection.
+const BLOCK_CLUSTER_SIZE = 3;
+const BLOCK_CLUSTER_INNER_SPACING = 22; // within a cluster — collectible in one jump arc
+const BLOCK_CLUSTER_GAP = 170; // between cluster starts — needs a distinct jump per cluster
+const BUILD_ZONE_LEN = 170; // window before the gap edge in which Build actually registers
+const POST_GAP_RECOVERY = 90; // flat landing strip after a gap before the next segment begins
+const TRAILING_HAZARD_OFFSET = 90; // late-game: distance before the gap edge for a combined hazard+build test
+const LOOKAHEAD_DISTANCE = 1500; // how far ahead of the player to keep segments generated
+const CULL_BEHIND_DISTANCE = 700; // how far behind the player before objects are destroyed
 
 export class BridgeRaceScene extends Phaser.Scene {
   private player!: Phaser.Physics.Arcade.Sprite;
@@ -134,11 +133,14 @@ export class BridgeRaceScene extends Phaser.Scene {
   private collectEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
   private landEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
   private distanceText!: Phaser.GameObjects.Text;
+  private speedText!: Phaser.GameObjects.Text;
   private blocksText!: Phaser.GameObjects.Text;
   private livesText!: Phaser.GameObjects.Text;
   private hint!: Phaser.GameObjects.Text;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private spaceKey!: Phaser.Input.Keyboard.Key;
+  private buildKeyDown!: Phaser.Input.Keyboard.Key;
+  private buildKeyS!: Phaser.Input.Keyboard.Key;
   private sfx = new Sfx();
 
   private blocksHeld = 0;
@@ -147,9 +149,17 @@ export class BridgeRaceScene extends Phaser.Scene {
   private lives = STARTING_LIVES;
   private ended = false;
   private wasTouchingDown = true;
-  private bridgesBuilt = new Set<number>();
   private hazardsHit = new Set<Phaser.Physics.Arcade.Sprite>();
   private onGameOver!: (result: RunResult) => void;
+
+  // Procedural generation state.
+  private generatedUpToX = 0;
+  private tileCursorX = 0;
+  private pendingGaps: GapState[] = [];
+  private groundTiles: Phaser.Physics.Arcade.Sprite[] = [];
+  private hazardSprites: Phaser.Physics.Arcade.Sprite[] = [];
+  private blockSprites: Phaser.Physics.Arcade.Sprite[] = [];
+  private decor: Phaser.GameObjects.GameObject[] = [];
 
   constructor() {
     super("BridgeRace");
@@ -163,8 +173,14 @@ export class BridgeRaceScene extends Phaser.Scene {
     this.lives = STARTING_LIVES;
     this.ended = false;
     this.wasTouchingDown = true;
-    this.bridgesBuilt = new Set();
     this.hazardsHit = new Set();
+    this.generatedUpToX = 0;
+    this.tileCursorX = 0;
+    this.pendingGaps = [];
+    this.groundTiles = [];
+    this.hazardSprites = [];
+    this.blockSprites = [];
+    this.decor = [];
   }
 
   preload() {
@@ -175,6 +191,7 @@ export class BridgeRaceScene extends Phaser.Scene {
     this.makeCircleTexture("br-player-light", 4, 0xf5dca0);
     this.makeRectTexture("br-ground", GROUND_TILE_W, 28, 0x2b2721);
     this.makeRectTexture("br-block", 20, 20, 0xf0bd5c);
+    this.makeRectTexture("br-block-high", 20, 20, 0xf5eecb);
     this.makeRectTexture("br-particle", 6, 6, 0xf0bd5c);
     this.makeHazardSignerTexture("br-hazard-signer", 24);
     this.makeHazardFrontendTexture("br-hazard-frontend", 24);
@@ -239,17 +256,17 @@ export class BridgeRaceScene extends Phaser.Scene {
   }
 
   create() {
-    this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-    this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     this.cameras.main.setBackgroundColor("#0a0a09");
-
     this.buildBackground();
-    this.buildGroundAndGaps();
-    this.buildHazards();
-    this.buildBlocks();
+
+    this.groundGroup = this.physics.add.staticGroup();
+    this.hazardGroup = this.physics.add.staticGroup();
+    this.blockGroup = this.physics.add.staticGroup();
+
     this.buildParticleEmitters();
     this.buildPlayer();
     this.buildHud();
+    this.ensureGenerated();
 
     this.physics.add.collider(this.player, this.groundGroup);
     this.physics.add.overlap(this.player, this.blockGroup, (_player, block) => {
@@ -262,130 +279,21 @@ export class BridgeRaceScene extends Phaser.Scene {
     this.cameras.main.startFollow(this.player, true, 0.12, 0.08);
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.buildKeyDown = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN);
+    this.buildKeyS = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S);
 
-    this.player.setVelocityX(PLAYER_SPEED);
+    this.player.setVelocityX(speedAtDistance(0));
   }
 
-  /** Dark gradient sky (a live Graphics fill, not a baked texture —
-   * gradients don't survive generateTexture's Canvas-API path) plus a
-   * sparse, hand-placed "network node" field (faint dots + occasional
-   * connecting lines between near neighbors) at a slower parallax scroll
-   * factor than the foreground, for real depth. Deliberately NOT a
-   * repeating tiled pattern — an earlier version used a TileSprite here and
-   * it read as a loud, distracting polka-dot moiré rather than atmosphere;
-   * a small fixed count of dots at low alpha, placed once with a seeded
-   * PRNG (deterministic, not Math.random()), stays genuinely subtle. */
+  /** Dark gradient sky, fixed to the camera viewport rather than the world
+   * — with the world now unbounded there is no single rect that could
+   * cover it, and a flat per-frame background doesn't need one. */
   private buildBackground() {
+    const cam = this.cameras.main;
     const sky = this.add.graphics();
     sky.fillGradientStyle(0x0a0a09, 0x0a0a09, 0x1a1310, 0x120d0a, 1);
-    sky.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-    sky.setScrollFactor(0.15, 0.05);
-    sky.setDepth(-30);
-
-    // mulberry32 — tiny, deterministic PRNG so the node field is stable
-    // across runs instead of reshuffling every game.
-    let seed = 1337;
-    const rand = () => {
-      seed |= 0;
-      seed = (seed + 0x6d2b79f5) | 0;
-      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-
-    const nodes = this.buildNetworkNodes(rand);
-    const lines = this.add.graphics();
-    lines.lineStyle(1, 0xe0a530, 0.08);
-    for (let i = 0; i < nodes.length; i++) {
-      for (let j = i + 1; j < nodes.length; j++) {
-        const a = nodes[i]!;
-        const b = nodes[j]!;
-        const dist = Math.hypot(a.x - b.x, a.y - b.y);
-        if (dist < 180) lines.lineBetween(a.x, a.y, b.x, b.y);
-      }
-    }
-    lines.setScrollFactor(0.35, 0.15);
-    lines.setDepth(-25);
-
-    const dotsLayer = this.add.graphics();
-    dotsLayer.fillStyle(0xe0a530, 0.22);
-    for (const n of nodes) dotsLayer.fillCircle(n.x, n.y, 2);
-    dotsLayer.setScrollFactor(0.35, 0.15);
-    dotsLayer.setDepth(-24);
-  }
-
-  /** ~1 node per 220px of world width, kept in the upper sky band so they
-   * never compete visually with the ground/gameplay layer. */
-  private buildNetworkNodes(rand: () => number): { x: number; y: number }[] {
-    const nodes: { x: number; y: number }[] = [];
-    const count = Math.round(WORLD_WIDTH / 220);
-    for (let i = 0; i < count; i++) {
-      nodes.push({
-        x: rand() * WORLD_WIDTH,
-        y: 20 + rand() * (GROUND_Y - 100),
-      });
-    }
-    return nodes;
-  }
-
-  private buildGroundAndGaps() {
-    this.groundGroup = this.physics.add.staticGroup();
-    let x = 0;
-    while (x < WORLD_WIDTH) {
-      const gap = GAPS.find((g) => x >= g.x && x < g.x + g.width);
-      if (gap) {
-        x += GROUND_TILE_W;
-        continue;
-      }
-      const tile = this.groundGroup.create(x + GROUND_TILE_W / 2, GROUND_Y + 14, "br-ground") as Phaser.Physics.Arcade.Sprite;
-      tile.refreshBody();
-      x += GROUND_TILE_W;
-    }
-
-    // Real visible danger: a dark pit fill sunk below the ground line, plus
-    // red warning edges right at the lip of every gap — decoration only,
-    // no physics (the actual fall trigger is the world-bounds Y check).
-    for (const gap of GAPS) {
-      const pit = this.add.graphics();
-      pit.fillStyle(0x050403, 1);
-      pit.fillRect(gap.x, GROUND_Y + 4, gap.width, WORLD_HEIGHT - GROUND_Y - 4);
-      pit.fillGradientStyle(0x3a0f14, 0x3a0f14, 0x050403, 0x050403, 0.55, 0.55, 0, 0);
-      pit.fillRect(gap.x, GROUND_Y + 4, gap.width, 70);
-      pit.setDepth(-5);
-
-      const edge = this.add.graphics();
-      edge.fillStyle(0xb84f5e, 0.85);
-      edge.fillRect(gap.x - 4, GROUND_Y, 4, 6);
-      edge.fillRect(gap.x + gap.width, GROUND_Y, 4, 6);
-      // Small warning chevrons at each lip.
-      for (const lipX of [gap.x, gap.x + gap.width]) {
-        edge.fillStyle(0xb84f5e, 0.7);
-        edge.beginPath();
-        edge.moveTo(lipX - 6, GROUND_Y);
-        edge.lineTo(lipX + 6, GROUND_Y);
-        edge.lineTo(lipX, GROUND_Y - 7);
-        edge.closePath();
-        edge.fillPath();
-      }
-    }
-  }
-
-  private buildHazards() {
-    this.hazardGroup = this.physics.add.staticGroup();
-    for (const hz of HAZARDS) {
-      const key = hz.kind === "signer" ? "br-hazard-signer" : "br-hazard-frontend";
-      const sprite = this.hazardGroup.create(hz.x, GROUND_Y - 14, key) as Phaser.Physics.Arcade.Sprite;
-      sprite.setData("kind", hz.kind);
-      sprite.refreshBody();
-    }
-  }
-
-  private buildBlocks() {
-    this.blockGroup = this.physics.add.staticGroup();
-    for (const pos of buildBlockPositions()) {
-      const block = this.blockGroup.create(pos.x, pos.y, "br-block") as Phaser.Physics.Arcade.Sprite;
-      block.refreshBody();
-    }
+    sky.fillRect(0, 0, cam.width, cam.height);
+    sky.setScrollFactor(0).setDepth(-30);
   }
 
   private buildParticleEmitters() {
@@ -441,13 +349,17 @@ export class BridgeRaceScene extends Phaser.Scene {
   private buildHud() {
     const textStyle = { fontFamily: "monospace", fontSize: "16px", color: "#f2ede1" };
     this.distanceText = this.add.text(12, 10, "Distance: 0", textStyle).setScrollFactor(0).setDepth(50);
-    this.blocksText = this.add.text(12, 32, "Blocks: 0", textStyle).setScrollFactor(0).setDepth(50);
+    this.speedText = this.add
+      .text(12, 32, "Speed: 220", { ...textStyle, fontSize: "13px", color: "#948a78" })
+      .setScrollFactor(0)
+      .setDepth(50);
+    this.blocksText = this.add.text(12, 52, "Blocks: 0", textStyle).setScrollFactor(0).setDepth(50);
     this.livesText = this.add
-      .text(12, 54, `Lives: ${"♥".repeat(STARTING_LIVES)}`, { ...textStyle, color: "#b84f5e" })
+      .text(12, 74, `Lives: ${"♥".repeat(STARTING_LIVES)}`, { ...textStyle, color: "#b84f5e" })
       .setScrollFactor(0)
       .setDepth(50);
     this.hint = this.add
-      .text(12, 78, "↑ / Space to jump — dodge hazards, bridge every gap with real collected blocks", {
+      .text(12, 98, "↑/Space: hold for a higher jump — ↓/S: build a bridge at a gap", {
         fontFamily: "monospace",
         fontSize: "11px",
         color: "#948a78",
@@ -455,6 +367,184 @@ export class BridgeRaceScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(50);
   }
+
+  // --- Procedural generation ---------------------------------------------
+
+  private ensureGenerated() {
+    while (this.generatedUpToX < this.player.x + LOOKAHEAD_DISTANCE) {
+      this.generateSegment();
+    }
+  }
+
+  /** Builds one full segment: a fixed-length reflex zone with distance-
+   * scaled hazard density, a run-up of jump-timed block pickups whose
+   * count follows the scarcity curve, then a gap whose width/cost follows
+   * its own curve. All difficulty numbers come from ./difficulty, keyed on
+   * `d` = this segment's starting world-x — the actual formulas the brief
+   * asked to see are there, not eyeballed inline here. */
+  private generateSegment() {
+    const d = this.generatedUpToX;
+    const segmentStart = this.generatedUpToX;
+
+    const hazardZoneStart = segmentStart + REFLEX_LEAD_IN;
+    const hazardCount = hazardCountAtDistance(d);
+    for (let j = 0; j < hazardCount; j++) {
+      const hx = hazardZoneStart + (HAZARD_ZONE_LEN / (hazardCount + 1)) * (j + 1);
+      this.spawnHazard(hx, (Math.floor(d / 1000) + j) % 2 === 0 ? "signer" : "frontend");
+    }
+    const hazardZoneEnd = hazardZoneStart + HAZARD_ZONE_LEN;
+
+    const gapWidth = gapWidthAtDistance(d);
+    const cost = gapCostForWidth(gapWidth);
+    const offered = blocksOfferedForGap(gapWidth, d);
+    const blockZoneStart = hazardZoneEnd + BLOCK_ZONE_LEAD_IN;
+    const clusterCount = Math.max(1, Math.ceil(offered / BLOCK_CLUSTER_SIZE));
+    const blockZoneLen = Math.max(clusterCount * BLOCK_CLUSTER_GAP, 220);
+    let placed = 0;
+    for (let c = 0; c < clusterCount; c++) {
+      const clusterX = blockZoneStart + (blockZoneLen / (clusterCount + 1)) * (c + 1);
+      const tier: BlockTier = Math.random() < highTierChanceAtDistance(d) ? "high" : "low";
+      const clusterSize = Math.min(BLOCK_CLUSTER_SIZE, offered - placed);
+      for (let i = 0; i < clusterSize; i++) {
+        this.spawnBlock(clusterX + i * BLOCK_CLUSTER_INNER_SPACING, tier);
+      }
+      placed += clusterSize;
+    }
+    const gapX = blockZoneStart + blockZoneLen + BUILD_ZONE_LEN;
+
+    // Ground from the segment start through the near edge of the gap.
+    this.spawnGroundRun(gapX);
+
+    this.spawnGapDecor(gapX, gapWidth);
+
+    // Late-game: a hazard planted inside the gap's own build window,
+    // forcing the combined "clear it, then still land the Build press"
+    // skill — never below TRAILING_HAZARD_START_D, ramping up after.
+    if (Math.random() < trailingHazardChanceAtDistance(d)) {
+      this.spawnHazard(gapX - TRAILING_HAZARD_OFFSET, Math.random() < 0.5 ? "signer" : "frontend");
+    }
+
+    const label = this.add
+      .text(gapX - BUILD_ZONE_LEN / 2, GROUND_Y - 70, "", {
+        fontFamily: "monospace",
+        fontSize: "12px",
+        color: "#e0a530",
+        backgroundColor: "#0a0a09cc",
+        padding: { x: 6, y: 3 },
+      })
+      .setOrigin(0.5)
+      .setDepth(40);
+    const marker = this.add
+      .rectangle(gapX - BUILD_ZONE_LEN, GROUND_Y - 4, 2, 12, 0xe0a530, 0.6)
+      .setOrigin(0.5, 1)
+      .setDepth(39);
+    this.decor.push(label, marker);
+
+    this.pendingGaps.push({ x: gapX, width: gapWidth, cost, built: false, label, marker });
+
+    // Ground resumes on the far side of the gap, grid-snapped forward past
+    // it, then a flat recovery strip before the next segment begins.
+    this.tileCursorX = Math.max(this.tileCursorX, Math.ceil((gapX + gapWidth) / GROUND_TILE_W) * GROUND_TILE_W);
+    this.generatedUpToX = gapX + gapWidth + POST_GAP_RECOVERY;
+    this.spawnGroundRun(this.generatedUpToX);
+
+    this.cameras.main.setBounds(0, 0, this.generatedUpToX + LOOKAHEAD_DISTANCE, WORLD_HEIGHT);
+  }
+
+  /** Lays ground tiles from the persistent grid cursor up to `toX`,
+   * grid-aligned to the same global GROUND_TILE_W spacing bridge planks
+   * use later — misaligned tiles previously stalled the player dead at a
+   * seam, so this cursor only ever advances, never resets per-segment. */
+  private spawnGroundRun(toX: number) {
+    while (this.tileCursorX < toX) {
+      const tile = this.groundGroup.create(
+        this.tileCursorX + GROUND_TILE_W / 2,
+        GROUND_Y + 14,
+        "br-ground",
+      ) as Phaser.Physics.Arcade.Sprite;
+      tile.refreshBody();
+      this.groundTiles.push(tile);
+      this.tileCursorX += GROUND_TILE_W;
+    }
+  }
+
+  private spawnHazard(x: number, kind: HazardKind) {
+    const key = kind === "signer" ? "br-hazard-signer" : "br-hazard-frontend";
+    const sprite = this.hazardGroup.create(x, HAZARD_Y, key) as Phaser.Physics.Arcade.Sprite;
+    sprite.setData("kind", kind);
+    sprite.refreshBody();
+    this.hazardSprites.push(sprite);
+  }
+
+  private spawnBlock(x: number, tier: BlockTier) {
+    const y = tier === "low" ? LOW_BLOCK_Y : HIGH_BLOCK_Y;
+    const key = tier === "low" ? "br-block" : "br-block-high";
+    const block = this.blockGroup.create(x, y, key) as Phaser.Physics.Arcade.Sprite;
+    block.setData("tier", tier);
+    block.refreshBody();
+    this.blockSprites.push(block);
+  }
+
+  /** Visible danger: a dark pit fill sunk below the ground line, plus red
+   * warning edges at the lip — decoration only, no physics (the actual
+   * fall trigger is the world-bounds Y check in update()). */
+  private spawnGapDecor(gapX: number, gapWidth: number) {
+    const pit = this.add.graphics();
+    pit.fillStyle(0x050403, 1);
+    pit.fillRect(gapX, GROUND_Y + 4, gapWidth, WORLD_HEIGHT - GROUND_Y - 4);
+    pit.fillGradientStyle(0x3a0f14, 0x3a0f14, 0x050403, 0x050403, 0.55, 0.55, 0, 0);
+    pit.fillRect(gapX, GROUND_Y + 4, gapWidth, 70);
+    pit.setDepth(-5);
+    this.decor.push(pit);
+
+    const edge = this.add.graphics();
+    edge.fillStyle(0xb84f5e, 0.85);
+    edge.fillRect(gapX - 4, GROUND_Y, 4, 6);
+    edge.fillRect(gapX + gapWidth, GROUND_Y, 4, 6);
+    for (const lipX of [gapX, gapX + gapWidth]) {
+      edge.fillStyle(0xb84f5e, 0.7);
+      edge.beginPath();
+      edge.moveTo(lipX - 6, GROUND_Y);
+      edge.lineTo(lipX + 6, GROUND_Y);
+      edge.lineTo(lipX, GROUND_Y - 7);
+      edge.closePath();
+      edge.fillPath();
+    }
+    this.decor.push(edge);
+  }
+
+  /** Destroys anything whose x has fallen more than CULL_BEHIND_DISTANCE
+   * behind the player — ground, hazards, blocks, decorations — so a run
+   * that goes on for a very long time stays bounded in memory instead of
+   * accumulating every object ever spawned. */
+  private cullBehind(thresholdX: number) {
+    this.groundTiles = this.cullSpriteArray(this.groundTiles, thresholdX);
+    this.hazardSprites = this.cullSpriteArray(this.hazardSprites, thresholdX);
+    this.blockSprites = this.cullSpriteArray(this.blockSprites, thresholdX);
+    this.decor = this.decor.filter((obj) => {
+      const x = (obj as unknown as { x: number }).x;
+      if (!obj.active || x < thresholdX) {
+        obj.destroy();
+        return false;
+      }
+      return true;
+    });
+  }
+
+  private cullSpriteArray(
+    arr: Phaser.Physics.Arcade.Sprite[],
+    thresholdX: number,
+  ): Phaser.Physics.Arcade.Sprite[] {
+    const kept: Phaser.Physics.Arcade.Sprite[] = [];
+    for (const obj of arr) {
+      if (!obj.active) continue;
+      if (obj.x < thresholdX) obj.destroy();
+      else kept.push(obj);
+    }
+    return kept;
+  }
+
+  // --- Gameplay events -----------------------------------------------
 
   private collectBlock(block: Phaser.Physics.Arcade.Sprite) {
     this.collectEmitter.explode(7, block.x, block.y);
@@ -476,12 +566,36 @@ export class BridgeRaceScene extends Phaser.Scene {
     this.time.delayedCall(140, () => this.player.clearTint());
 
     this.lives -= 1;
-    this.livesText.setText(`Lives: ${"♥".repeat(Math.max(0, this.lives))}${"♡".repeat(STARTING_LIVES - Math.max(0, this.lives))}`);
+    this.livesText.setText(
+      `Lives: ${"♥".repeat(Math.max(0, this.lives))}${"♡".repeat(STARTING_LIVES - Math.max(0, this.lives))}`,
+    );
     this.punch(this.livesText);
 
     if (this.lives <= 0) {
       this.finish("hit");
     }
+  }
+
+  /** Attempts to build a bridge across the next unresolved gap. Only
+   * succeeds if the player is physically inside the gap's build window
+   * (a real, visible zone — see the marker/label spawned with the gap)
+   * *and* is holding enough blocks. Pressed early, late, or under-
+   * resourced: nothing happens except denial feedback, and the run
+   * continues toward a gap that will not have ground under it. */
+  private tryBuild(px: number) {
+    const gap = this.pendingGaps.find((g) => !g.built);
+    if (!gap) return;
+    const zoneStart = gap.x - BUILD_ZONE_LEN;
+    if (px < zoneStart || px > gap.x) {
+      this.sfx.buildDenied();
+      return;
+    }
+    if (this.blocksHeld < gap.cost) {
+      this.sfx.buildDenied();
+      this.punch(this.blocksText, 0xb84f5e);
+      return;
+    }
+    this.buildBridge(gap);
   }
 
   private punch(target: Phaser.GameObjects.Text, tint?: number) {
@@ -500,11 +614,15 @@ export class BridgeRaceScene extends Phaser.Scene {
 
   update() {
     if (this.ended) return;
+    this.ensureGenerated();
 
     const body = this.player.body as Phaser.Physics.Arcade.Body;
-    const jumpPressed = this.cursors.up.isDown || this.spaceKey.isDown;
-    if (jumpPressed && body.touching.down) {
-      this.player.setVelocityY(JUMP_VELOCITY);
+    const jumpHeld = this.cursors.up.isDown || this.spaceKey.isDown;
+    const jumpJustPressed =
+      Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.spaceKey);
+
+    if (jumpJustPressed && body.touching.down) {
+      body.setVelocityY(JUMP_VELOCITY);
       this.tweens.add({
         targets: this.player,
         scaleX: 0.8,
@@ -515,7 +633,16 @@ export class BridgeRaceScene extends Phaser.Scene {
       });
       this.sfx.jump();
     }
-    this.player.setVelocityX(PLAYER_SPEED);
+    // Variable height: releasing the key while still ascending faster than
+    // the cutoff truncates the rest of the jump — checked every frame
+    // against live key state, so release feels instant, not buffered.
+    if (!jumpHeld && body.velocity.y < JUMP_CUTOFF_VELOCITY) {
+      body.setVelocityY(JUMP_CUTOFF_VELOCITY);
+    }
+
+    const px = this.player.x;
+    const speed = speedAtDistance(px);
+    this.player.setVelocityX(speed);
 
     // Landing squash — fires once on the down-transition of touching.down.
     if (!this.wasTouchingDown && body.touching.down) {
@@ -531,36 +658,71 @@ export class BridgeRaceScene extends Phaser.Scene {
     this.wasTouchingDown = body.touching.down;
 
     this.scannerLight.setPosition(this.player.x, this.player.y - 16);
-
-    const px = this.player.x;
     this.distanceText.setText(`Distance: ${Math.floor(px)}`);
+    this.speedText.setText(`Speed: ${Math.round(speed)}`);
 
-    for (const gap of GAPS) {
-      if (this.bridgesBuilt.has(gap.x)) continue;
-      if (px > gap.x - 90 && px < gap.x + gap.width && this.blocksHeld >= gap.cost) {
-        this.buildBridge(gap);
-      }
+    const buildJustPressed =
+      Phaser.Input.Keyboard.JustDown(this.buildKeyDown) || Phaser.Input.Keyboard.JustDown(this.buildKeyS);
+    if (buildJustPressed) this.tryBuild(px);
+    this.updateGapLabels(px);
+
+    while (this.pendingGaps.length > 0 && this.pendingGaps[0]!.built && px > this.pendingGaps[0]!.x + this.pendingGaps[0]!.width) {
+      this.pendingGaps.shift();
     }
+
+    this.publishDebugState(px, speed);
 
     if (this.player.y > FALL_THRESHOLD_Y) {
       this.finish("fell");
       return;
     }
-    if (px >= FINISH_X) {
-      this.finish("finished");
+
+    this.cullBehind(px - CULL_BEHIND_DISTANCE);
+  }
+
+  private publishDebugState(px: number, speed: number) {
+    if (typeof window === "undefined") return;
+    const gap = this.pendingGaps.find((g) => !g.built) ?? null;
+    window.__bridgeRaceDebug = {
+      distance: px,
+      speed,
+      blocksHeld: this.blocksHeld,
+      lives: this.lives,
+      ended: this.ended,
+      nextGap: gap && { x: gap.x, width: gap.width, cost: gap.cost, built: gap.built, buildZoneStart: gap.x - BUILD_ZONE_LEN },
+      upcomingHazards: this.hazardSprites.filter((h) => h.active && h.x > px).map((h) => h.x),
+      upcomingBlocks: this.blockSprites
+        .filter((b) => b.active && b.x > px)
+        .map((b) => ({ x: b.x, tier: b.getData("tier") as "low" | "high" })),
+    };
+  }
+
+  /** Keeps each pending gap's world-space sign current: shows the real
+   * block cost, turns green the moment the player is actually carrying
+   * enough to cross, red once they're past the build window and the gap
+   * still isn't built (a dead run walking, visibly). */
+  private updateGapLabels(px: number) {
+    for (const gap of this.pendingGaps) {
+      if (gap.built) continue;
+      const zoneStart = gap.x - BUILD_ZONE_LEN;
+      const inZone = px >= zoneStart && px <= gap.x;
+      const pastWindow = px > gap.x;
+      const ready = this.blocksHeld >= gap.cost;
+      gap.label.setText(`↓/S BUILD  need ${gap.cost} · have ${this.blocksHeld}`);
+      gap.label.setColor(pastWindow ? "#b84f5e" : ready ? "#2d9a77" : inZone ? "#e0a530" : "#948a78");
     }
   }
 
   /** Real bridge-building visual: planks drop in one at a time (staggered),
    * each falling from above into place with a bounce-settle, a small dust
    * burst on landing, and a short camera flash once the whole span is
-   * down — not just an instant color change. Grid-aligned to the exact
-   * same GROUND_TILE_W-spaced global grid the ground loop uses, so tiles
-   * slot in with zero gap and zero overlap against the neighboring real
-   * ground tiles (a real bug here previously stalled the player dead at
-   * the seam — see PROGRESS.md / the fix commit). */
-  private buildBridge(gap: GapDef) {
-    this.bridgesBuilt.add(gap.x);
+   * down. Grid-aligned to the same GROUND_TILE_W-spaced global grid the
+   * ground-laying loop uses, so tiles slot in with zero gap and zero
+   * overlap against the neighboring ground tiles. */
+  private buildBridge(gap: GapState) {
+    gap.built = true;
+    gap.label.destroy();
+    gap.marker.destroy();
     this.blocksHeld -= gap.cost;
     this.blocksSpent += gap.cost;
     this.blocksText.setText(`Blocks: ${this.blocksHeld}`);
@@ -575,6 +737,7 @@ export class BridgeRaceScene extends Phaser.Scene {
       plank.refreshBody();
       plank.setY(targetY - 90);
       plank.setAlpha(0);
+      this.groundTiles.push(plank);
       const delay = i * 90;
       this.tweens.add({
         targets: plank,
@@ -597,14 +760,16 @@ export class BridgeRaceScene extends Phaser.Scene {
     });
   }
 
-  private finish(outcome: "finished" | "fell" | "hit") {
+  private finish(outcome: "fell" | "hit") {
     this.ended = true;
     this.player.setVelocityX(0);
     const distance = Math.max(0, Math.floor(this.player.x));
-    const score = distance + this.blocksCollectedTotal * 5 + (outcome === "finished" ? 500 : 0);
+    const score = distance + this.blocksCollectedTotal * 5;
+    if (typeof window !== "undefined" && window.__bridgeRaceDebug) {
+      window.__bridgeRaceDebug = { ...window.__bridgeRaceDebug, ended: true, outcome };
+    }
 
-    if (outcome === "finished") this.sfx.gameOverFinished();
-    else this.sfx.gameOverFell();
+    this.sfx.gameOverFell();
 
     const panel = this.add.rectangle(
       this.cameras.main.width / 2,
@@ -616,13 +781,12 @@ export class BridgeRaceScene extends Phaser.Scene {
     );
     panel.setStrokeStyle(1, 0x3a352c, 1).setScrollFactor(0).setDepth(60);
 
-    const labelMap = { finished: "Finished!", fell: "Fell short", hit: "Hit too many hazards" } as const;
-    const colorMap = { finished: "#2d9a77", fell: "#b84f5e", hit: "#b84f5e" } as const;
+    const labelMap = { fell: "Fell short", hit: "Hit too many hazards" } as const;
     this.add
       .text(this.cameras.main.width / 2, this.cameras.main.height / 2 - 24, labelMap[outcome], {
         fontFamily: "monospace",
         fontSize: "24px",
-        color: colorMap[outcome],
+        color: "#b84f5e",
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
