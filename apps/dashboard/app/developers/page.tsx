@@ -103,6 +103,52 @@ const score = await getBridgeHealthOnChain(connection, "wormhole");
             />
           </div>
 
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-dark">
+              Every other real export
+            </p>
+            <p className="text-sm text-text-secondary">
+              That's the whole package — six exports total, nothing hidden:
+            </p>
+            <CodeBlock
+              language="typescript"
+              code={`bandOf(score: number): HealthBand
+// "green" if score >= 80, "yellow" if score >= 50, else "red".
+// (Note: this is the raw threshold function -- it doesn't know about
+// "unmonitored". A disabled/unscored bridge is a band your own code
+// derives from health being undefined, same as bandFor() does server-side.)
+
+RADAR_ORACLE_PROGRAM_ID: PublicKey
+// = 6148M4aXYbDsscWn14zCazPy9V4fQFGozdDQp4LFmqHM (Devnet). The default
+// programId getBridgeHealthOnChain() uses if you don't pass your own.
+
+class BridgeRadarError extends Error {}
+// Thrown by both getBridgeHealth() (non-2xx response) and
+// getBridgeHealthOnChain() (account missing, or shorter than the real
+// 82-byte layout) -- catch this specifically to distinguish "Bridge Radar
+// told us something's wrong" from a generic network/RPC failure.
+
+// Types (all plain data, re-exported for your own function signatures):
+interface BridgeHealth { bridge: BridgeRow; health?: HealthScore; defillama?: DefiLlamaProtocolTvl }
+interface HealthScore { bridge_id: string; computed_at: string; score: number; components: HealthComponents }
+interface HealthComponents { parity_severity: number; outflow_severity: number; signer_recency: number; frontend_recency: number; oracle_staleness: number }
+type HealthBand = "green" | "yellow" | "red" | "unmonitored";
+interface BridgeRow { id: string; display_name: string; homepage?: string; enabled: boolean }
+interface DefiLlamaProtocolTvl { source: "defillama"; fetched_at: string; defillama_slug: string; defillama_name: string; category: string | null; tvl_usd: number }`}
+            />
+          </div>
+
+          <div className="rounded-xl border border-border-subtle bg-surface/50 p-4 text-xs text-muted-dark">
+            Need retry/failover across multiple RPC endpoints too, plus a one-line health gate before a
+            withdrawal? See{" "}
+            <Link className={linkClass} href="https://www.npmjs.com/package/@bridge-radar/fetch">
+              @bridge-radar/fetch
+            </Link>{" "}
+            — a real <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">Connection</code> subclass
+            that wraps this SDK's <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">getBridgeHealth</code>,
+            published separately since it's a different concern (RPC reliability, not bridge data).
+          </div>
+
           <p className="text-xs text-muted-dark">
             Real source: <Link className={linkClass} href={`${REPO}/blob/master/packages/sdk/src/index.ts`}>packages/sdk/src/index.ts</Link>
           </p>
@@ -124,24 +170,21 @@ const score = await getBridgeHealthOnChain(connection, "wormhole");
           <ApiEndpoint
             method="GET"
             path="/v1/bridges"
-            description="Every monitored bridge with its latest real health score and DeFiLlama TVL cross-reference."
+            description="Every monitored bridge with its latest real health score and DeFiLlama TVL cross-reference. No query parameters -- always returns all 16 real bridges (14 implemented + 2 planned), no pagination. Planned bridges (no adapter yet) come back with enabled:false and no health key at all -- that's how to tell them apart from a real 0/unscored implemented bridge."
             curl={`curl -s ${API_BASE}/v1/bridges`}
             response={`{
-  "scoring": { "algorithm": "v1-mixed", "weights": { "parity": 40, "outflow": 25, "signer": 15, "frontend": 10, "oracle": 10 }, ... },
+  "scoring": { "algorithm": "v1-mixed", "weights": { "parity": 40, "outflow": 25, "signer": 15, "frontend": 10, "oracle": 10 }, "description": "outflow_severity = z-score over a rolling 30-day distribution ... (full text in /v1/bridges/:id/health)" },
   "bridges": [
-    {
-      "id": "wormhole",
-      "display_name": "Wormhole",
-      "homepage": "https://wormhole.com",
-      "enabled": true,
-      "health": {
-        "bridge_id": "wormhole",
-        "computed_at": "2026-08-08T19:30:05.176Z",
-        "score": 90,
-        "components": { "parity_severity": 0, "outflow_severity": 0, "signer_recency": 0, "frontend_recency": 0.989213, "oracle_staleness": 0 }
-      }
-    },
-    // ... 15 more real bridges
+    { "id": "wormhole", "display_name": "Wormhole", "homepage": "https://wormhole.com", "enabled": true,
+      "health": { "bridge_id": "wormhole", "computed_at": "2026-08-08T19:30:05.176Z", "score": 90, "components": { "parity_severity": 0, "outflow_severity": 0, "signer_recency": 0, "frontend_recency": 0.989213, "oracle_staleness": 0 } } },
+    { "id": "axelar", "display_name": "Axelar", "homepage": "https://axelar.network", "enabled": true,
+      "health": { "bridge_id": "axelar", "computed_at": "2026-08-08T19:30:05.176Z", "score": 60, "components": { "...": "..." } } },
+    { "id": "hyperlane", "display_name": "Hyperlane", "homepage": "https://hyperlane.xyz", "enabled": false }
+    /* real, live, all 16: across, allbridge, atomiq, axelar, base-solana-bridge, cctp*, debridge,
+       garden, hyperlane*, layerzero, mayan, orderly, portal, relay, rhinofi, wormhole
+       (* = planned, no health key). Current real scores: 100 (across, allbridge, atomiq,
+       base-solana-bridge, garden, orderly, relay, rhinofi), 90 (portal, wormhole),
+       60 (axelar, debridge, layerzero, mayan) -- verify live, these change. */
   ]
 }`}
           />
@@ -149,7 +192,7 @@ const score = await getBridgeHealthOnChain(connection, "wormhole");
           <ApiEndpoint
             method="GET"
             path="/v1/bridges/:id"
-            description="One bridge's real health score plus its real DeFiLlama TVL."
+            description={`One bridge's real health score plus its real DeFiLlama TVL. No query parameters. 404 with {"error":"bridge not found"} for an id not in the registry at all -- distinct from a real, registered bridge that just has no health/defillama key yet (200, those fields simply absent).`}
             curl={`curl -s ${API_BASE}/v1/bridges/wormhole`}
             response={`{
   "bridge": { "id": "wormhole", "display_name": "Wormhole", "homepage": "https://wormhole.com", "enabled": true },
@@ -165,16 +208,31 @@ const score = await getBridgeHealthOnChain(connection, "wormhole");
 
           <ApiEndpoint
             method="GET"
+            path="/v1/bridges/:id/health"
+            description={`Just the scoring metadata + one bridge's HealthScore, flattened (not nested under a "health" key like /v1/bridges/:id -- a real, easy-to-miss shape difference). 404 with {"error":"no score yet"} for both an unscored bridge AND an id that doesn't exist at all -- unlike /v1/bridges/:id, this route can't tell those two cases apart, since it only ever looks in the scores table, never the bridge registry.`}
+            curl={`curl -s ${API_BASE}/v1/bridges/wormhole/health`}
+            response={`{
+  "scoring": { "algorithm": "v1-mixed", "description": "outflow_severity = z-score over a rolling 30-day distribution of 5-min bucket counts (z=4 -> severity 1.0); falls back to clamp(events_per_5min / 10, 0, 1) for the first ~4 hours of observations. parity_severity = 1 - min(origin, solana) / max(origin, solana) over a 5-min window (count proxy; USD-weighted parity per Appendix B follows once per-bridge ABI decoders populate amount_usd). signer / frontend / oracle stream live once their detectors are deployed.", "weights": { "parity": 40, "outflow": 25, "signer": 15, "frontend": 10, "oracle": 10 } },
+  "bridge_id": "wormhole",
+  "computed_at": "2026-08-08T19:30:05.176Z",
+  "score": 90,
+  "components": { "parity_severity": 0, "outflow_severity": 0, "signer_recency": 0, "frontend_recency": 0.989213, "oracle_staleness": 0 }
+}`}
+          />
+
+          <ApiEndpoint
+            method="GET"
             path="/v1/bridges/:id/history"
-            description="Real score history for one bridge since a given ISO timestamp."
+            description="Real score history for one bridge, from ?since= (ISO timestamp; optional, defaults to 24h ago) onward. That's the only query parameter -- there is no ?limit= on this route and no pagination. Real example: since=2026-08-08T00:00:00Z on wormhole returns 364 real entries (this bridge gets scored roughly every ~1min), not 2 -- expect and handle a large array."
             curl={`curl -s "${API_BASE}/v1/bridges/wormhole/history?since=2026-08-08T00:00:00Z"`}
             response={`{
   "bridge_id": "wormhole",
   "since": "2026-08-08T00:00:00Z",
   "history": [
-    { "bridge_id": "wormhole", "computed_at": "2026-08-08T14:22:14.762Z", "score": 100, "components": { ... } },
-    { "bridge_id": "wormhole", "computed_at": "2026-08-08T14:23:11.876Z", "score": 100, "components": { ... } }
-    // ... every real score computed since the given timestamp
+    { "bridge_id": "wormhole", "computed_at": "2026-08-08T14:22:14.762Z", "score": 100, "components": { "parity_severity": 0, "outflow_severity": 0, "signer_recency": 0, "frontend_recency": 0, "oracle_staleness": 0 } },
+    { "bridge_id": "wormhole", "computed_at": "2026-08-08T14:23:11.876Z", "score": 100, "components": { "parity_severity": 0, "outflow_severity": 0, "signer_recency": 0, "frontend_recency": 0, "oracle_staleness": 0 } }
+    /* ... all 364 real entries for this real window, unpaginated. Full array, no truncation --
+       this is genuinely everything scoreHistory() returns for the given since. */
   ]
 }`}
           />
@@ -182,12 +240,13 @@ const score = await getBridgeHealthOnChain(connection, "wormhole");
           <ApiEndpoint
             method="GET"
             path="/v1/events"
-            description="Real detected anomaly + transfer events (signer_change, frontend_change, oracle_stale, lock/mint/burn/unlock), newest first. Filter with ?bridge=, ?type=, ?chain=, ?since=, ?limit=."
-            curl={`curl -s "${API_BASE}/v1/events?limit=2"`}
+            description="Real detected anomaly + transfer events (signer_change, frontend_change, oracle_stale, lock/mint/burn/unlock), newest first. Complete real query parameter list, confirmed against the route handler: ?bridge= (exact bridge_id), ?type= (exact BridgeEventKind), ?chain= (exact chain id), ?since= (ISO timestamp), ?limit= (integer). All optional; no others exist."
+            curl={`curl -s "${API_BASE}/v1/events?limit=3"`}
             response={`{
   "events": [
-    { "id": "9866bde5-...", "bridge_id": "portal", "event_time": "2026-08-08T19:50:10.419Z", "type": "frontend_change", "region": "default", "new_hash": "125377...", "old_hash": "201508..." },
-    { "id": "23f83f96-...", "bridge_id": "wormhole", "event_time": "2026-08-08T19:50:10.127Z", "type": "frontend_change", "region": "default", "new_hash": "8d9970...", "old_hash": "d4c0f5..." }
+    { "id": "9866bde5-79ec-4dc7-8ad8-631022b678a2", "bridge_id": "portal", "event_time": "2026-08-08T19:50:10.419Z", "type": "frontend_change", "region": "default", "new_hash": "1253772937357a5e45a482f79cef95a2999bcb8426ac313a97e277d6986044b6", "old_hash": "201508e5331fcfe8ea8893d25acb7ed518dd913155301a87205c465fb7f81cca" },
+    { "id": "23f83f96-83a0-4ef6-b65e-c33b067b361e", "bridge_id": "wormhole", "event_time": "2026-08-08T19:50:10.127Z", "type": "frontend_change", "region": "default", "new_hash": "8d9970044dcaf61fe9ccd72482c738b4b5a3051b317d90c030381b3738d27ac7", "old_hash": "d4c0f5ab17d578fdbdd2dac0de8b3841e180ae65a1f12b341fe29eb48673a27e" },
+    { "id": "b7acca5a-2c2a-4c30-ab62-8dc9d15ad88f", "bridge_id": "portal", "event_time": "2026-08-08T19:45:22.977Z", "type": "frontend_change", "region": "default", "new_hash": "201508e5331fcfe8ea8893d25acb7ed518dd913155301a87205c465fb7f81cca", "old_hash": "ce0961084944482e6f9dfc11b218786abe974369d0c44445a337a108b4aba610" }
   ]
 }`}
           />
@@ -195,15 +254,20 @@ const score = await getBridgeHealthOnChain(connection, "wormhole");
           <ApiEndpoint
             method="GET"
             path="/v1/registry"
-            description="Every bridge we track (implemented and planned), independent of live health data — chains supported, homepage, adapter status."
+            description="Every bridge we track (implemented and planned), independent of live health data -- chains supported, homepage, adapter status. No query parameters, no pagination -- this is genuinely the complete, real, current list, exactly 16 entries."
             curl={`curl -s ${API_BASE}/v1/registry`}
             response={`{
   "summary": { "total": 16, "implemented": 14, "planned": 2 },
   "implemented": [
-    { "id": "wormhole", "name": "Wormhole", "homepage": "https://wormhole.com", "supportedChains": ["solana","ethereum","polygon", ...], "hasSolana": true, "status": "active" },
-    // ... 13 more
+    { "id": "wormhole", "name": "Wormhole", "homepage": "https://wormhole.com", "supportedChains": ["solana","ethereum","polygon","avalanche","arbitrum","optimism","bsc","base","sui","aptos"], "hasSolana": true, "status": "active" }
+    /* ... all 14 real implemented ids, in this real order: wormhole, allbridge, debridge,
+       layerzero, mayan, portal, axelar, relay, across, garden, base-solana-bridge, atomiq,
+       rhinofi, orderly -- same shape as above for every one. */
   ],
-  "planned": [ /* real bridges without a live adapter yet */ ]
+  "planned": [
+    { "id": "hyperlane", "name": "Hyperlane", "homepage": "https://hyperlane.xyz", "supportedChains": ["solana","ethereum","polygon","arbitrum","optimism","base"], "hasSolana": true, "status": "active" },
+    { "id": "cctp", "name": "Circle CCTP", "homepage": "https://www.circle.com/en/usdc/bridge", "supportedChains": ["solana","ethereum","polygon","arbitrum","optimism","base","avalanche"], "hasSolana": true, "status": "active" }
+  ]
 }`}
           />
 
@@ -213,8 +277,8 @@ const score = await getBridgeHealthOnChain(connection, "wormhole");
             description="Trailing-7-day anomaly-event count and healthy/watch/alert tally across every monitored bridge — the same computation the Telegram weekly digest sends."
             curl={`curl -s ${API_BASE}/v1/weekly-digest`}
             response={`{
-  "windowStart": "2026-08-02T18:46:49.699Z",
-  "windowEnd": "2026-08-09T18:46:49.699Z",
+  "windowStart": "2026-08-03T10:03:35.927Z",
+  "windowEnd": "2026-08-10T10:03:35.927Z",
   "anomalyEventCount": 128,
   "monitoredBridgeCount": 14,
   "bridgeHealthTally": { "healthy": 10, "watch": 4, "alert": 0, "unmonitored": 2 }
@@ -236,6 +300,54 @@ const score = await getBridgeHealthOnChain(connection, "wormhole");
 ws.onmessage = (e) => console.log(JSON.parse(e.data));
 // real first message: {"kind":"hello","data":{"server_time":"2026-08-09T20:17:14.013Z"}}`}
             />
+          </div>
+
+          <div className="space-y-3 border-t border-border-subtle pt-6">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-dark">
+              Real error responses
+            </p>
+            <p className="text-sm text-text-secondary">
+              Every error is a real JSON body shaped <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-xs text-accent">{"{ error: string }"}</code>,
+              sometimes with a <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-xs text-accent">detail</code> field
+              — read from the actual route handlers, not guessed:
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-b border-border-subtle text-[11px] uppercase tracking-wide text-muted-dark">
+                    <th className="py-2 pr-4 font-medium">Status</th>
+                    <th className="py-2 pr-4 font-medium">Where</th>
+                    <th className="py-2 font-medium">Real body</th>
+                  </tr>
+                </thead>
+                <tbody className="text-text-secondary">
+                  {[
+                    ["404", "/v1/bridges/:id", `{"error":"bridge not found"}`],
+                    ["404", "/v1/bridges/:id/health", `{"error":"no score yet"} -- for an unscored bridge or an unknown id alike`],
+                    ["404", "/widget/health/:bridgeId", `{"error":"unknown bridge \\"<id>\\""}`],
+                    ["404", "any unmatched route", `{"error":"not found"}`],
+                    ["400", "wallet-activity / wallet-holdings / wallet-timeline / streak / game-scores", `{"error":"invalid Solana address"}` + " / " + `"wallet_address must be a real, valid Solana address"`],
+                    ["400", "/v1/defillama/price/:mint", `{"error":"invalid mint address"}`],
+                    ["400", "wallet-activity / wallet-timeline", `{"error":"limit must be a number"}`],
+                    ["400", "/v1/game-scores", `{"error":"score must be an integer between 0 and 100000"}` + " (and matching messages for blocks_used / distance)"],
+                    ["501", "/v1/wallet-timeline/:address", `{"error":"not configured","detail":"..."} -- no HELIUS_API_KEY / non-Helius SOLANA_RPC_URL. Never a degraded fake classification.`],
+                    ["502", "wallet-activity / wallet-holdings / wallet-timeline", `{"error":"failed to fetch wallet ...","detail":"<real underlying error message>"}`],
+                    ["503", "wallet-activity / wallet-holdings / wallet-timeline", `{"error":"...rate-limited...","detail":"real guidance to set a paid SOLANA_RPC_URL"}`],
+                  ].map(([status, where, body], i) => (
+                    <tr key={i} className="border-b border-border-subtle/50 align-top">
+                      <td className="py-2 pr-4 font-mono text-xs text-accent">{status}</td>
+                      <td className="py-2 pr-4 font-mono text-xs">{where}</td>
+                      <td className="py-2 font-mono text-[11px] text-muted-dark">{body}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-muted-dark">
+              No API key and no rate limiting enforced by Bridge Radar itself on any route today (noted at the
+              top of this section) — the 503s above come from the upstream Solana RPC being rate-limited, not
+              from us.
+            </p>
           </div>
         </section>
       </Reveal>
@@ -267,10 +379,79 @@ ws.onmessage = (e) => console.log(JSON.parse(e.data));
             </div>
           </div>
 
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-dark">
+              Every real data-* attribute — two, no more
+            </p>
+            <p className="text-sm text-text-secondary">
+              Read straight from <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-xs text-accent">apps/api/src/widget.ts</code>:{" "}
+              the whole script reads exactly two attributes off its own <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-xs text-accent">&lt;script&gt;</code> tag.
+              There is no color/size/theme override, no custom label text, no other data attribute — the badge's
+              inline styles are fixed in the script itself.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-b border-border-subtle text-[11px] uppercase tracking-wide text-muted-dark">
+                    <th className="py-2 pr-4 font-medium">Attribute</th>
+                    <th className="py-2 pr-4 font-medium">Required</th>
+                    <th className="py-2 font-medium">Real behavior</th>
+                  </tr>
+                </thead>
+                <tbody className="text-text-secondary">
+                  <tr className="border-b border-border-subtle/50 align-top">
+                    <td className="py-2 pr-4 font-mono text-xs text-accent">data-bridge</td>
+                    <td className="py-2 pr-4 text-xs">Yes</td>
+                    <td className="py-2 text-xs">
+                      Bridge id to query. If missing, the script silently returns and renders nothing at all —
+                      no badge, no error in the DOM.
+                    </td>
+                  </tr>
+                  <tr className="align-top">
+                    <td className="py-2 pr-4 font-mono text-xs text-accent">data-api</td>
+                    <td className="py-2 pr-4 text-xs">No</td>
+                    <td className="py-2 text-xs">
+                      Defaults to the script tag's own origin (<code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">new URL(script.src).origin</code>).
+                      Set this when the widget script is served from a different host than the API.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-dark">
+              Real states — exactly what renders, from the actual source
+            </p>
+            <ul className="list-disc space-y-1.5 pl-5 text-sm text-text-secondary">
+              <li>
+                <strong className="text-text">On load:</strong> a grey dot and "Bridge Radar: loading…", immediately, before the
+                first fetch resolves.
+              </li>
+              <li>
+                <strong className="text-text">On a successful response:</strong> the dot becomes green/yellow/red per the real{" "}
+                <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-xs text-accent">band</code> field (grey for any
+                unrecognized band, e.g. <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-xs text-accent">"unmonitored"</code>),
+                and the label becomes exactly <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-xs text-accent">{"{displayName}: {score} · {Healthy|Watch|Alert}"}</code> —
+                or an em dash instead of the score when <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-xs text-accent">score</code> is null.
+              </li>
+              <li>
+                <strong className="text-text">Invalid bridge id, unreachable API, or any other fetch failure — identical fallback:</strong> grey
+                dot, "Bridge Radar: unavailable". The script's single <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-xs text-accent">.catch()</code> doesn't
+                distinguish a real 404 (bad bridge id) from a network error (API down) — both render exactly the same text. If you need to
+                tell those apart, call <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-xs text-accent">GET /widget/health/:bridgeId</code> yourself
+                instead of embedding the script.
+              </li>
+              <li>
+                <strong className="text-text">Every 30s after that,</strong> forever, via <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-xs text-accent">setInterval</code> — no
+                backoff, no max-retry cutoff.
+              </li>
+            </ul>
+          </div>
+
           <p className="text-xs text-muted-dark">
-            Add <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">data-api="https://your-api-host"</code> if
-            you're serving the script from a different host than the API. Data comes from a real,
-            openly-CORS'd <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">GET /widget/health/:bridgeId</code>,
+            Data comes from a real, openly-CORS'd <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">GET /widget/health/:bridgeId</code>,
             separate from the restricted-origin <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">/v1/*</code> routes
             above. Real source: <Link className={linkClass} href={`${REPO}/blob/master/apps/api/src/widget.ts`}>apps/api/src/widget.ts</Link>.
           </p>
@@ -336,6 +517,75 @@ const lastUpdated = info.data.readBigInt64LE(41);`}
             by the program's own &gt;10-minute freshness rule (the attester isn't continuously running against
             Devnet in this environment). The PDA read above is real; treat the specific numbers as a point-in-time
             snapshot, not a live feed.
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-dark">
+              Complete account structure — BridgeHealth (82 bytes incl. discriminator)
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-b border-border-subtle text-[11px] uppercase tracking-wide text-muted-dark">
+                    <th className="py-2 pr-4 font-medium">Field</th>
+                    <th className="py-2 pr-4 font-medium">Type</th>
+                    <th className="py-2 font-medium">Real meaning</th>
+                  </tr>
+                </thead>
+                <tbody className="text-text-secondary">
+                  {[
+                    ["bridge_id", "[u8; 32]", "sha256(bridge slug) — the PDA seed, not a display name."],
+                    ["score", "u8", "0..=100. 0 means \"no score yet,\" not \"perfectly unhealthy.\""],
+                    ["last_updated", "i64", "Unix timestamp of the last update_health call. The program's own doc comment says treat scores older than ~10 minutes as stale."],
+                    ["attester", "Pubkey", "The only key allowed to call update_health / rotate_attester for this bridge."],
+                    ["bump", "u8", "PDA bump seed."],
+                  ].map(([field, type, meaning], i) => (
+                    <tr key={i} className="border-b border-border-subtle/50 align-top">
+                      <td className="py-2 pr-4 font-mono text-xs text-accent">{field}</td>
+                      <td className="py-2 pr-4 font-mono text-xs">{type}</td>
+                      <td className="py-2 text-xs">{meaning}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-dark">
+              Every real instruction — three, all attester-gated except registration
+            </p>
+            <CodeBlock
+              language="rust"
+              code={`init_bridge(bridge_id: [u8; 32], attester: Pubkey)
+// Permissionless -- anyone can register a bridge by funding its PDA
+// (init, payer = whoever calls it). Sets score = 0, last_updated = 0,
+// bump = ctx.bumps.health. Emits BridgeRegistered { bridge_id, attester }.
+// Accounts: health (PDA, init), payer (mut signer), system_program.
+
+update_health(bridge_id: [u8; 32], score: u8)
+// Attester-only: requires attester.key() == health.attester exactly,
+// else RadarError::Unauthorized. Requires score <= 100, else
+// RadarError::InvalidScore. Sets score + last_updated = Clock::get()?
+// .unix_timestamp. Emits HealthUpdated { bridge_id, prev_score, score,
+// timestamp }. Accounts: health (mut, PDA re-derived from seeds+bump),
+// attester (signer).
+
+rotate_attester(bridge_id: [u8; 32], new_attester: Pubkey)
+// Attester-only (same Unauthorized check as update_health) -- the
+// *current* attester must sign to hand off to a new one. Overwrites
+// health.attester. Real detail: unlike the other two, this emits no
+// event at all. Accounts: health (mut), attester (signer).`}
+            />
+            <p className="text-xs text-muted-dark">
+              Two real error codes: <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">Unauthorized</code> ("only the
+              registered attester can perform this action") and{" "}
+              <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">InvalidScore</code> ("score must be between 0
+              and 100 inclusive"). Two real events: <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">BridgeRegistered</code>{" "}
+              and <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">HealthUpdated</code> (fields shown above) —
+              those are the only two; <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">rotate_attester</code> emits
+              nothing.
+            </p>
           </div>
 
           <p className="text-xs text-muted-dark">
