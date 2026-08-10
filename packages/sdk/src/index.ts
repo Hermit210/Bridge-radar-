@@ -9,11 +9,52 @@
 
 import { PublicKey, type Connection } from "@solana/web3.js";
 import { sha256 } from "@noble/hashes/sha256";
-import type { BridgeRow, DefiLlamaProtocolTvl, HealthBand, HealthScore } from "@radar/shared";
-import { bandOf } from "@radar/shared";
 
-export type { BridgeRow, DefiLlamaProtocolTvl, HealthBand, HealthScore };
-export { bandOf };
+// The types and bandOf() below mirror packages/shared/src/index.ts (which is
+// workspace-private, never published) — inlined here so this package has no
+// unresolvable dependency once installed standalone via npm.
+
+export interface HealthComponents {
+  parity_severity: number;
+  outflow_severity: number;
+  signer_recency: number;
+  frontend_recency: number;
+  oracle_staleness: number;
+}
+
+export interface HealthScore {
+  bridge_id: string;
+  computed_at: string;
+  score: number; // 0..100
+  components: HealthComponents;
+}
+
+export type HealthBand = "green" | "yellow" | "red" | "unmonitored";
+
+export function bandOf(score: number): HealthBand {
+  if (score >= 80) return "green";
+  if (score >= 50) return "yellow";
+  return "red";
+}
+
+export interface BridgeRow {
+  id: string;
+  display_name: string;
+  homepage?: string;
+  enabled: boolean;
+}
+
+// Real DeFiLlama protocol TVL for a bridge (crates/radar-defillama →
+// defillama_cache → GET /v1/bridges). Absent when the bridge has no verified
+// DeFiLlama protocol slug or no sync has run yet — never a fabricated number.
+export interface DefiLlamaProtocolTvl {
+  source: "defillama";
+  fetched_at: string;
+  defillama_slug: string;
+  defillama_name: string;
+  category: string | null;
+  tvl_usd: number;
+}
 
 /** Real shape of `GET /v1/bridges/:id` — see apps/api/src/index.ts. */
 export interface BridgeHealth {

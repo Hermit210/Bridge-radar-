@@ -2,7 +2,7 @@
 
 Minimal client for [Bridge Radar](https://github.com/Hermit210/Bridge-radar-)'s
 real-time Solana bridge health scores — via the public REST API or directly
-on-chain. Not published to npm yet (`workspace:*` only, for now).
+on-chain. Published on npm: [npmjs.com/package/@bridge-radar/sdk](https://www.npmjs.com/package/@bridge-radar/sdk).
 
 ## What this is not
 
@@ -13,7 +13,14 @@ The on-chain oracle program is deployed on **Solana devnet only**.
 
 ## Install
 
-Inside this monorepo: `"@bridge-radar/sdk": "workspace:*"`.
+```bash
+npm install @bridge-radar/sdk
+```
+
+There is no hosted production Bridge Radar API yet (see "What this is not"
+below), so `getBridgeHealth` takes the API URL as an explicit argument —
+point it at your own running `apps/api` instance, or at our production URL
+once one is deployed.
 
 ## API
 
@@ -78,5 +85,6 @@ guarantee or financial advice — see `WHITEPAPER.md` §5.3.
 ## Types
 
 `BridgeHealth`, `HealthScore`, `HealthBand`, `BridgeRow`, `DefiLlamaProtocolTvl`,
-and `bandOf` are re-exported from `@radar/shared` (the same types the
-dashboard and API use) rather than duplicated.
+and `bandOf` are defined directly in this package (mirrored from
+`packages/shared/src/index.ts`, which is workspace-private and never
+published) so the published package has no unresolvable dependency.
