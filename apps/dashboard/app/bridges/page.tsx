@@ -91,7 +91,20 @@ export default function Home() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const matches = bridges.filter((b) => {
-      if (bandFilter !== "all" && bandFor(b) !== bandFilter) return false;
+      const band = bandFor(b);
+      // Default "All" view surfaces only real, actively monitored bridges --
+      // a bridge with no verified Solana adapter yet (e.g. cctp, hyperlane;
+      // real bridges, seeded disabled -- see radar_core::bridges::registry)
+      // has no health signal to show and would just read as clutter/broken
+      // rows in the default list. Still fully real and visible via the
+      // explicit "Not monitored" filter below, and unchanged in
+      // /v1/registry + /developers -- this is a presentation choice, not
+      // data removal.
+      if (bandFilter === "all") {
+        if (band === "unmonitored") return false;
+      } else if (band !== bandFilter) {
+        return false;
+      }
       if (!q) return true;
       return b.display_name.toLowerCase().includes(q) || b.id.toLowerCase().includes(q);
     });
@@ -109,7 +122,13 @@ export default function Home() {
   }
 
   const segments: StatBarSegment[] = [
-    { key: "all", label: "All", value: bridges.length, active: bandFilter === "all", onClick: () => setBandFilter("all") },
+    {
+      key: "all",
+      label: "All",
+      value: bridges.length - totals.unknown,
+      active: bandFilter === "all",
+      onClick: () => setBandFilter("all"),
+    },
     {
       key: "green",
       label: "Healthy",
