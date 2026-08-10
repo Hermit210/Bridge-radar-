@@ -5,6 +5,7 @@ import { Inter, Instrument_Serif, JetBrains_Mono, Outfit } from "next/font/googl
 import { WalletProviders } from "@/components/wallet-providers";
 import { WalletConnectButton } from "@/components/wallet-connect-button";
 import { TelegramIcon, DiscordIcon } from "@/components/social-icons";
+import { NavLinks } from "@/components/nav-links";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -55,13 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 Bridge Radar
               </Link>
               <nav className="flex items-center justify-center gap-5 overflow-x-auto whitespace-nowrap text-[13px] font-medium text-text-secondary sm:gap-7">
-                <Link href="/bridges" className="transition-colors duration-150 hover:text-text">Bridges</Link>
-                <Link href="/bridges/compare" className="transition-colors duration-150 hover:text-text">Compare</Link>
-                <Link href="/events" className="transition-colors duration-150 hover:text-text">Events</Link>
-                <Link href="/network" className="transition-colors duration-150 hover:text-text">Network</Link>
-                <Link href="/my-activity" className="transition-colors duration-150 hover:text-text">My Activity</Link>
-                <Link href="/developers" className="transition-colors duration-150 hover:text-text">Developers</Link>
-                <Link href="/about" className="transition-colors duration-150 hover:text-text">About</Link>
+                <NavLinks />
               </nav>
               <div className="flex shrink-0 items-center justify-end gap-3 whitespace-nowrap">
                 <WalletConnectButton />
