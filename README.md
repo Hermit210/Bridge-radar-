@@ -296,9 +296,6 @@ Wallet connect via `@solana/wallet-adapter` (Phantom, Solflare, Coinbase, Ledger
 8. Opt-in score-change notifications (client-side only, browser Notifications API — honest that it only fires while the tab stays open)
 9. Personal per-bridge usage summary next to each bridge's real-time score
 
-## Bridge Race (mini-game)
-
-Single-player mini-game on `/my-activity` (10th feature, behind the existing wallet gate): run, collect real blocks, bridge 4 real gaps, real score, real wallet-gated leaderboard. Built with Phaser 4.2.1 (`apps/dashboard/components/bridge-race/`), `POST /v1/game-scores` / `GET /v1/game-scores/leaderboard`, schema in `migrations/0008_game_scores.sql`. No server-side replay verification — real client-reported data under a real connected wallet, honestly not tamper-proof.
 
 ## Alerting — Telegram, Discord, webhooks
 
