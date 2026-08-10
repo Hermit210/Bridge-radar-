@@ -1,7 +1,6 @@
 {
   "name": "@bridge-radar/sdk",
   "version": "0.1.0",
-  "private": true,
   "description": "Minimal client for Bridge Radar's real-time Solana bridge health scores — via the public REST API or directly on-chain.",
   "type": "module",
   "main": "./dist/index.js",
@@ -21,8 +20,7 @@
     "test": "echo 'no tests'"
   },
   "dependencies": {
-    "@noble/hashes": "^1.4.0",
-    "@radar/shared": "workspace:*"
+    "@noble/hashes": "^1.4.0"
   },
   "peerDependencies": {
     "@solana/web3.js": "^1.98.0"

@@ -54,22 +54,21 @@ export default async function DevelopersPage() {
             </p>
           </div>
 
-          <div className="rounded-xl border border-yellow/30 bg-yellow-glow/40 px-4 py-3 text-xs text-yellow">
-            Not published to npm yet — <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">@bridge-radar/sdk</code>{" "}
-            is marked <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">"private": true</code> in its
-            package.json and a real check against the npm registry returns 404. Available today via
-            GitHub — <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">npm publish</code> coming soon.
+          <div className="rounded-xl border border-green/30 bg-green/10 px-4 py-3 text-xs text-green">
+            Published on npm — <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">@bridge-radar/sdk@0.1.0</code>,
+            public, zero unresolvable dependencies. Verify yourself:{" "}
+            <Link className={linkClass} href="https://www.npmjs.com/package/@bridge-radar/sdk">npmjs.com/package/@bridge-radar/sdk</Link>.
           </div>
 
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-dark">Install (today)</p>
-            <CodeBlock
-              language="bash"
-              code={`git clone ${REPO}.git
-cd Bridge-radar-/packages/sdk
-pnpm install && pnpm build
-# then reference it from your app, e.g. via a pnpm workspace / file: dependency`}
-            />
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-dark">Install</p>
+            <CodeBlock language="bash" code={`npm install @bridge-radar/sdk`} />
+            <p className="text-xs text-muted-dark">
+              No hosted production API exists yet (see DEPLOYMENT.md), so <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">getBridgeHealth()</code> takes
+              the API URL as an explicit argument rather than baking in a default that doesn't exist —
+              every example below points at <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">{API_BASE}</code>,
+              a real API running locally right now. Point it at your own instance, or at our production URL once one is deployed.
+            </p>
           </div>
 
           <div className="space-y-2">
