@@ -246,7 +246,7 @@ Complete request/response shapes, real curl examples against real live data, and
 
 ## On-chain oracle
 
-`programs/radar-oracle` — an Anchor program, deployed on **Solana Devnet only** (`6148M4aXYbDsscWn14zCazPy9V4fQFGozdDQp4LFmqHM`), single-attester model in v1 (multi-attester quorum is v2). Not redeployed to mainnet — that's a separate, deliberate, real-funds decision not made yet.
+`programs/radar-oracle` — an Anchor program, deployed on **Solana Devnet only**, single-attester model in v1 (multi-attester quorum is v2). Not redeployed to mainnet — that's a separate, deliberate, real-funds decision not made yet. Program ID and full account layout are on [`/developers`](./apps/dashboard/app/developers/page.tsx), not repeated here.
 
 **Account** (`BridgeHealth`, 82 bytes including the 8-byte Anchor discriminator): `bridge_id: [u8; 32]` (sha256 of the bridge slug), `score: u8` (0 = no score yet), `last_updated: i64`, `attester: Pubkey`, `bump: u8`.
 
