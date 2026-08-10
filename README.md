@@ -68,8 +68,7 @@ Built by: Khan Saloni ([@Hermit210](https://github.com/Hermit210))
 - **On-chain oracle program + attester:** still **devnet** — see below. Not
   redeployed to mainnet yet; that's a separate, deliberate step.
 
-## Devnet Deployment
-- Program ID: `6148M4aXYbDsscWn14zCazPy9V4fQFGozdDQp4LFmqHM`
+
 
 ## Security
 
