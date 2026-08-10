@@ -14,6 +14,7 @@ const SECTIONS: DocsSection[] = [
   { id: "detectors", label: "Detectors" },
   { id: "surfaces", label: "Surfaces" },
   { id: "architecture", label: "Architecture" },
+  { id: "finality", label: "Finality & Alpenglow" },
   { id: "open-source", label: "Open source" },
 ];
 
@@ -136,6 +137,50 @@ export default async function AboutPage() {
               Timescale container). See{" "}
               <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-accent">ARCHITECTURE.md</code>{" "}
               for the full breakdown.
+            </p>
+          </section>
+        </Reveal>
+
+        <Reveal>
+          <section id="finality" className="scroll-mt-24 space-y-3">
+            <h2 className="font-display text-xl font-semibold tracking-[-0.01em] text-text">
+              Finality & Alpenglow
+            </h2>
+            <p className="text-sm leading-relaxed text-text-secondary">
+              Solana is mid-transition from its current consensus (TowerBFT — a real, documented ~12.8s
+              finality time) to a new consensus mechanism called{" "}
+              <span className="text-text">Alpenglow</span>, built around a new voting protocol called{" "}
+              <span className="text-text">Votor</span>, targeting ~150ms finality — roughly an 80-100x
+              improvement. As of this writing, Alpenglow is not live on Solana mainnet: per{" "}
+              <Link className={linkClass} href="https://solana.com/upgrades/alpenglow">
+                Solana's own official upgrade page
+              </Link>
+              , it's being tested on a community cluster, with mainnet activation targeted for Q3 2026 —
+              not yet confirmed live. Our own real observed data below is consistent with that: finality
+              is still measuring in the ~12-second TowerBFT range, not the ~150ms Alpenglow target.
+            </p>
+            <p className="text-sm leading-relaxed text-text-secondary">
+              This matters for bridges specifically: any bridge with a hardcoded assumption about how
+              long finality takes (e.g. "wait for N confirmations before minting on the destination
+              chain") could see that assumption become stale once Alpenglow activates — either
+              unnecessarily conservative, or, during a mixed-validator-set transition period, genuinely
+              inconsistent. <span className="text-text">Finality Watch</span> tracks this directly: it
+              polls Solana's own documented{" "}
+              <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-accent">getSlot</code> RPC
+              method at both <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-accent">confirmed</code> and{" "}
+              <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-accent">finalized</code> commitment,
+              records the real elapsed time between them, and flags a real anomaly only when an
+              observation deviates 3x from a real trailing-hour baseline — relative to observed data,
+              never a hardcoded assumption about which consensus version is currently active. See the
+              live panel on the homepage, or{" "}
+              <Link className={linkClass} href="/developers">
+                GET /v1/network/finality
+              </Link>{" "}
+              for the real current numbers.
+            </p>
+            <p className="text-xs leading-relaxed text-muted-dark">
+              This is descriptive infrastructure context, not a claim that Bridge Radar detects or
+              prevents any specific incident — same rule as every other signal on this site.
             </p>
           </section>
         </Reveal>

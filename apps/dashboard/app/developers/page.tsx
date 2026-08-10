@@ -105,10 +105,32 @@ const score = await getBridgeHealthOnChain(connection, "wormhole");
 
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-dark">
+              getFinalityHealth() — real GET /v1/network/finality under the hood
+            </p>
+            <div className="rounded-xl border border-yellow/30 bg-yellow-glow/40 px-4 py-3 text-xs text-yellow">
+              Not in the published <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">@bridge-radar/sdk@0.1.0</code> yet
+              — it's real, working source on this branch, but the npm package hasn't been re-published with it. Use from source
+              (<code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">packages/sdk/src/index.ts</code>) until a
+              new version ships.
+            </div>
+            <CodeBlock
+              language="typescript"
+              code={`import { getFinalityHealth } from "@bridge-radar/sdk";
+
+const health = await getFinalityHealth("${API_BASE}");
+
+console.log(health.latest?.elapsedMs);   // real ms between this slot's confirmed and finalized observation
+console.log(health.rollingBaselineMs);   // real trailing-hour median, or null if under 5 real samples
+console.log(health.isAnomalous);         // true only when latest exceeds the real baseline by 3x`}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-dark">
               Every other real export
             </p>
             <p className="text-sm text-text-secondary">
-              That's the whole package — six exports total, nothing hidden:
+              Every remaining export — 3 values plus 7 types, nothing hidden beyond what's already shown above:
             </p>
             <CodeBlock
               language="typescript"
@@ -134,7 +156,8 @@ interface HealthScore { bridge_id: string; computed_at: string; score: number; c
 interface HealthComponents { parity_severity: number; outflow_severity: number; signer_recency: number; frontend_recency: number; oracle_staleness: number }
 type HealthBand = "green" | "yellow" | "red" | "unmonitored";
 interface BridgeRow { id: string; display_name: string; homepage?: string; enabled: boolean }
-interface DefiLlamaProtocolTvl { source: "defillama"; fetched_at: string; defillama_slug: string; defillama_name: string; category: string | null; tvl_usd: number }`}
+interface DefiLlamaProtocolTvl { source: "defillama"; fetched_at: string; defillama_slug: string; defillama_name: string; category: string | null; tvl_usd: number }
+interface FinalityHealth { latest: { slot: number; confirmedAt: string; finalizedAt: string; elapsedMs: number } | null; rollingBaselineMs: number | null; sampleCount: number; windowStart: string; isAnomalous: boolean; anomalousBridgeEventsLastHour: number; note: string }`}
             />
           </div>
 
@@ -240,13 +263,11 @@ interface DefiLlamaProtocolTvl { source: "defillama"; fetched_at: string; defill
           <ApiEndpoint
             method="GET"
             path="/v1/events"
-            description="Real detected anomaly + transfer events (signer_change, frontend_change, oracle_stale, lock/mint/burn/unlock), newest first. Complete real query parameter list, confirmed against the route handler: ?bridge= (exact bridge_id), ?type= (exact BridgeEventKind), ?chain= (exact chain id), ?since= (ISO timestamp), ?limit= (integer). All optional; no others exist."
-            curl={`curl -s "${API_BASE}/v1/events?limit=3"`}
+            description="Real detected anomaly + transfer events (signer_change, frontend_change, oracle_stale, lock/mint/burn/unlock), newest first. Complete real query parameter list, confirmed against the route handler: ?bridge= (exact bridge_id), ?type= (exact BridgeEventKind), ?chain= (exact chain id), ?since= (ISO timestamp), ?limit= (integer). All optional; no others exist. Every event also carries a real finality_anomaly_at_time (see /v1/network/finality below) -- true only if a real Finality Watch observation within 5s of this event's own event_time was itself flagged anomalous; purely descriptive, not a claim about this specific transaction."
+            curl={`curl -s "${API_BASE}/v1/events?limit=1"`}
             response={`{
   "events": [
-    { "id": "9866bde5-79ec-4dc7-8ad8-631022b678a2", "bridge_id": "portal", "event_time": "2026-08-08T19:50:10.419Z", "type": "frontend_change", "region": "default", "new_hash": "1253772937357a5e45a482f79cef95a2999bcb8426ac313a97e277d6986044b6", "old_hash": "201508e5331fcfe8ea8893d25acb7ed518dd913155301a87205c465fb7f81cca" },
-    { "id": "23f83f96-83a0-4ef6-b65e-c33b067b361e", "bridge_id": "wormhole", "event_time": "2026-08-08T19:50:10.127Z", "type": "frontend_change", "region": "default", "new_hash": "8d9970044dcaf61fe9ccd72482c738b4b5a3051b317d90c030381b3738d27ac7", "old_hash": "d4c0f5ab17d578fdbdd2dac0de8b3841e180ae65a1f12b341fe29eb48673a27e" },
-    { "id": "b7acca5a-2c2a-4c30-ab62-8dc9d15ad88f", "bridge_id": "portal", "event_time": "2026-08-08T19:45:22.977Z", "type": "frontend_change", "region": "default", "new_hash": "201508e5331fcfe8ea8893d25acb7ed518dd913155301a87205c465fb7f81cca", "old_hash": "ce0961084944482e6f9dfc11b218786abe974369d0c44445a337a108b4aba610" }
+    { "id": "90a9ee82-dd2e-4688-a810-aeb52e0ac253", "bridge_id": "across", "event_time": "2026-08-10T20:01:20.956Z", "type": "lock", "chain": "solana", "asset": "unknown", "amount_usd": 0, "tx": "5PGc8soBEVnu4BXvT2PFg3yrrVcdFVWvEcCxuoG5ZeceMv8oXFDKZ3JmBJAy1iqY54QXLJ9uJkfZ2NVEXnWhLd64", "finality_anomaly_at_time": false }
   ]
 }`}
           />
@@ -282,6 +303,22 @@ interface DefiLlamaProtocolTvl { source: "defillama"; fetched_at: string; defill
   "anomalyEventCount": 128,
   "monitoredBridgeCount": 14,
   "bridgeHealthTally": { "healthy": 10, "watch": 4, "alert": 0, "unmonitored": 2 }
+}`}
+          />
+
+          <ApiEndpoint
+            method="GET"
+            path="/v1/network/finality"
+            description="Real observed Solana finality health -- 'Finality Watch' (see the on-page explainer above). latest is the most recent real confirmed->finalized observation; rollingBaselineMs is the real trailing-hour median (null under 5 real samples); isAnomalous is true only when latest exceeds that baseline by 3x. No query parameters."
+            curl={`curl -s ${API_BASE}/v1/network/finality`}
+            response={`{
+  "latest": { "slot": 438465853, "confirmedAt": "2026-08-10T20:01:07.707Z", "finalizedAt": "2026-08-10T20:01:20.948Z", "elapsedMs": 13241 },
+  "rollingBaselineMs": 12221.5,
+  "sampleCount": 122,
+  "windowStart": "2026-08-10T19:08:34.915Z",
+  "isAnomalous": false,
+  "anomalousBridgeEventsLastHour": 0,
+  "note": "rollingBaselineMs and isAnomalous are computed from real observed data only"
 }`}
           />
 
