@@ -8,6 +8,7 @@
 use super::{BridgeRow, DefiLlamaRecord, ParityState, Result, Storage, StorageError};
 use crate::chain::ChainId;
 use crate::event::{BridgeEvent, BridgeEventKind, EventFilter};
+use crate::finality::FinalityObservation;
 use crate::health::{HealthComponents, HealthScore};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -86,6 +87,22 @@ CREATE TABLE IF NOT EXISTS telegram_subscriptions (
     subscribed_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 CREATE INDEX IF NOT EXISTS telegram_subscriptions_chat_id_idx ON telegram_subscriptions (chat_id);
+
+-- Real "Finality Watch" observations -- see crate::finality doc comment.
+-- One row per real slot this indexer's own RPC poll saw transition from
+-- confirmed to finalized. baseline_ms_at_time/is_anomalous are frozen at
+-- insert time (the real trailing-window baseline that existed then), not
+-- recomputed later.
+CREATE TABLE IF NOT EXISTS finality_observations (
+    slot                 INTEGER NOT NULL PRIMARY KEY,
+    confirmed_at         TEXT NOT NULL,
+    finalized_at         TEXT NOT NULL,
+    elapsed_ms           INTEGER NOT NULL,
+    baseline_ms_at_time  INTEGER,
+    is_anomalous         INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS finality_observations_finalized_idx
+    ON finality_observations (finalized_at DESC);
 
 INSERT OR IGNORE INTO bridges (id, display_name, homepage) VALUES
     ('wormhole',  'Wormhole',  'https://wormhole.com'),
@@ -453,6 +470,75 @@ impl Storage for SqliteStorage {
         .await?;
         Ok(())
     }
+
+    async fn insert_finality_observation(&self, obs: &FinalityObservation) -> Result<()> {
+        sqlx::query(
+            r#"INSERT OR IGNORE INTO finality_observations
+                 (slot, confirmed_at, finalized_at, elapsed_ms, baseline_ms_at_time, is_anomalous)
+               VALUES (?, ?, ?, ?, ?, ?)"#,
+        )
+        .bind(obs.slot as i64)
+        .bind(obs.confirmed_at.to_rfc3339())
+        .bind(obs.finalized_at.to_rfc3339())
+        .bind(obs.elapsed_ms)
+        .bind(obs.baseline_ms_at_time)
+        .bind(obs.is_anomalous as i64)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    async fn finality_observations_since(&self, since: DateTime<Utc>) -> Result<Vec<FinalityObservation>> {
+        let rows = sqlx::query(
+            r#"SELECT slot, confirmed_at, finalized_at, elapsed_ms, baseline_ms_at_time, is_anomalous
+                 FROM finality_observations
+                WHERE confirmed_at >= ?
+             ORDER BY confirmed_at ASC"#,
+        )
+        .bind(since.to_rfc3339())
+        .fetch_all(&self.pool)
+        .await?;
+        rows.into_iter().map(row_to_finality_observation).collect()
+    }
+
+    async fn latest_finality_observation(&self) -> Result<Option<FinalityObservation>> {
+        let row = sqlx::query(
+            r#"SELECT slot, confirmed_at, finalized_at, elapsed_ms, baseline_ms_at_time, is_anomalous
+                 FROM finality_observations
+             ORDER BY confirmed_at DESC LIMIT 1"#,
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        row.map(row_to_finality_observation).transpose()
+    }
+
+    async fn finality_anomalous_near(&self, at: DateTime<Utc>, window: chrono::Duration) -> Result<bool> {
+        let lo = (at - window).to_rfc3339();
+        let hi = (at + window).to_rfc3339();
+        let row = sqlx::query(
+            r#"SELECT 1 FROM finality_observations
+                WHERE finalized_at >= ? AND finalized_at <= ? AND is_anomalous = 1
+                LIMIT 1"#,
+        )
+        .bind(lo)
+        .bind(hi)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.is_some())
+    }
+}
+
+fn row_to_finality_observation(row: sqlx::sqlite::SqliteRow) -> Result<FinalityObservation> {
+    let confirmed_at_str: String = row.try_get("confirmed_at")?;
+    let finalized_at_str: String = row.try_get("finalized_at")?;
+    Ok(FinalityObservation {
+        slot: row.try_get::<i64, _>("slot")? as u64,
+        confirmed_at: parse_rfc3339(&confirmed_at_str)?,
+        finalized_at: parse_rfc3339(&finalized_at_str)?,
+        elapsed_ms: row.try_get("elapsed_ms")?,
+        baseline_ms_at_time: row.try_get::<Option<i64>, _>("baseline_ms_at_time")?,
+        is_anomalous: row.try_get::<i64, _>("is_anomalous")? != 0,
+    })
 }
 
 fn row_to_defillama(row: sqlx::sqlite::SqliteRow) -> Result<DefiLlamaRecord> {

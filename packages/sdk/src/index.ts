@@ -87,6 +87,38 @@ export async function getBridgeHealth(bridgeId: string, apiUrl: string): Promise
   return (await res.json()) as BridgeHealth;
 }
 
+/** Real shape of `GET /v1/network/finality` — see apps/api/src/index.ts. */
+export interface FinalityHealth {
+  latest: { slot: number; confirmedAt: string; finalizedAt: string; elapsedMs: number } | null;
+  rollingBaselineMs: number | null;
+  sampleCount: number;
+  windowStart: string;
+  isAnomalous: boolean;
+  anomalousBridgeEventsLastHour: number;
+  note: string;
+}
+
+/**
+ * Fetches Bridge Radar's real observed Solana finality-time health —
+ * "Finality Watch" (relevant during the TowerBFT -> Alpenglow consensus
+ * transition). `rollingBaselineMs`/`isAnomalous` are computed from real
+ * observed confirmed->finalized latency, relative to a trailing-hour
+ * baseline — never a hardcoded assumption about which consensus version is
+ * active. `rollingBaselineMs` is `null` and `isAnomalous` is always `false`
+ * when there aren't yet enough real observations to trust a baseline (see
+ * the real `note` field for why).
+ *
+ * Real endpoint: `GET {apiUrl}/v1/network/finality` — see
+ * apps/api/src/index.ts and crates/radar-core/src/finality.rs.
+ */
+export async function getFinalityHealth(apiUrl: string): Promise<FinalityHealth> {
+  const res = await fetch(`${apiUrl.replace(/\/$/, "")}/v1/network/finality`);
+  if (!res.ok) {
+    throw new BridgeRadarError(`GET /v1/network/finality failed: ${res.status} ${res.statusText}`);
+  }
+  return (await res.json()) as FinalityHealth;
+}
+
 /**
  * Reads a bridge's health score **directly from the on-chain oracle**, no
  * API involved — the same PDA `radar-attester` pushes to

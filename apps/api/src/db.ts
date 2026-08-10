@@ -69,6 +69,19 @@ export interface TelegramSubscriptionRow {
   subscribedAt: string;
 }
 
+/** One real "Finality Watch" observation -- see crates/radar-core/src/finality.rs
+ * doc comment (this table is written by the Rust indexer, read-only here).
+ * `baselineMsAtTime`/`isAnomalous` are frozen at insert time: the real
+ * trailing-hour baseline that existed when this row was recorded. */
+export interface FinalityObservationRow {
+  slot: number;
+  confirmedAt: string;
+  finalizedAt: string;
+  elapsedMs: number;
+  baselineMsAtTime: number | null;
+  isAnomalous: boolean;
+}
+
 export interface RadarDb {
   listBridges(): Promise<BridgeRow[]>;
   latestScores(): Promise<HealthScore[]>;
@@ -109,6 +122,26 @@ export interface RadarDb {
   /** Every real subscription row -- used by the weekly-digest sender to
    * fan a single computed digest out to every real subscriber. */
   listTelegramSubscriptions(): Promise<TelegramSubscriptionRow[]>;
+
+  /** The single most recent real Finality Watch observation, or null if the
+   * indexer hasn't recorded any yet. */
+  latestFinalityObservation(): Promise<FinalityObservationRow | null>;
+  /** Real observations with confirmedAt >= sinceIso, oldest first -- the
+   * real rolling-baseline window for GET /v1/network/finality. */
+  finalityObservationsSince(sinceIso: string): Promise<FinalityObservationRow[]>;
+  /** True if any real observation with finalizedAt within
+   * [atIso - windowSeconds, atIso + windowSeconds] was itself flagged
+   * anomalous (its own frozen isAnomalous). The real cross-reference
+   * primitive behind "was this bridge event processed during anomalous
+   * finality behavior" -- note this compares wall-clock proximity between
+   * the bridge event's own ingestion time and a finality observation's
+   * finalized time, a real but approximate correlation, not a claim that
+   * this specific transaction's own finalization was measured. */
+  finalityAnomalousNear(atIso: string, windowSeconds: number): Promise<boolean>;
+  /** Real count of bridge events at or after sinceIso whose event_time
+   * falls within windowSeconds of a real observation flagged anomalous. */
+  countAnomalousBridgeEventsSince(sinceIso: string, windowSeconds: number): Promise<number>;
+
   close(): Promise<void>;
 }
 
@@ -137,6 +170,33 @@ function rowToScore(r: {
     computed_at: r.computed_at,
     score: r.score,
     components,
+  };
+}
+
+interface DbFinalityRow {
+  // node-postgres returns BIGINT columns (slot, elapsed_ms,
+  // baseline_ms_at_time here) as strings, not numbers, to avoid float64
+  // precision loss on values outside Number.MAX_SAFE_INTEGER -- better-sqlite3
+  // returns plain numbers for the same columns. Typed as the union of both
+  // real shapes and normalized to number in rowToFinalityObservation below
+  // (Solana slot numbers are ~4.4*10^8 today, nowhere near the 2^53 safe-
+  // integer ceiling, so the number conversion is exact).
+  slot: number | string;
+  confirmed_at: string | Date;
+  finalized_at: string | Date;
+  elapsed_ms: number | string;
+  baseline_ms_at_time: number | string | null;
+  is_anomalous: number | boolean;
+}
+
+function rowToFinalityObservation(r: DbFinalityRow): FinalityObservationRow {
+  return {
+    slot: Number(r.slot),
+    confirmedAt: isoOf(r.confirmed_at),
+    finalizedAt: isoOf(r.finalized_at),
+    elapsedMs: Number(r.elapsed_ms),
+    baselineMsAtTime: r.baseline_ms_at_time === null ? null : Number(r.baseline_ms_at_time),
+    isAnomalous: typeof r.is_anomalous === "boolean" ? r.is_anomalous : r.is_anomalous !== 0,
   };
 }
 
@@ -261,6 +321,20 @@ class SqliteRadarDb implements RadarDb {
         subscribed_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
       );
       CREATE INDEX IF NOT EXISTS telegram_subscriptions_chat_id_idx ON telegram_subscriptions (chat_id);
+
+      -- Real "Finality Watch" observations, written by the Rust indexer
+      -- (crates/radar-indexer-solana/src/finality.rs) -- read-only here, same
+      -- reasoning as the bare-minimum-schema comment above this block.
+      CREATE TABLE IF NOT EXISTS finality_observations (
+        slot                 INTEGER NOT NULL PRIMARY KEY,
+        confirmed_at         TEXT NOT NULL,
+        finalized_at         TEXT NOT NULL,
+        elapsed_ms           INTEGER NOT NULL,
+        baseline_ms_at_time  INTEGER,
+        is_anomalous         INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX IF NOT EXISTS finality_observations_finalized_idx
+        ON finality_observations (finalized_at DESC);
       INSERT OR IGNORE INTO bridges (id, display_name, homepage) VALUES
         ('wormhole','Wormhole','https://wormhole.com'),
         ('allbridge','Allbridge','https://allbridge.io'),
@@ -566,6 +640,53 @@ class SqliteRadarDb implements RadarDb {
       .prepare(`SELECT wallet_address, chat_id, subscribed_at FROM telegram_subscriptions ORDER BY subscribed_at ASC`)
       .all() as { wallet_address: string; chat_id: number; subscribed_at: string }[];
     return rows.map((r) => ({ walletAddress: r.wallet_address, chatId: String(r.chat_id), subscribedAt: r.subscribed_at }));
+  }
+
+  async latestFinalityObservation(): Promise<FinalityObservationRow | null> {
+    const row = this.db
+      .prepare(
+        `SELECT slot, confirmed_at, finalized_at, elapsed_ms, baseline_ms_at_time, is_anomalous
+           FROM finality_observations ORDER BY confirmed_at DESC LIMIT 1`,
+      )
+      .get() as DbFinalityRow | undefined;
+    return row ? rowToFinalityObservation(row) : null;
+  }
+
+  async finalityObservationsSince(sinceIso: string): Promise<FinalityObservationRow[]> {
+    const rows = this.db
+      .prepare(
+        `SELECT slot, confirmed_at, finalized_at, elapsed_ms, baseline_ms_at_time, is_anomalous
+           FROM finality_observations WHERE confirmed_at >= ? ORDER BY confirmed_at ASC`,
+      )
+      .all(sinceIso) as DbFinalityRow[];
+    return rows.map(rowToFinalityObservation);
+  }
+
+  async finalityAnomalousNear(atIso: string, windowSeconds: number): Promise<boolean> {
+    const row = this.db
+      .prepare(
+        `SELECT 1 FROM finality_observations
+           WHERE is_anomalous = 1
+             AND ABS(julianday(finalized_at) - julianday(?)) * 86400.0 <= ?
+           LIMIT 1`,
+      )
+      .get(atIso, windowSeconds) as unknown;
+    return row !== undefined;
+  }
+
+  async countAnomalousBridgeEventsSince(sinceIso: string, windowSeconds: number): Promise<number> {
+    const r = this.db
+      .prepare(
+        `SELECT COUNT(*) AS c FROM bridge_events e
+           WHERE e.event_time >= ?
+             AND EXISTS (
+               SELECT 1 FROM finality_observations f
+                WHERE f.is_anomalous = 1
+                  AND ABS(julianday(f.finalized_at) - julianday(e.event_time)) * 86400.0 <= ?
+             )`,
+      )
+      .get(sinceIso, windowSeconds) as { c: number };
+    return r.c;
   }
 
   async close(): Promise<void> {
@@ -885,6 +1006,48 @@ class PostgresRadarDb implements RadarDb {
       `SELECT wallet_address, chat_id, subscribed_at FROM telegram_subscriptions ORDER BY subscribed_at ASC`,
     );
     return rows.map((r) => ({ walletAddress: r.wallet_address, chatId: r.chat_id, subscribedAt: isoOf(r.subscribed_at) }));
+  }
+
+  async latestFinalityObservation(): Promise<FinalityObservationRow | null> {
+    const { rows } = await this.pool.query<DbFinalityRow>(
+      `SELECT slot, confirmed_at, finalized_at, elapsed_ms, baseline_ms_at_time, is_anomalous
+         FROM finality_observations ORDER BY confirmed_at DESC LIMIT 1`,
+    );
+    return rows[0] ? rowToFinalityObservation(rows[0]) : null;
+  }
+
+  async finalityObservationsSince(sinceIso: string): Promise<FinalityObservationRow[]> {
+    const { rows } = await this.pool.query<DbFinalityRow>(
+      `SELECT slot, confirmed_at, finalized_at, elapsed_ms, baseline_ms_at_time, is_anomalous
+         FROM finality_observations WHERE confirmed_at >= $1 ORDER BY confirmed_at ASC`,
+      [sinceIso],
+    );
+    return rows.map(rowToFinalityObservation);
+  }
+
+  async finalityAnomalousNear(atIso: string, windowSeconds: number): Promise<boolean> {
+    const { rows } = await this.pool.query(
+      `SELECT 1 FROM finality_observations
+         WHERE is_anomalous = TRUE
+           AND ABS(EXTRACT(EPOCH FROM (finalized_at - $1::timestamptz))) <= $2
+         LIMIT 1`,
+      [atIso, windowSeconds],
+    );
+    return rows.length > 0;
+  }
+
+  async countAnomalousBridgeEventsSince(sinceIso: string, windowSeconds: number): Promise<number> {
+    const { rows } = await this.pool.query<{ c: string }>(
+      `SELECT COUNT(*) AS c FROM bridge_events e
+         WHERE e.event_time >= $1
+           AND EXISTS (
+             SELECT 1 FROM finality_observations f
+              WHERE f.is_anomalous = TRUE
+                AND ABS(EXTRACT(EPOCH FROM (f.finalized_at - e.event_time))) <= $2
+           )`,
+      [sinceIso, windowSeconds],
+    );
+    return Number(rows[0]?.c ?? 0);
   }
 
   async close(): Promise<void> {
