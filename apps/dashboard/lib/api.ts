@@ -65,6 +65,30 @@ export async function getFinalityHealth() {
   return fetchJson<FinalityHealth>("/v1/network/finality");
 }
 
+export interface FinalityObservation {
+  slot: number;
+  confirmedAt: string;
+  finalizedAt: string;
+  elapsedMs: number;
+  baselineMsAtTime: number | null;
+  isAnomalous: boolean;
+}
+
+export interface FinalityHistory {
+  since: string;
+  count: number;
+  truncated: boolean;
+  history: FinalityObservation[];
+}
+
+export async function getFinalityHistory(opts: { since?: string; limit?: number } = {}) {
+  const params = new URLSearchParams();
+  if (opts.since) params.set("since", opts.since);
+  if (opts.limit) params.set("limit", String(opts.limit));
+  const q = params.toString() ? `?${params.toString()}` : "";
+  return fetchJson<FinalityHistory>(`/v1/network/finality/history${q}`);
+}
+
 export interface RegistryEntry {
   id: string;
   name: string;
