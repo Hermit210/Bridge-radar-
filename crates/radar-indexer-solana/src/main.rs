@@ -2,6 +2,7 @@
 //! a [`radar_core::BridgeAdapter`] via WebSocket `logsSubscribe`, with an
 //! HTTP polling fallback because public RPCs drop.
 
+mod finality;
 mod poll;
 mod ws;
 
@@ -64,8 +65,11 @@ async fn main() -> Result<()> {
 
     let ws_handle = tokio::spawn(ws::run(ws_url.clone(), watched.clone(), storage.clone()));
     let poll_handle = tokio::spawn(poll::run(rpc_url.clone(), watched.clone(), storage.clone()));
+    let finality_handle = tokio::spawn(finality::run(rpc_url.clone(), storage.clone()));
 
-    // Either task crashing should bring the indexer down so a supervisor
+    info!("finality watch: tracking real confirmed -> finalized slot latency");
+
+    // Any task crashing should bring the indexer down so a supervisor
     // (systemd / docker / k8s) can restart it cleanly.
     tokio::select! {
         r = ws_handle => match r {
@@ -77,6 +81,11 @@ async fn main() -> Result<()> {
             Ok(Ok(())) => info!("poll task exited"),
             Ok(Err(e)) => warn!(error = %e, "poll task failed"),
             Err(e) => warn!(error = %e, "poll task panicked"),
+        },
+        r = finality_handle => match r {
+            Ok(Ok(())) => info!("finality watch task exited"),
+            Ok(Err(e)) => warn!(error = %e, "finality watch task failed"),
+            Err(e) => warn!(error = %e, "finality watch task panicked"),
         },
     }
     Ok(())

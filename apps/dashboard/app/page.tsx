@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LiveStatusStrip } from "@/components/live-status-strip";
+import { FinalityStatusPanel } from "@/components/finality-status-panel";
 import { Reveal } from "@/components/reveal";
 import { DetectorGrid } from "@/components/detector-grid";
 import { ScoringBeamDiagram } from "@/components/scoring-beam-diagram";
@@ -63,6 +64,11 @@ export default async function LandingPage() {
           <LiveStatusStrip />
         </Reveal>
       </section>
+
+      {/* Network finality status */}
+      <Reveal>
+        <FinalityStatusPanel />
+      </Reveal>
 
       {/* Live bridge network */}
       <Reveal>

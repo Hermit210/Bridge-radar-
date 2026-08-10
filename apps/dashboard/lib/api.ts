@@ -50,6 +50,21 @@ export async function listEvents(opts: { bridge?: string; type?: BridgeEvent["ty
   return fetchJson<{ events: BridgeEvent[] }>(`/v1/events${q}`);
 }
 
+/** Real shape of GET /v1/network/finality — see apps/api/src/index.ts. */
+export interface FinalityHealth {
+  latest: { slot: number; confirmedAt: string; finalizedAt: string; elapsedMs: number } | null;
+  rollingBaselineMs: number | null;
+  sampleCount: number;
+  windowStart: string;
+  isAnomalous: boolean;
+  anomalousBridgeEventsLastHour: number;
+  note: string;
+}
+
+export async function getFinalityHealth() {
+  return fetchJson<FinalityHealth>("/v1/network/finality");
+}
+
 export interface RegistryEntry {
   id: string;
   name: string;

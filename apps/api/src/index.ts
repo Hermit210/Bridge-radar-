@@ -121,6 +121,7 @@ app.get("/", (c) =>
       "GET /v1/bridges/:id/health",
       "GET /v1/bridges/:id/history",
       "GET /v1/events",
+      "GET /v1/network/finality",
       "GET /v1/wallet-activity/:address",
       "GET /v1/wallet-holdings/:address",
       "GET /v1/wallet-timeline/:address",
@@ -505,6 +506,11 @@ app.get("/v1/wallet-timeline/:address", async (c) => {
   }
 });
 
+// Real wall-clock correlation window (seconds) used to cross-reference a
+// bridge event's own event_time against Finality Watch observations -- see
+// FINALITY_ANOMALY_WINDOW_SECONDS doc comment below /v1/network/finality.
+const FINALITY_ANOMALY_WINDOW_SECONDS = 5;
+
 app.get("/v1/events", async (c) => {
   const events = await db.listEvents({
     bridgeId: c.req.query("bridge"),
@@ -513,7 +519,76 @@ app.get("/v1/events", async (c) => {
     since: c.req.query("since"),
     limit: c.req.query("limit") ? Number(c.req.query("limit")) : undefined,
   });
-  return c.json({ events });
+  // Real per-event cross-reference against Finality Watch (see
+  // crates/radar-core/src/finality.rs) -- purely descriptive, not an
+  // advisory/predictive claim about any specific event, same rule as every
+  // other risk-flag feature in this API.
+  const withFinality = await Promise.all(
+    events.map(async (event) => ({
+      ...event,
+      finality_anomaly_at_time: await db.finalityAnomalousNear(event.event_time, FINALITY_ANOMALY_WINDOW_SECONDS),
+    })),
+  );
+  return c.json({ events: withFinality });
+});
+
+// ── "Finality Watch" — real observed Solana confirmed -> finalized latency ─
+//
+// Written by the Rust indexer's finality tracker (crates/radar-indexer-solana
+// /src/finality.rs), which polls the real, documented getSlot(commitment)
+// RPC method (https://solana.com/docs/rpc/http/getslot) at both "confirmed"
+// and "finalized" and records the real observed elapsed time between them.
+// Relevant during the TowerBFT -> Alpenglow consensus transition: the
+// rolling baseline/anomaly check here is relative to real observed data,
+// never a hardcoded assumption about which consensus version is active.
+const FINALITY_BASELINE_WINDOW_MS = 60 * 60 * 1000; // trailing hour
+const FINALITY_MIN_BASELINE_SAMPLES = 5;
+const FINALITY_ANOMALY_MULTIPLIER = 3;
+
+function medianElapsedMs(observations: { elapsedMs: number }[]): number | null {
+  if (observations.length === 0) return null;
+  const values = observations.map((o) => o.elapsedMs).sort((a, b) => a - b);
+  const mid = Math.floor(values.length / 2);
+  return values.length % 2 === 0 ? (values[mid - 1]! + values[mid]!) / 2 : values[mid]!;
+}
+
+app.get("/v1/network/finality", async (c) => {
+  const sinceIso = new Date(Date.now() - FINALITY_BASELINE_WINDOW_MS).toISOString();
+  const [latest, window, anomalousBridgeEventsLastHour] = await Promise.all([
+    db.latestFinalityObservation(),
+    db.finalityObservationsSince(sinceIso),
+    db.countAnomalousBridgeEventsSince(sinceIso, FINALITY_ANOMALY_WINDOW_SECONDS),
+  ]);
+
+  const sampleCount = window.length;
+  const rollingBaselineMs = sampleCount >= FINALITY_MIN_BASELINE_SAMPLES ? medianElapsedMs(window) : null;
+  const isAnomalous =
+    latest !== null &&
+    rollingBaselineMs !== null &&
+    rollingBaselineMs > 0 &&
+    latest.elapsedMs > rollingBaselineMs * FINALITY_ANOMALY_MULTIPLIER;
+
+  return c.json({
+    latest: latest
+      ? {
+          slot: latest.slot,
+          confirmedAt: latest.confirmedAt,
+          finalizedAt: latest.finalizedAt,
+          elapsedMs: latest.elapsedMs,
+        }
+      : null,
+    rollingBaselineMs,
+    sampleCount,
+    windowStart: sinceIso,
+    isAnomalous,
+    anomalousBridgeEventsLastHour,
+    note:
+      latest === null
+        ? "no real observations yet -- the indexer's finality tracker hasn't recorded any confirmed->finalized transitions since it last started"
+        : sampleCount < FINALITY_MIN_BASELINE_SAMPLES
+          ? `only ${sampleCount} real observation(s) in the trailing hour -- below the ${FINALITY_MIN_BASELINE_SAMPLES} needed to trust a baseline, so isAnomalous is always false until there are enough`
+          : "rollingBaselineMs and isAnomalous are computed from real observed data only",
+  });
 });
 
 // ── "Bridge Race" mini-game — real scores, real wallet-gated leaderboard ───

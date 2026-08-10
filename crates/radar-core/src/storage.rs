@@ -2,6 +2,7 @@ pub mod postgres;
 pub mod sqlite;
 
 use crate::event::{BridgeEvent, BridgeId, EventFilter};
+use crate::finality::FinalityObservation;
 use crate::health::{HealthComponents, HealthScore};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -95,6 +96,29 @@ pub trait Storage: Send + Sync {
     /// creating a second subscription). Written by the alerter's command
     /// handler; read by the Node API's weekly-digest scheduler.
     async fn upsert_telegram_subscription(&self, wallet_address: &str, chat_id: i64) -> Result<()>;
+
+    /// Persists one real finality observation (see [`crate::finality`]).
+    /// `slot` is the primary key — idempotent under retries.
+    async fn insert_finality_observation(&self, obs: &FinalityObservation) -> Result<()>;
+
+    /// Real observations with `confirmed_at >= since`, oldest first — used
+    /// both as the rolling-baseline window and for the /v1/network/finality
+    /// endpoint's sample count.
+    async fn finality_observations_since(&self, since: DateTime<Utc>) -> Result<Vec<FinalityObservation>>;
+
+    /// The single most recent real observation, if the tracker has recorded
+    /// any yet.
+    async fn latest_finality_observation(&self) -> Result<Option<FinalityObservation>>;
+
+    /// True if any real observation with `finalized_at` within
+    /// `[at - window, at + window]` was itself flagged anomalous (its own
+    /// frozen `is_anomalous`, from the baseline that existed when it was
+    /// recorded) — the real cross-reference primitive behind "was this
+    /// bridge event processed during anomalous finality behavior." Returns
+    /// `false` (not an error) when there's simply no observation in range —
+    /// "we don't know" is represented by the caller checking sample
+    /// coverage separately, not by this call failing.
+    async fn finality_anomalous_near(&self, at: DateTime<Utc>, window: chrono::Duration) -> Result<bool>;
 }
 
 #[derive(Debug, Clone)]
