@@ -128,14 +128,27 @@ importers:
         specifier: ^5.6.0
         version: 5.9.3
 
+  packages/fetch:
+    dependencies:
+      '@bridge-radar/sdk':
+        specifier: ^0.1.0
+        version: 0.1.0(@solana/web3.js@1.98.4(bufferutil@4.1.0)(typescript@5.9.3))
+    devDependencies:
+      '@solana/web3.js':
+        specifier: ^1.98.4
+        version: 1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
+      '@types/node':
+        specifier: ^22.7.0
+        version: 22.19.17
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+
   packages/sdk:
     dependencies:
       '@noble/hashes':
         specifier: ^1.4.0
         version: 1.8.0
-      '@radar/shared':
-        specifier: workspace:*
-        version: link:../shared
     devDependencies:
       '@solana/web3.js':
         specifier: ^1.98.4
@@ -229,6 +242,11 @@ packages:
   '@babel/types@7.29.7':
     resolution: {integrity: sha512-4zBIxpPzowiZpusoFkyGVwakdRJUyuH5PxQ/PrqghfdFWWasvnCdPfQXHrenDai+gyLARulZjZowCOj6fjT4pA==}
     engines: {node: '>=6.9.0'}
+
+  '@bridge-radar/sdk@0.1.0':
+    resolution: {integrity: sha512-yRDGaL3cfrEnA1+t/RSKYnn55qEIs1Eg/OdnR+aExRECLMqVPFrJ1fW5UjzfYScDqQ4nZ98Wr2apRg3Z0upt1Q==}
+    peerDependencies:
+      '@solana/web3.js': ^1.98.0
 
   '@emnapi/runtime@1.10.0':
     resolution: {integrity: sha512-ewvYlk86xUoGI0zQRNq/mC+16R1QeDlKQy21Ki3oSYXNgLb45GV1P6A0M+/s6nyCuNDqe5VpaY84BzXGwVbwFA==}
@@ -3656,6 +3674,11 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
+
+  '@bridge-radar/sdk@0.1.0(@solana/web3.js@1.98.4(bufferutil@4.1.0)(typescript@5.9.3))':
+    dependencies:
+      '@noble/hashes': 1.8.0
+      '@solana/web3.js': 1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
 
   '@emnapi/runtime@1.10.0':
     dependencies:

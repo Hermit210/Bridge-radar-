@@ -1,0 +1,33 @@
+{
+  "name": "@bridge-radar/fetch",
+  "version": "0.1.0",
+  "description": "A Solana Connection with basic sequential RPC failover, plus an optional real bridge-health gate via @bridge-radar/sdk.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "test": "echo 'no tests'"
+  },
+  "dependencies": {
+    "@bridge-radar/sdk": "^0.1.0"
+  },
+  "peerDependencies": {
+    "@solana/web3.js": "^1.98.0"
+  },
+  "devDependencies": {
+    "@solana/web3.js": "^1.98.4",
+    "@types/node": "^22.7.0",
+    "typescript": "^5.6.0"
+  }
+}
