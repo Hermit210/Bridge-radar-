@@ -122,6 +122,7 @@ app.get("/", (c) =>
       "GET /v1/bridges/:id/history",
       "GET /v1/events",
       "GET /v1/network/finality",
+      "GET /v1/network/finality/history",
       "GET /v1/wallet-activity/:address",
       "GET /v1/wallet-holdings/:address",
       "GET /v1/wallet-timeline/:address",
@@ -589,6 +590,30 @@ app.get("/v1/network/finality", async (c) => {
           ? `only ${sampleCount} real observation(s) in the trailing hour -- below the ${FINALITY_MIN_BASELINE_SAMPLES} needed to trust a baseline, so isAnomalous is always false until there are enough`
           : "rollingBaselineMs and isAnomalous are computed from real observed data only",
   });
+});
+
+const FINALITY_HISTORY_DEFAULT_WINDOW_MS = 60 * 60 * 1000; // 1h
+const FINALITY_HISTORY_MAX_POINTS = 2000;
+
+app.get("/v1/network/finality/history", async (c) => {
+  const sinceParam = c.req.query("since");
+  const since = sinceParam ?? new Date(Date.now() - FINALITY_HISTORY_DEFAULT_WINDOW_MS).toISOString();
+  const limitParam = c.req.query("limit");
+  const limit = limitParam
+    ? Math.min(Math.max(Number(limitParam), 1), FINALITY_HISTORY_MAX_POINTS)
+    : FINALITY_HISTORY_MAX_POINTS;
+  if (Number.isNaN(limit)) {
+    return c.json({ error: "limit must be a number" }, 400);
+  }
+
+  const all = await db.finalityObservationsSince(since);
+  // Real observations, oldest first; if there are more real rows than
+  // `limit`, keep the most recent ones (drop the oldest) rather than
+  // truncating the tail -- a chart caring about "right now" wants recency,
+  // not an arbitrary prefix.
+  const history = all.length > limit ? all.slice(all.length - limit) : all;
+
+  return c.json({ since, count: history.length, truncated: all.length > limit, history });
 });
 
 // ── "Bridge Race" mini-game — real scores, real wallet-gated leaderboard ───

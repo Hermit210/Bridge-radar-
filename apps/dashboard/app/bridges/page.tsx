@@ -7,6 +7,7 @@ import { useAutoAnimate } from "@formkit/auto-animate/react";
 import { HealthCard, type HeartbeatInfo } from "@/components/health-card";
 import { HeartbeatDot } from "@/components/heartbeat-dot";
 import { StatBar, type StatBarSegment } from "@/components/stat-bar";
+import { FinalityStatusPanel } from "@/components/finality-status-panel";
 import { listBridges, listEvents } from "@/lib/api";
 import { bandFor, formatUsd, type BridgeWithHealth, type BridgeEvent, type HealthBand } from "@radar/shared";
 
@@ -162,6 +163,8 @@ export default function Home() {
       </div>
 
       <StatBar segments={segments} />
+
+      <FinalityStatusPanel compact />
 
       <div className="flex flex-wrap items-center gap-3">
         <input
