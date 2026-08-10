@@ -571,4 +571,71 @@ sources, or searching for increasingly obscure projects with no
 verification path — a reasonable stopping point until new leads surface
 (a working RPC provider with higher rate limits, a docs site coming back
 online, or a project publicly disclosing a program address it hasn't yet).
-public program ID surfaces.
+
+---
+
+## Pass 4 (2026-08-10) — Solflare Bridge, researched and excluded
+
+### ❌ Solflare Bridge — not a genuine dedicated bridge (same class as NEAR Intents)
+
+Requested candidate: Solflare Bridge, announced ~2026-07-30, lets users fund
+their Solflare wallet from Bitcoin, Ethereum, Arbitrum, BNB Chain, Polygon,
+Tron, NEAR, and Base via a permanent, reusable deposit address per
+source-chain-and-token pair.
+
+**Research, in order:**
+
+1. **Official Solflare docs** (`docs.solflare.com`) — fetched directly; no
+   Bridge section exists on the page indexed there. No program ID, contract
+   address, or GitHub link disclosed.
+2. **The announcement thread** (`x.com/solflare/status/2082410017140203739`)
+   — not fetchable (X returns 402 Payment Required to unauthenticated
+   fetches); worked around via independent press coverage instead of
+   guessing at its contents.
+3. **Independent press coverage**, cross-checked across multiple outlets
+   (CCN, FF News, Manila Times/GlobeNewswire, Metaverse Post,
+   blockchainreporter.net, NullTX, Cryptonews) — all describe the same
+   mechanism consistently: Solflare Bridge is powered by **Aurora
+   Intents**, which settles via **NEAR Intents**. Direct quote (FF News/
+   GlobeNewswire syndication): *"Multiple solvers compete to fill each
+   intent, while settlement through NEAR Intents **avoids the traditional
+   lock-and-mint bridge model**."*
+4. **NEAR Intents' own source** (`github.com/near/intents`) — fetched
+   directly to check for a Solana-side settlement contract. Finding: the
+   core contract (`contracts/defuse`, the "Verifier") is NEAR-native
+   (`intents.near`), with `execute_intents` settling atomically **on NEAR**.
+   No `Anchor.toml`, no `declare_id!`, no Solana program directory anywhere
+   in the repo. Solana appears only as a *source* chain in NEAR Intents'
+   own general documentation — never as a settlement/destination layer with
+   its own canonical contract.
+
+**Conclusion:** there is no single Solana program to point an adapter at,
+because architecturally none exists. Deposits happen on the *source* chain
+(Bitcoin/Ethereum/etc.) into a Solflare/Aurora-controlled address; Solana
+delivery is executed per-intent by whichever solver wins, with no fixed
+receiving program whose logs a `decode_solana_log()` could reliably match
+— the same structural reason **NEAR Intents** itself was already excluded
+in Pass 1 ("MPC-based intent-settlement/solver network... not a lock-mint
+bridge contract"). Solflare Bridge is a UX wrapper over that same solver
+network, not a new bridge with its own program.
+
+Per the project's standing rule, **not fabricating or guessing an address**
+to force this in. No adapter code, no test, no registry entry, no
+`solana_programs()` addition — nothing built. If Aurora/NEAR later publish
+a canonical Solana-side settlement contract (or Solflare direct-discloses
+one), this is revisitable.
+
+Sources: [CCN](https://www.ccn.com/news/crypto/solflare-bridge-bitcoin-ethereum-transfers-solana/),
+[FF News](https://ffnews.com/news/solflare-launches-bridge-to-enable-seamless-multi-chain-transfers-to-solana-via-aurora-intents),
+[Manila Times/GlobeNewswire](https://www.manilatimes.net/2026/07/30/tmt-newswire/globenewswire/aurora-intents-powers-a-new-way-to-fund-solflare-wallet-from-any-major-chain/2394738),
+[near/intents on GitHub](https://github.com/near/intents).
+
+### Pass 4 summary
+
+| Outcome | Bridges |
+|---|---|
+| **Excluded — intent/solver system, no dedicated Solana program (same class as NEAR Intents)** | Solflare Bridge |
+
+Registry remains unchanged: 14 bridges with real, live adapters, 2 (CCTP,
+Hyperlane) honestly marked unmonitored. `cargo test --workspace` not run
+for this pass — no code changed.
