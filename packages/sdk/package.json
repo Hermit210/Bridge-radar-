@@ -1,6 +1,6 @@
 {
   "name": "@bridge-radar/sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Minimal client for Bridge Radar's real-time Solana bridge health scores — via the public REST API or directly on-chain.",
   "type": "module",
   "main": "./dist/index.js",
