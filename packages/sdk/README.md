@@ -25,7 +25,7 @@ once one is deployed.
 ## API
 
 ```ts
-import { getBridgeHealth, getBridgeHealthOnChain, bandOf } from "@bridge-radar/sdk";
+import { getBridgeHealth, getBridgeHealthOnChain, getFinalityHealth, bandOf } from "@bridge-radar/sdk";
 import { Connection } from "@solana/web3.js";
 
 // Real off-chain score, from wherever you run apps/api.
@@ -37,7 +37,39 @@ console.log(health?.score, health ? bandOf(health.score) : "no score yet");
 // fabricated 0 for "doesn't exist").
 const conn = new Connection("https://api.devnet.solana.com");
 const onChainScore = await getBridgeHealthOnChain(conn, "wormhole");
+
+// Real observed Solana confirmed->finalized latency ("Finality Watch"),
+// relevant during the TowerBFT -> Alpenglow consensus transition.
+const finality = await getFinalityHealth("http://localhost:3001");
+console.log(finality.latest?.elapsedMs, finality.rollingBaselineMs, finality.isAnomalous);
 ```
+
+### `getFinalityHealth` — real example output
+
+Ran against a live local `apps/api` instance (real Solana mainnet slot, real
+observed latency — not a fixture):
+
+```ts
+const finality = await getFinalityHealth("http://localhost:3001");
+// {
+//   latest: {
+//     slot: 438582838,
+//     confirmedAt: "2026-08-11T09:43:14.903Z",
+//     finalizedAt: "2026-08-11T09:43:29.185Z",
+//     elapsedMs: 14282
+//   },
+//   rollingBaselineMs: 12605,
+//   sampleCount: 8492,
+//   windowStart: "2026-08-11T08:43:29.902Z",
+//   isAnomalous: false,
+//   anomalousBridgeEventsLastHour: 0,
+//   note: "rollingBaselineMs and isAnomalous are computed from real observed data only"
+// }
+```
+
+`rollingBaselineMs` and `isAnomalous` are `null`/`false` until enough real
+observations exist to trust a trailing-hour baseline — see the real `note`
+field, never a hardcoded guess about which consensus version is active.
 
 Note: the on-chain score can legitimately differ from the API's off-chain
 score — the on-chain value only updates when `radar-attester` actually runs
@@ -85,6 +117,6 @@ guarantee or financial advice — see `WHITEPAPER.md` §5.3.
 ## Types
 
 `BridgeHealth`, `HealthScore`, `HealthBand`, `BridgeRow`, `DefiLlamaProtocolTvl`,
-and `bandOf` are defined directly in this package (mirrored from
+`FinalityHealth`, and `bandOf` are defined directly in this package (mirrored from
 `packages/shared/src/index.ts`, which is workspace-private and never
 published) so the published package has no unresolvable dependency.
