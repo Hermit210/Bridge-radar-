@@ -24,7 +24,7 @@ Built by [Saloni Khan](https://github.com/Hermit210). Grant application in progr
 12. [Wallet layer (`/my-activity`)](#wallet-layer-my-activity)
 13. [Alerting — Telegram, Discord, webhooks](#alerting--telegram-discord-webhooks)
 14. [DeFiLlama data sync](#defillama-data-sync)
-15. [Storage](#storage)
+15. [Storage & data model](#storage--data-model)
 16. [Quick start / running it locally](#quick-start--running-it-locally)
 17. [Testing](#testing)
 18. [Deployment status](#deployment-status)
@@ -55,24 +55,90 @@ See [`PROGRESS.md`](./PROGRESS.md) for the full, dated, honest build log — wha
 
 ## Architecture
 
-```
-┌────────────────────────────────────────────────────────────────────────────┐
-│  Solana RPC (mainnet, Helius)  ──┐                                         │
-│  EVM RPCs (6 chains)            ─┼─► Indexers (Rust) ──► Storage ──► Scorer│
-│                                   │        │                          │    │
-│                                   │        ▼                          ▼    │
-│                                   │  Watchers (signer/frontend/oracle)│    │
-│                                   │        │                               │
-│                                   ▼        ▼                               │
-│                            API gateway (Hono/TS) ──► Dashboard (Next.js)  │
-│                                   │                                        │
-│                                   ├──► Alerter ──► Telegram / Discord / WH │
-│                                   │                                        │
-│                                   └──► Attester ──► Anchor oracle (Devnet) │
-└────────────────────────────────────────────────────────────────────────────┘
+Every box below is a real running process or real file in this repo — nothing here is aspirational. Solid arrows are real, currently-exercised data paths.
+
+```mermaid
+flowchart LR
+    subgraph Sources["Chain data sources"]
+        SOL[("Solana RPC<br/>mainnet — Helius")]
+        EVM[("EVM RPCs<br/>6 chains")]
+    end
+
+    subgraph Indexers["Rust indexers"]
+        IXS["radar-indexer-solana<br/>logsSubscribe + poll reconcile<br/>+ Finality Watch tracker"]
+        IXE["radar-indexer-evm<br/>eth_getLogs, 12-block<br/>confirmation buffer"]
+    end
+
+    DB[("Storage<br/>Postgres + TimescaleDB (prod)<br/>or SQLite (dev default)")]
+
+    subgraph Detect["Detection + scoring"]
+        WATCH["radar-watchers<br/>signer / frontend / oracle"]
+        SCORE["radar-scorer<br/>Health Score, every 60s"]
+    end
+
+    LLAMA["radar-defillama<br/>9 categories, independent schedules"]
+
+    subgraph Serve["Serving layer"]
+        API["API gateway<br/>Hono/TS — REST + WebSocket"]
+        DASH["Dashboard<br/>Next.js 15"]
+    end
+
+    subgraph Fanout["Fan-out"]
+        ALERT["radar-alerter"]
+        TG(["Telegram"])
+        DISC(["Discord"])
+        WH(["Generic webhook"])
+        ATT["radar-attester"]
+        ORACLE[["Anchor oracle<br/>Devnet"]]
+    end
+
+    SOL --> IXS --> DB
+    EVM --> IXE --> DB
+    LLAMA --> DB
+    DB <--> WATCH
+    DB <--> SCORE
+    DB <--> API --> DASH
+    DB --> ALERT
+    ALERT --> TG
+    ALERT --> DISC
+    ALERT --> WH
+    DB --> ATT --> ORACLE
 ```
 
-Two independent storage implementations exist for the same schema — a Rust `Storage` trait (`crates/radar-core/src/storage/{sqlite,postgres}.rs`) written to by every Rust binary, and a TypeScript `RadarDb` interface (`apps/api/src/db.ts`) read by the API — kept logically equivalent (same column names, same row shapes) but implemented independently since Node and Rust don't share a storage layer. Both dispatch on `DATABASE_URL`'s scheme (`sqlite://` vs anything else) the same way.
+**Real event → score → alert → oracle timeline**, tying the diagram above to actual code paths:
+
+```mermaid
+sequenceDiagram
+    participant Chain as Solana / EVM chain
+    participant Idx as Indexer (Rust)
+    participant DB as Storage (Postgres/SQLite)
+    participant Watch as radar-watchers
+    participant Score as radar-scorer
+    participant API as API gateway
+    participant Dash as Dashboard / SDK
+    participant Alert as radar-alerter
+    participant Att as radar-attester
+    participant Oracle as Anchor oracle (Devnet)
+
+    Chain->>Idx: logsSubscribe / eth_getLogs event
+    Idx->>DB: INSERT bridge_events
+    Watch->>DB: read recent events per bridge
+    Watch->>DB: INSERT signer_sets / frontend_hashes /<br/>oracle_stale event (only on real change)
+    loop every 60s
+        Score->>DB: read last window per bridge
+        Score->>DB: INSERT bridge_health_scores<br/>(5 weighted components)
+    end
+    Dash->>API: GET /v1/bridges, /v1/events, WS subscribe
+    API->>DB: query
+    DB-->>API: rows
+    API-->>Dash: JSON / WS push
+    DB-->>Alert: new event / score drop
+    Alert->>Alert: Telegram sendMessage, Discord webhook,<br/>generic webhook
+    Att->>DB: read latest score
+    Att->>Oracle: update_health(bridge_id, score)
+```
+
+Two independent storage implementations exist for the same schema — a Rust `Storage` trait (`crates/radar-core/src/storage/{sqlite,postgres}.rs`) written to by every Rust binary, and a TypeScript `RadarDb` interface (`apps/api/src/db.ts`) read by the API — kept logically equivalent (same column names, same row shapes) but implemented independently since Node and Rust don't share a storage layer. Both dispatch on `DATABASE_URL`'s scheme (`sqlite://` vs anything else) the same way. Full column-level schema for every table is in [Storage & data model](#storage--data-model) below.
 
 ## Repository map
 
@@ -304,9 +370,264 @@ Wallet connect via `@solana/wallet-adapter` (Phantom, Solflare, Coinbase, Ledger
 
 `crates/radar-defillama` syncs 9 categories of external reference data on independent schedules into `defillama_cache`, exposed read-only via `/v1/defillama/*`. Every response carries `source: "defillama"` and `fetched_at` so it's never confused with this project's own on-chain-derived detection data. 3 of the 9 categories (bridges, bridge-volume, oracles TVS) require a paid DeFiLlama Pro key ($300/mo); without one, those routes honestly report `{"available": false}` — never fake or fallback numbers.
 
-## Storage
+## Storage & data model
 
-v0 dev default: SQLite at `./data/radar.db`, zero setup, schema created inline on connect. Production: **Postgres + TimescaleDB**, live and verified end-to-end as of 2026-08-08 (`bridge_events` and `bridge_health_scores` are hypertables). Both are implemented twice — once as a Rust `Storage` trait impl (`crates/radar-core/src/storage/`) used by every Rust binary, and once as a TypeScript `RadarDb` interface (`apps/api/src/db.ts`) used by the API — kept logically equivalent so `DATABASE_URL`'s scheme alone decides which backend either side uses. Migration files in `migrations/` (0001 through 0011) target Postgres and are applied via `docker-compose.yml`'s initdb mount for a fresh database, or manually via `psql -f` for an already-running one.
+v0 dev default: SQLite at `./data/radar.db`, zero setup, schema created inline on connect. Production: **Postgres + TimescaleDB**, live and verified end-to-end as of 2026-08-08 (`bridge_events` and `bridge_health_scores` are hypertables, partitioned on their timestamp column). Both are implemented twice — once as a Rust `Storage` trait impl (`crates/radar-core/src/storage/`) used by every Rust binary, and once as a TypeScript `RadarDb` interface (`apps/api/src/db.ts`) used by the API — kept logically equivalent so `DATABASE_URL`'s scheme alone decides which backend either side uses.
+
+### Entity-relationship diagram
+
+11 real tables, applied in order by `migrations/0001`–`0011`. Five reference `bridges.id` directly; the rest (external cache, wallet/game features, network telemetry) are intentionally standalone — nothing here is inferred, this mirrors the actual `CREATE TABLE` statements verbatim.
+
+```mermaid
+erDiagram
+    BRIDGES ||--o{ BRIDGE_EVENTS : bridge_id
+    BRIDGES ||--o{ BRIDGE_HEALTH_SCORES : bridge_id
+    BRIDGES ||--o{ SIGNER_SETS : bridge_id
+    BRIDGES ||--o{ FRONTEND_HASHES : bridge_id
+    BRIDGES ||--o{ PARITY_STATE : bridge_id
+
+    BRIDGES {
+        text id PK
+        text display_name
+        text homepage
+        jsonb config
+        boolean enabled
+        timestamptz created_at
+    }
+    BRIDGE_EVENTS {
+        uuid id PK
+        timestamptz event_time PK
+        text bridge_id FK
+        text event_type
+        text chain_id
+        text asset
+        numeric amount_usd
+        text tx
+        jsonb payload
+        timestamptz ingested_at
+    }
+    BRIDGE_HEALTH_SCORES {
+        text bridge_id PK_FK
+        timestamptz computed_at PK
+        smallint score
+        real parity_severity
+        real outflow_severity
+        real signer_recency
+        real frontend_recency
+        real oracle_staleness
+        jsonb components
+    }
+    SIGNER_SETS {
+        text bridge_id PK_FK
+        timestamptz captured_at PK
+        text_array members
+        text source_tx
+    }
+    FRONTEND_HASHES {
+        text bridge_id PK_FK
+        text region PK
+        timestamptz captured_at PK
+        text hash
+    }
+    PARITY_STATE {
+        text bridge_id PK_FK
+        text asset PK
+        numeric locked_origin_usd
+        numeric minted_solana_usd
+        numeric burned_solana_usd
+        numeric unlocked_origin_usd
+        timestamptz updated_at
+    }
+    DEFILLAMA_CACHE {
+        text category PK
+        text key PK
+        jsonb payload
+        timestamptz fetched_at
+    }
+    GAME_SCORES {
+        bigint id PK
+        text wallet_address
+        integer score
+        integer blocks_used
+        integer distance
+        timestamptz completed_at
+    }
+    USER_STREAKS {
+        text wallet_address PK
+        date last_active_date
+        integer current_streak
+        integer longest_streak
+        timestamptz updated_at
+    }
+    TELEGRAM_SUBSCRIPTIONS {
+        text wallet_address PK
+        bigint chat_id
+        timestamptz subscribed_at
+    }
+    FINALITY_OBSERVATIONS {
+        bigint slot PK
+        timestamptz confirmed_at
+        timestamptz finalized_at
+        bigint elapsed_ms
+        bigint baseline_ms_at_time
+        boolean is_anomalous
+    }
+```
+
+*(`PK_FK` marks columns that are both part of a composite primary key and a foreign key back to `bridges.id` — mermaid's ER renderer doesn't support stacking both tags on one column.)*
+
+### Table reference
+
+**`bridges`** — the registry. One row per tracked bridge, 16 seeded rows today (14 `enabled = true`, 2 disabled — CCTP, Hyperlane).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `TEXT` **PK** | canonical slug, e.g. `"wormhole"` |
+| `display_name` | `TEXT NOT NULL` | |
+| `homepage` | `TEXT` | |
+| `config` | `JSONB NOT NULL DEFAULT '{}'` | programs, contracts, signer set, etc. |
+| `enabled` | `BOOLEAN NOT NULL DEFAULT TRUE` | scorer skips disabled bridges entirely |
+| `created_at` | `TIMESTAMPTZ NOT NULL DEFAULT NOW()` | |
+
+**`bridge_events`** — the normalized cross-chain event stream, mirrors `radar-core::BridgeEvent`. Timescale hypertable, partitioned on `event_time`.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `UUID NOT NULL` | part of composite PK |
+| `event_time` | `TIMESTAMPTZ NOT NULL` | hypertable partition column, part of composite PK |
+| `bridge_id` | `TEXT NOT NULL` **FK → bridges.id** | |
+| `event_type` | `TEXT NOT NULL CHECK IN (...)` | `lock`, `mint`, `burn`, `unlock`, `signer_change`, `frontend_change`, `oracle_stale` |
+| `chain_id` | `TEXT` | |
+| `asset` | `TEXT` | |
+| `amount_usd` | `NUMERIC(38,8)` | unpriced `0.0` placeholder in most adapters today — see [Known gaps](#known-gaps-honest-not-hidden) |
+| `tx` | `TEXT` | |
+| `payload` | `JSONB NOT NULL DEFAULT '{}'` | |
+| `ingested_at` | `TIMESTAMPTZ NOT NULL DEFAULT NOW()` | |
+
+PK: `(event_time, id)`. Indexes: `(bridge_id, event_time DESC)`, `(event_type, event_time DESC)`, `(asset, event_time DESC) WHERE asset IS NOT NULL`.
+
+**`bridge_health_scores`** — one row per `(bridge, computed_at)` tick, written by `radar-scorer` every 60s. Timescale hypertable, partitioned on `computed_at`.
+
+| Column | Type | Notes |
+|---|---|---|
+| `bridge_id` | `TEXT NOT NULL` **FK → bridges.id**, PK | |
+| `computed_at` | `TIMESTAMPTZ NOT NULL`, PK | |
+| `score` | `SMALLINT NOT NULL CHECK (0..100)` | |
+| `parity_severity` | `REAL NOT NULL DEFAULT 0` | weight 40 in the formula |
+| `outflow_severity` | `REAL NOT NULL DEFAULT 0` | weight 25 |
+| `signer_recency` | `REAL NOT NULL DEFAULT 0` | weight 15 |
+| `frontend_recency` | `REAL NOT NULL DEFAULT 0` | weight 10 |
+| `oracle_staleness` | `REAL NOT NULL DEFAULT 0` | weight 10 |
+| `components` | `JSONB NOT NULL DEFAULT '{}'` | full breakdown, makes every score backwards-auditable |
+
+PK: `(computed_at, bridge_id)`. Index: `(bridge_id, computed_at DESC)`. See [The five detectors + Health Score model](#the-five-detectors--health-score-model) for how these 5 columns combine.
+
+**`signer_sets`** — snapshot history feeding signer-set-diff detection.
+
+| Column | Type | Notes |
+|---|---|---|
+| `bridge_id` | `TEXT NOT NULL` **FK → bridges.id**, PK | |
+| `captured_at` | `TIMESTAMPTZ NOT NULL`, PK | |
+| `members` | `TEXT[] NOT NULL` | the signer pubkey/address set at that snapshot |
+| `source_tx` | `TEXT` | |
+
+**`frontend_hashes`** — bundle-hash chain per bridge per region, feeding frontend-drift detection.
+
+| Column | Type | Notes |
+|---|---|---|
+| `bridge_id` | `TEXT NOT NULL` **FK → bridges.id**, PK | |
+| `region` | `TEXT NOT NULL`, PK | |
+| `hash` | `TEXT NOT NULL` | |
+| `captured_at` | `TIMESTAMPTZ NOT NULL`, PK | |
+
+**`parity_state`** — running lock/mint/burn/unlock totals per `(bridge, asset)`, the parity detector's working set.
+
+| Column | Type | Notes |
+|---|---|---|
+| `bridge_id` | `TEXT NOT NULL` **FK → bridges.id**, PK | |
+| `asset` | `TEXT NOT NULL`, PK | |
+| `locked_origin_usd` | `NUMERIC(38,8) NOT NULL DEFAULT 0` | |
+| `minted_solana_usd` | `NUMERIC(38,8) NOT NULL DEFAULT 0` | |
+| `burned_solana_usd` | `NUMERIC(38,8) NOT NULL DEFAULT 0` | |
+| `unlocked_origin_usd` | `NUMERIC(38,8) NOT NULL DEFAULT 0` | |
+| `updated_at` | `TIMESTAMPTZ NOT NULL DEFAULT NOW()` | |
+
+**`defillama_cache`** — external reference data only, never used for detection. One row per `(category, key)`; `payload` is normalized JSON, not the raw API blob, so the shape stays stable across DeFiLlama's own API changes.
+
+| Column | Type | Notes |
+|---|---|---|
+| `category` | `TEXT NOT NULL`, PK | e.g. `"chain_tvl"`, `"stablecoins"`, `"protocols"` |
+| `key` | `TEXT NOT NULL`, PK | date, symbol, slug, or `"solana"` — disambiguator within category |
+| `payload` | `JSONB NOT NULL` | |
+| `fetched_at` | `TIMESTAMPTZ NOT NULL` | every API response also echoes this as `source: "defillama"` |
+
+Index: `(category, fetched_at DESC)`.
+
+**`game_scores`** — Bridge Race leaderboard. Client-reported, sane-bounds validated server-side, honestly documented as not tamper-proof (no anti-cheat in v0).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `BIGSERIAL PRIMARY KEY` | |
+| `wallet_address` | `TEXT NOT NULL` | validated base58 Solana address before insert |
+| `score` | `INTEGER NOT NULL CHECK (>= 0)` | |
+| `blocks_used` | `INTEGER NOT NULL CHECK (>= 0)` | |
+| `distance` | `INTEGER NOT NULL CHECK (>= 0)` | |
+| `completed_at` | `TIMESTAMPTZ NOT NULL DEFAULT NOW()` | |
+
+Indexes: `score DESC`, `wallet_address`.
+
+**`user_streaks`** — one row per wallet, daily UTC check-in streak for `/my-activity`.
+
+| Column | Type | Notes |
+|---|---|---|
+| `wallet_address` | `TEXT PRIMARY KEY` | |
+| `last_active_date` | `DATE NOT NULL` | |
+| `current_streak` | `INTEGER NOT NULL DEFAULT 1 CHECK (>= 1)` | resets to 1 on any gap, no-op if already recorded today |
+| `longest_streak` | `INTEGER NOT NULL DEFAULT 1 CHECK (>= 1)` | |
+| `updated_at` | `TIMESTAMPTZ NOT NULL DEFAULT NOW()` | |
+
+**`telegram_subscriptions`** — one row per wallet, written by the real `/start <wallet_address>` deep-link handler.
+
+| Column | Type | Notes |
+|---|---|---|
+| `wallet_address` | `TEXT PRIMARY KEY` | re-linking from a different chat updates `chat_id`, never creates a second row |
+| `chat_id` | `BIGINT NOT NULL` | |
+| `subscribed_at` | `TIMESTAMPTZ NOT NULL DEFAULT NOW()` | |
+
+Index: `chat_id`.
+
+**`finality_observations`** — one row per real Solana slot observed transitioning `confirmed` → `finalized`. Backs [Finality Watch](#finality-watch).
+
+| Column | Type | Notes |
+|---|---|---|
+| `slot` | `BIGINT PRIMARY KEY` | |
+| `confirmed_at` | `TIMESTAMPTZ NOT NULL` | |
+| `finalized_at` | `TIMESTAMPTZ NOT NULL` | |
+| `elapsed_ms` | `BIGINT NOT NULL` | real wall-clock time between the two observations |
+| `baseline_ms_at_time` | `BIGINT` | trailing-hour median **frozen at insert time**, not recomputed later — lets a later query honestly answer "was finality anomalous when this event happened" using the baseline that actually existed then |
+| `is_anomalous` | `BOOLEAN NOT NULL DEFAULT FALSE` | true at 3x the frozen baseline |
+
+Index: `finalized_at DESC`.
+
+### Migrations
+
+Applied in order, target Postgres; SQLite gets an equivalent inline schema baked into the Rust and TS `Storage` impls rather than replaying these files.
+
+| # | File | Adds |
+|---|---|---|
+| 0001 | `0001_init.sql` | `bridges`, `bridge_events`, `bridge_health_scores`, `signer_sets`, `frontend_hashes`, `parity_state` + seeds first 7 bridges |
+| 0002 | `0002_defillama_cache.sql` | `defillama_cache` |
+| 0003 | `0003_seed_relay_bridge.sql` | seed row: Relay |
+| 0004 | `0004_seed_across_bridge.sql` | seed row: Across Protocol |
+| 0005 | `0005_seed_garden_bridge.sql` | seed row: Garden Finance |
+| 0006 | `0006_seed_base_solana_bridge.sql` | seed row: Coinbase Bridge (Base-Solana) |
+| 0007 | `0007_seed_remaining_bridges.sql` | seed rows: remaining bridges up to 16 total |
+| 0008 | `0008_game_scores.sql` | `game_scores` |
+| 0009 | `0009_user_streaks.sql` | `user_streaks` |
+| 0010 | `0010_telegram_subscriptions.sql` | `telegram_subscriptions` |
+| 0011 | `0011_finality_observations.sql` | `finality_observations` |
+
+Applied via `docker-compose.yml`'s initdb mount for a fresh database, or manually via `psql -f migrations/000N_*.sql` in order for an already-running one.
 
 ## Quick start / running it locally
 
