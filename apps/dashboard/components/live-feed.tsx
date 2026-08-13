@@ -16,13 +16,32 @@ const KIND_OPTIONS: { value: BridgeEvent["type"]; label: string }[] = [
   { value: "oracle_stale", label: "Oracle stale" },
 ];
 
+// The three non-transfer event kinds — real, documented on /developers as
+// distinct BridgeEventKind values. The API only accepts one ?type= per
+// request (no OR support), so "Anomalies only" below issues one real
+// request per kind and merges them, rather than inventing a server
+// capability that doesn't exist.
+const ANOMALY_KINDS: BridgeEvent["type"][] = ["signer_change", "frontend_change", "oracle_stale"];
+
+type Preset = "all" | "anomalies" | "finality";
+
+const PRESETS: { value: Preset; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "anomalies", label: "Anomalies only" },
+  { value: "finality", label: "Finality-anomalous only" },
+];
+
 interface Props {
   initial: BridgeEvent[];
   bridgeOptions: { id: string; displayName: string }[];
 }
 
 const selectClass =
-  "rounded-lg border border-border-subtle bg-surface-2 px-3 py-1.5 text-xs text-text-secondary transition-colors hover:border-accent/30 focus:border-accent/40 focus:outline-none";
+  "rounded-lg border border-border-subtle bg-surface-2 px-3 py-1.5 text-xs text-text-secondary transition-colors hover:border-accent/30 focus:border-accent/40 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed";
+
+function sortByEventTimeDesc(events: BridgeEvent[]): BridgeEvent[] {
+  return [...events].sort((a, b) => new Date(b.event_time).getTime() - new Date(a.event_time).getTime());
+}
 
 export function LiveFeed({ initial, bridgeOptions }: Props) {
   const [events, setEvents] = useState<BridgeEvent[]>(initial);
@@ -30,6 +49,7 @@ export function LiveFeed({ initial, bridgeOptions }: Props) {
   const [connected, setConnected] = useState(true);
   const [bridgeFilter, setBridgeFilter] = useState<string>("");
   const [typeFilter, setTypeFilter] = useState<string>("");
+  const [preset, setPreset] = useState<Preset>("all");
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
   const seenIds = useRef<Set<string>>(new Set(initial.map((e) => e.id)));
   const isFirstRun = useRef(true);
@@ -39,11 +59,35 @@ export function LiveFeed({ initial, bridgeOptions }: Props) {
 
     async function fetchEvents(markNew: boolean) {
       try {
-        const { events: newEvents } = await listEvents({
-          limit: 50,
-          bridge: bridgeFilter || undefined,
-          type: (typeFilter || undefined) as BridgeEvent["type"] | undefined,
-        });
+        let newEvents: BridgeEvent[];
+        if (preset === "anomalies") {
+          // Real merge of 3 real single-type requests -- see ANOMALY_KINDS.
+          const batches = await Promise.all(
+            ANOMALY_KINDS.map((type) => listEvents({ limit: 20, bridge: bridgeFilter || undefined, type })),
+          );
+          newEvents = sortByEventTimeDesc(batches.flatMap((b) => b.events)).slice(0, 50);
+        } else if (preset === "finality") {
+          // finality_anomaly_at_time is real per-event data already returned
+          // by the API (see /developers) but has no server-side query param
+          // of its own -- fetch a wider real batch and filter honestly
+          // client-side, rather than silently limiting to the last 50
+          // all-type events (real finality anomalies are rare enough that
+          // window would frequently show nothing even when real anomalous
+          // events exist further back).
+          const { events: batch } = await listEvents({
+            limit: 200,
+            bridge: bridgeFilter || undefined,
+            type: (typeFilter || undefined) as BridgeEvent["type"] | undefined,
+          });
+          newEvents = batch.filter((e) => e.finality_anomaly_at_time === true).slice(0, 50);
+        } else {
+          const { events: batch } = await listEvents({
+            limit: 50,
+            bridge: bridgeFilter || undefined,
+            type: (typeFilter || undefined) as BridgeEvent["type"] | undefined,
+          });
+          newEvents = batch;
+        }
         if (cancelled) return;
         const freshlyArrived = markNew
           ? new Set(newEvents.filter((e) => !seenIds.current.has(e.id)).map((e) => e.id))
@@ -76,7 +120,7 @@ export function LiveFeed({ initial, bridgeOptions }: Props) {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [bridgeFilter, typeFilter]);
+  }, [bridgeFilter, typeFilter, preset]);
 
   /** Real breakdown of the events currently on screen, by kind — computed
    * from the same data already fetched, never a separate estimate. */
@@ -106,6 +150,23 @@ export function LiveFeed({ initial, bridgeOptions }: Props) {
           </span>
         </div>
 
+        <div className="flex flex-wrap items-center gap-1.5">
+          {PRESETS.map((p) => (
+            <button
+              key={p.value}
+              type="button"
+              onClick={() => setPreset(p.value)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                preset === p.value
+                  ? "bg-accent text-bg"
+                  : "border border-border-subtle text-muted-dark hover:text-text"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+
         <div className="flex flex-wrap items-center gap-2">
           <select
             value={bridgeFilter}
@@ -123,6 +184,8 @@ export function LiveFeed({ initial, bridgeOptions }: Props) {
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
+            disabled={preset === "anomalies"}
+            title={preset === "anomalies" ? "Overridden by the Anomalies only preset" : undefined}
             className={selectClass}
             aria-label="Filter by event type"
           >
@@ -133,12 +196,13 @@ export function LiveFeed({ initial, bridgeOptions }: Props) {
               </option>
             ))}
           </select>
-          {(bridgeFilter || typeFilter) && (
+          {(bridgeFilter || typeFilter || preset !== "all") && (
             <button
               type="button"
               onClick={() => {
                 setBridgeFilter("");
                 setTypeFilter("");
+                setPreset("all");
               }}
               className="text-xs text-muted-dark underline transition-colors hover:text-text"
             >
@@ -187,8 +251,8 @@ export function LiveFeed({ initial, bridgeOptions }: Props) {
                       </div>
                     </div>
                     <p className="text-muted text-sm">
-                      {bridgeFilter || typeFilter
-                        ? "No events match these filters yet."
+                      {bridgeFilter || typeFilter || preset !== "all"
+                        ? "No real events match these filters yet."
                         : "Waiting for events. Make sure the indexer is running."}
                     </p>
                   </div>
