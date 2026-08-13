@@ -15,6 +15,17 @@ import { bandFor, formatUsd, type BridgeWithHealth, type BridgeEvent, type Healt
 // for busier bridges — not a data-freshness cutoff for anything else.
 const RECENT_WINDOW_MS = 60_000;
 
+const SINCE_24H = () => new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+// One real request for every bridge's 24h events combined, not one request
+// per bridge (16 bridges x a 5s poll would be real, unnecessary API load —
+// see the compare page's fetch24hCount for the per-bridge version, used
+// there because it only ever needs 1-2 bridges at once). The API caps a
+// single response at 1000 rows; a combined count that hits the cap likely
+// under-represents the busiest bridges specifically, so that's surfaced
+// honestly rather than presented as exact.
+const ACTIVITY_POLL_MS = 30_000;
+const ACTIVITY_LIMIT = 1000;
+
 // Default card-grid ordering: surfaces alert/watch bridges before healthy
 // ones, since that's what a security-monitoring dashboard's default view
 // should prioritize. Lower rank sorts first.
@@ -43,6 +54,7 @@ function buildHeartbeats(events: BridgeEvent[]): Record<string, HeartbeatInfo> {
 export default function Home() {
   const [bridges, setBridges] = useState<BridgeWithHealth[]>([]);
   const [events, setEvents] = useState<BridgeEvent[]>([]);
+  const [dayEvents, setDayEvents] = useState<BridgeEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [bandFilter, setBandFilter] = useState<HealthBand | "all">("all");
@@ -77,6 +89,34 @@ export default function Home() {
       clearInterval(interval);
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchDayEvents = () => {
+      listEvents({ since: SINCE_24H(), limit: ACTIVITY_LIMIT })
+        .then((r) => {
+          if (!cancelled) setDayEvents(r.events);
+        })
+        .catch(() => {
+          /* honest no-op — "Most active" sort just falls back to 0 counts, no fake data */
+        });
+    };
+    fetchDayEvents();
+    const interval = setInterval(fetchDayEvents, ACTIVITY_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
+
+  /** Real 24h event count per bridge, from the same combined fetch above —
+   * `capped` is true if the combined response hit ACTIVITY_LIMIT, meaning
+   * these specific counts may under-represent real activity. */
+  const activity = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const e of dayEvents) counts.set(e.bridge_id, (counts.get(e.bridge_id) ?? 0) + 1);
+    return { counts, capped: dayEvents.length >= ACTIVITY_LIMIT };
+  }, [dayEvents]);
 
   const bands = bridges.map(bandFor);
   const totals = {
@@ -246,7 +286,7 @@ export default function Home() {
           ))}
         </div>
       ) : (
-        <BridgeTable bridges={filtered} heartbeats={heartbeats} />
+        <BridgeTable bridges={filtered} heartbeats={heartbeats} activity={activity} />
       )}
     </div>
   );
@@ -302,7 +342,7 @@ const bandBarClass = {
   unmonitored: "health-bar-muted",
 } as const;
 
-type SortKey = "score" | "tvl";
+type SortKey = "score" | "tvl" | "activity";
 type SortDir = "desc" | "asc";
 
 function SortHeader({
@@ -339,9 +379,11 @@ function SortHeader({
 function BridgeTable({
   bridges,
   heartbeats,
+  activity,
 }: {
   bridges: BridgeWithHealth[];
   heartbeats: Record<string, HeartbeatInfo>;
+  activity: { counts: Map<string, number>; capped: boolean };
 }) {
   const router = useRouter();
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
@@ -368,12 +410,14 @@ function BridgeTable({
       const value =
         sortKey === "score"
           ? (band === "unmonitored" ? undefined : b.health?.score) ?? -1
-          : b.defillama?.tvl_usd ?? -1;
+          : sortKey === "activity"
+            ? activity.counts.get(b.id) ?? 0
+            : b.defillama?.tvl_usd ?? -1;
       return { b, value };
     });
     withValue.sort((x, y) => (sortDir === "desc" ? y.value - x.value : x.value - y.value));
     return withValue.map((w) => w.b);
-  }, [bridges, sortKey, sortDir]);
+  }, [bridges, sortKey, sortDir, activity]);
 
   return (
     <section className="glass-card-elevated overflow-hidden">
@@ -384,7 +428,13 @@ function BridgeTable({
               <th className="px-5 py-2.5">Bridge</th>
               <th className="px-2 py-2.5">Status</th>
               <SortHeader label="Score" sortKey="score" active={sortKey === "score"} dir={sortDir} onClick={toggleSort} />
-              <th className="px-2 py-2.5">Activity</th>
+              <SortHeader
+                label={`Activity (24h)${activity.capped ? "*" : ""}`}
+                sortKey="activity"
+                active={sortKey === "activity"}
+                dir={sortDir}
+                onClick={toggleSort}
+              />
               <SortHeader label="TVL" sortKey="tvl" active={sortKey === "tvl"} dir={sortDir} onClick={toggleSort} />
               <th className="px-2 py-2.5">Adapter</th>
             </tr>
@@ -421,11 +471,19 @@ function BridgeTable({
                     </div>
                   </td>
                   <td className="px-2 py-3">
-                    <HeartbeatDot
-                      lastEventAt={hb?.lastEventAt}
-                      recentCount={hb?.recentCount ?? 0}
-                      monitored={b.enabled}
-                    />
+                    <div className="flex items-center gap-2">
+                      <HeartbeatDot
+                        lastEventAt={hb?.lastEventAt}
+                        recentCount={hb?.recentCount ?? 0}
+                        monitored={b.enabled}
+                      />
+                      {b.enabled && (
+                        <span className="font-mono text-[11px] text-muted-dark">
+                          {activity.counts.get(b.id) ?? 0}
+                          {activity.capped ? "+" : ""}/24h
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-2 py-3 font-mono text-xs text-text-secondary">
                     {b.defillama ? formatUsd(b.defillama.tvl_usd) : <span className="text-muted-dark">—</span>}
