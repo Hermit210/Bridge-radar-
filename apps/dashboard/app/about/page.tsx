@@ -6,11 +6,14 @@ import { listRegistry } from "@/lib/api";
 
 export const metadata = { title: "About — Bridge Radar" };
 
+const REPO = "https://github.com/Hermit210/Bridge-radar-";
+
 const linkClass =
   "text-accent hover:text-accent-bright transition-colors underline underline-offset-4 decoration-accent/30 hover:decoration-accent";
 
 const SECTIONS: DocsSection[] = [
   { id: "overview", label: "Overview" },
+  { id: "status", label: "What's live" },
   { id: "detectors", label: "Detectors" },
   { id: "surfaces", label: "Surfaces" },
   { id: "architecture", label: "Architecture" },
@@ -53,6 +56,48 @@ export default async function AboutPage() {
             covers what Bridge Radar is and how it's built.
           </p>
         </section>
+
+        <Reveal>
+          <section id="status" className="scroll-mt-24 space-y-4">
+            <div>
+              <h2 className="font-display text-xl font-semibold tracking-[-0.01em] text-text">
+                What's live right now
+              </h2>
+              <p className="mt-1.5 text-sm text-muted">
+                A snapshot of what's real and running today, not aspirational — full detail in{" "}
+                <Link className={linkClass} href={`${REPO}/blob/master/PROGRESS.md`}>
+                  PROGRESS.md
+                </Link>
+                .
+              </p>
+            </div>
+            <ul className="space-y-2.5">
+              {[
+                registry
+                  ? `${registry.summary.implemented} bridges actively monitored on Solana mainnet, ${registry.summary.planned} more real bridges tracked with no verified adapter yet — see /bridges`
+                  : "Bridge count unavailable right now — the registry API didn't respond.",
+                "5 independent detectors feeding one weighted Health Score, real since 2026-08-01 (parity, outflow, signer, frontend, oracle).",
+                "Postgres + TimescaleDB in production — deployed on Render, real hypertables, not the SQLite dev default.",
+                <>
+                  <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-accent">
+                    @bridge-radar/sdk@0.2.0
+                  </code>{" "}
+                  published on npm, including Finality Watch's <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-accent">getFinalityHealth()</code>.
+                </>,
+                "REST + WebSocket API live and publicly reachable — see /developers for real curl examples.",
+                "On-chain oracle live on Solana Devnet — not mainnet yet, a deliberate real-funds decision not made.",
+              ].map((content, i) => (
+                <li
+                  key={i}
+                  className="glass-card-interactive flex items-start gap-3 p-4 text-sm text-text-secondary"
+                >
+                  <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-green" />
+                  <span>{content}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </Reveal>
 
         <Reveal>
           <section id="detectors" className="scroll-mt-24 space-y-4">
