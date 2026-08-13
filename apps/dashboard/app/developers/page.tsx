@@ -7,12 +7,13 @@ import { listRegistry } from "@/lib/api";
 export const metadata = { title: "Developers — Bridge Radar" };
 
 const REPO = "https://github.com/Hermit210/Bridge-radar-";
-// Real, current dev API base — there is no live production deployment yet
-// (no vercel.json/CI deploy workflow in this repo, and DEPLOYMENT.md is
-// explicit that nothing here has been run against a live server). Every
-// example on this page targets this real, running-right-now URL rather
-// than inventing a domain that doesn't exist. Swap this once one does.
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+// Real, current API base. Live in production on Render's free tier as of
+// 2026-08-13 (see PROGRESS.md) — every example on this page targets that
+// real, running URL. `.trim()` guards against whitespace accidentally
+// baked into NEXT_PUBLIC_API_URL at the hosting layer (e.g. a stray tab
+// pasted into a dashboard env var field) leaking into every code example
+// on the page and making them non-copy-pasteable.
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001").trim();
 
 const linkClass =
   "text-accent hover:text-accent-bright transition-colors underline underline-offset-4 decoration-accent/30 hover:decoration-accent";
@@ -35,9 +36,10 @@ export default async function DevelopersPage() {
         <p className="text-[15px] leading-[1.75] text-text-secondary">
           Four real ways to pull Bridge Radar's data into your own app: the TypeScript SDK, the
           REST/WebSocket API directly, a drop-in embeddable badge, or reading the on-chain oracle
-          yourself. No live production deployment exists yet — every URL below points at a real
-          API running locally right now (<code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-accent">{API_BASE}</code>),
-          not a placeholder domain.
+          yourself. Every URL below points at the real, live API
+          (<code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-accent">{API_BASE}</code>),
+          not a placeholder domain — deployed on Render's free tier, so expect an occasional
+          cold-start delay after a period of inactivity.
         </p>
       </div>
 
@@ -55,7 +57,7 @@ export default async function DevelopersPage() {
           </div>
 
           <div className="rounded-xl border border-green/30 bg-green/10 px-4 py-3 text-xs text-green">
-            Published on npm — <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">@bridge-radar/sdk@0.1.0</code>,
+            Published on npm — <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">@bridge-radar/sdk@0.2.0</code>,
             public, zero unresolvable dependencies. Verify yourself:{" "}
             <Link className={linkClass} href="https://www.npmjs.com/package/@bridge-radar/sdk">npmjs.com/package/@bridge-radar/sdk</Link>.
           </div>
@@ -64,10 +66,10 @@ export default async function DevelopersPage() {
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-dark">Install</p>
             <CodeBlock language="bash" code={`npm install @bridge-radar/sdk`} />
             <p className="text-xs text-muted-dark">
-              No hosted production API exists yet (see DEPLOYMENT.md), so <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">getBridgeHealth()</code> takes
-              the API URL as an explicit argument rather than baking in a default that doesn't exist —
-              every example below points at <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">{API_BASE}</code>,
-              a real API running locally right now. Point it at your own instance, or at our production URL once one is deployed.
+              <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">getBridgeHealth()</code> takes
+              the API URL as an explicit argument rather than baking in a default — every example below points at{" "}
+              <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">{API_BASE}</code>,
+              our real live instance. Point it at your own instance instead if you're self-hosting.
             </p>
           </div>
 
@@ -107,11 +109,10 @@ const score = await getBridgeHealthOnChain(connection, "wormhole");
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-dark">
               getFinalityHealth() — real GET /v1/network/finality under the hood
             </p>
-            <div className="rounded-xl border border-yellow/30 bg-yellow-glow/40 px-4 py-3 text-xs text-yellow">
-              Not in the published <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">@bridge-radar/sdk@0.1.0</code> yet
-              — it's real, working source on this branch, but the npm package hasn't been re-published with it. Use from source
-              (<code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">packages/sdk/src/index.ts</code>) until a
-              new version ships.
+            <div className="rounded-xl border border-green/30 bg-green/10 px-4 py-3 text-xs text-green">
+              Published — real, live in <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">@bridge-radar/sdk@0.2.0</code> on
+              npm. No source-only caveat anymore: <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">npm install @bridge-radar/sdk</code> gets
+              you this export directly.
             </div>
             <CodeBlock
               language="typescript"
@@ -185,7 +186,7 @@ interface FinalityHealth { latest: { slot: number; confirmedAt: string; finalize
             <h2 className="font-display text-xl font-semibold tracking-[-0.01em] text-text">REST + WebSocket API</h2>
             <p className="mt-1.5 text-sm text-muted">
               No API key, no rate limiting currently enforced in the code — every route below is a real,
-              public GET. (That will very likely change before a real production deployment; this page
+              public GET. (That will very likely change as this deployment matures; this page
               reflects the code as it stands.)
             </p>
           </div>
