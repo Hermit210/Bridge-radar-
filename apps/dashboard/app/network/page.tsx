@@ -27,15 +27,24 @@ function medianOf(values: number[]): number | null {
 export default function NetworkPage() {
   const [windowMs, setWindowMs] = useState<number>(WINDOWS[0].ms);
   const [observations, setObservations] = useState<FinalityObservation[]>([]);
+  const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     const poll = () => {
+      // limit: 2000 is the server's real hard cap (FINALITY_HISTORY_MAX_POINTS
+      // in apps/api/src/index.ts) -- requesting higher does nothing, the API
+      // clamps it. Finality Watch samples roughly once/second, so even the
+      // 1h window has ~3600 real observations -- more than the cap. The API
+      // already computes `truncated` for exactly this case (keeping the most
+      // recent points, dropping the oldest); this used to be fetched and
+      // silently discarded rather than shown.
       getFinalityHistory({ since: new Date(Date.now() - windowMs).toISOString(), limit: 2000 })
         .then((h) => {
           if (!cancelled) {
             setObservations(h.history);
+            setTruncated(h.truncated);
             setLoading(false);
           }
         })
@@ -99,14 +108,22 @@ export default function NetworkPage() {
             <FinalityChart observations={observations} baselineMs={baselineMs} />
           )}
           <p className="text-xs text-muted-dark">
-            {observations.length} real observation(s) in the selected window. Red dots mark observations
-            flagged anomalous (≥3x that observation's own real trailing-hour baseline at the time it was
-            recorded) — real source:{" "}
+            {observations.length} real observation(s) shown{truncated ? " (most recent — see note below)" : ""} in
+            the selected window. Red dots mark observations flagged anomalous (≥3x that observation's own real
+            trailing-hour baseline at the time it was recorded) — real source:{" "}
             <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[11px] text-accent">
               GET /v1/network/finality/history
             </code>
             .
           </p>
+          {truncated && (
+            <p className="rounded-xl border border-yellow/30 bg-yellow-glow/40 px-4 py-3 text-xs text-yellow">
+              This window has more real observations than the API returns in one request (capped at 2,000 —
+              Finality Watch samples roughly once per second, so wider windows exceed that fast). Showing the
+              most recent 2,000; earlier ones in this window are real but not included in this view. Pick a
+              narrower window to see the full window without truncation.
+            </p>
+          )}
         </section>
       </Reveal>
 
