@@ -1,11 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { bandFor, type BridgeWithHealth, type HealthBand } from "@radar/shared";
-import { listBridges } from "@/lib/api";
-
-const POLL_MS = 5000;
+import { useHomepageLiveData } from "./homepage-live-data";
 
 const bandDot: Record<HealthBand, string> = {
   green: "status-dot-green",
@@ -41,29 +39,14 @@ function MarqueeItem({ bridge }: { bridge: BridgeWithHealth }) {
 }
 
 /** Real-data scrolling ticker — every bridge name and health dot/score
- * comes from the same polled /v1/bridges the rest of the app reads; the
- * list is duplicated once so the CSS marquee loop is seamless, never
- * padded with placeholder entries. Pauses on hover and respects
- * prefers-reduced-motion (falls back to a horizontally scrollable row). */
+ * comes from the shared HomepageLiveDataProvider poll (same /v1/bridges
+ * the rest of the app reads, no fetch of its own); the list is duplicated
+ * once so the CSS marquee loop is seamless, never padded with placeholder
+ * entries. Pauses on hover and respects prefers-reduced-motion (falls
+ * back to a horizontally scrollable row). */
 export function BridgeMarquee() {
-  const [bridges, setBridges] = useState<BridgeWithHealth[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const poll = () => {
-      listBridges()
-        .then((r) => {
-          if (!cancelled) setBridges(r.bridges.filter((b) => b.enabled));
-        })
-        .catch(() => {});
-    };
-    poll();
-    const interval = setInterval(poll, POLL_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, []);
+  const { bridges: allBridges } = useHomepageLiveData();
+  const bridges = useMemo(() => (allBridges ?? []).filter((b) => b.enabled), [allBridges]);
 
   if (bridges.length === 0) return null;
 

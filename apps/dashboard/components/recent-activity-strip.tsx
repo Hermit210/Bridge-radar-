@@ -1,12 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import type { BridgeEvent } from "@radar/shared";
-import { listEvents } from "@/lib/api";
+import { useMemo } from "react";
 import { kindBg } from "./event-row";
+import { useHomepageLiveData } from "./homepage-live-data";
 
-const POLL_MS = 5000;
 const LIMIT = 5;
 
 function timeAgo(iso: string): string {
@@ -17,31 +15,19 @@ function timeAgo(iso: string): string {
   return `${Math.round(m / 60)}h ago`;
 }
 
-/** Last 5 real events, same /v1/events data every other page on the site
- * reads — no separate "homepage feed" source. Each row links to that
- * bridge's own page; the whole homepage previously had zero real event
- * data despite the entire product being about real-time events. */
+/** Last 5 real events, derived from the shared HomepageLiveDataProvider
+ * poll (same /v1/events data every other page on the site reads) — no
+ * fetch of its own. Each row links to that bridge's own page.
+ *
+ * One real behavior change from when this had its own unbounded fetch:
+ * the shared poll scopes events to the last 1h (see homepage-live-data.tsx),
+ * so on a bridge with zero real activity in the last hour this would show
+ * "no events" even if an older real event exists. Given real continuous
+ * ingestion, that's the honest state to show, not a bug — an actually
+ * quiet last hour is worth reflecting, not papering over with a stale event. */
 export function RecentActivityStrip() {
-  const [events, setEvents] = useState<BridgeEvent[] | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    const poll = () => {
-      listEvents({ limit: LIMIT })
-        .then((r) => {
-          if (!cancelled) setEvents(r.events);
-        })
-        .catch(() => {
-          /* honest no-op — strip just stays on its last real data / loading state */
-        });
-    };
-    poll();
-    const interval = setInterval(poll, POLL_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, []);
+  const { events } = useHomepageLiveData();
+  const recent = useMemo(() => (events ?? []).slice(0, LIMIT), [events]);
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-2.5">
@@ -56,10 +42,10 @@ export function RecentActivityStrip() {
       <div className="divide-y divide-border-subtle rounded-2xl border border-border-subtle bg-surface-0/70 backdrop-blur-sm">
         {events === null ? (
           <div className="px-5 py-6 text-center text-sm text-muted">Loading real events…</div>
-        ) : events.length === 0 ? (
-          <div className="px-5 py-6 text-center text-sm text-muted">No events yet.</div>
+        ) : recent.length === 0 ? (
+          <div className="px-5 py-6 text-center text-sm text-muted">No events in the last hour.</div>
         ) : (
-          events.map((e) => (
+          recent.map((e) => (
             <Link
               key={e.id}
               href={`/bridges/${e.bridge_id}`}

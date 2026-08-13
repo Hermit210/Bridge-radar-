@@ -7,6 +7,7 @@ import { OrbitGlow } from "@/components/orbit-glow";
 import { BridgeMarquee } from "@/components/bridge-marquee";
 import { BridgeGlobe } from "@/components/bridge-globe";
 import { RecentActivityStrip } from "@/components/recent-activity-strip";
+import { HomepageLiveDataProvider } from "@/components/homepage-live-data";
 
 const heroCtaClass =
   "cta-glow group inline-flex items-center justify-center gap-2 rounded-full bg-accent px-8 py-4 font-display text-sm font-semibold tracking-[-0.01em] text-bg transition-all duration-200 hover:scale-[1.03] hover:bg-accent-bright hover:shadow-glow-md active:scale-[0.98]";
@@ -34,6 +35,7 @@ function ArrowIcon() {
 
 export default async function LandingPage() {
   return (
+    <HomepageLiveDataProvider>
     <div className="mx-auto max-w-5xl space-y-28 px-6 py-16 sm:space-y-36 sm:py-24">
       {/* Hero */}
       <section className="relative py-6 text-center">
@@ -148,5 +150,6 @@ export default async function LandingPage() {
         </section>
       </Reveal>
     </div>
+    </HomepageLiveDataProvider>
   );
 }

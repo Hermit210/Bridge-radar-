@@ -5,14 +5,13 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import type { GlobeMethods } from "react-globe.gl";
 import { bandFor, type BridgeWithHealth } from "@radar/shared";
-import { listBridges, listEvents, listRegistry, type RegistryEntry } from "@/lib/api";
+import { type RegistryEntry } from "@/lib/api";
+import { useHomepageLiveData } from "./homepage-live-data";
 
 // react-globe.gl wraps three.js/WebGL and has no meaningful server-rendered
 // output — load it client-only so it never blocks or bloats pages that
 // don't render the globe (e.g. any future SSR/streaming of this page).
 const Globe = dynamic(() => import("react-globe.gl"), { ssr: false });
-
-const POLL_MS = 5000;
 
 /** The chains we actually run an indexer against — Solana (radar-indexer-solana)
  * plus every EVM chain radar-indexer-evm polls (see .env: ETH/ARBITRUM/BASE/
@@ -135,10 +134,7 @@ export function BridgeGlobe() {
   const containerRef = useRef<HTMLDivElement>(null);
   const globeRef = useRef<GlobeMethods | undefined>(undefined);
   const [size, setSize] = useState({ width: 320, height: 420 });
-  const [bridges, setBridges] = useState<BridgeWithHealth[] | null>(null);
-  const [registry, setRegistry] = useState<RegistryEntry[] | null>(null);
-  const [activeBridgeIds, setActiveBridgeIds] = useState<Set<string>>(new Set());
-  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const { bridges, registry, events, updatedAt } = useHomepageLiveData();
 
   useEffect(() => {
     const el = containerRef.current;
@@ -153,29 +149,11 @@ export function BridgeGlobe() {
     return () => ro.disconnect();
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    const oneHourAgo = () => new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const poll = () => {
-      Promise.all([
-        listBridges().catch(() => null),
-        listRegistry().catch(() => null),
-        listEvents({ since: oneHourAgo(), limit: 1000 }).catch(() => null),
-      ]).then(([b, r, e]) => {
-        if (cancelled) return;
-        if (b) setBridges(b.bridges);
-        if (r) setRegistry(r.implemented);
-        if (e) setActiveBridgeIds(new Set(e.events.map((ev) => ev.bridge_id)));
-        setUpdatedAt(Date.now());
-      });
-    };
-    poll();
-    const interval = setInterval(poll, POLL_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, []);
+  // Derived from the shared HomepageLiveDataProvider poll -- no fetch of
+  // its own (see that file for why: this used to be its own independent
+  // listBridges + listRegistry + listEvents poll every 5s, one of 4 such
+  // duplicated polls on this page).
+  const activeBridgeIds = useMemo(() => new Set((events ?? []).map((e) => e.bridge_id)), [events]);
 
   const arcs = useMemo(
     () => (bridges && registry ? buildArcs(bridges, registry, activeBridgeIds) : []),
