@@ -36,7 +36,13 @@ services:
     # cannot execute that without a loader, and the tsc+node path has never
     # actually been run end-to-end (see README's Deployment status section)
     # — tsx is the one execution path already proven to work, in dev.
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @radar/api typecheck
+    #
+    # No `corepack enable` — Render's Node image already has pnpm on PATH at
+    # /usr/bin/pnpm (confirmed by a real build failure: `corepack enable`
+    # tried to relink that exact path and hit EROFS, since /usr/bin is
+    # read-only on this image). Enabling corepack here was always redundant;
+    # it just failed loudly instead of being a harmless no-op.
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @radar/api typecheck
     startCommand: node_modules/.bin/tsx apps/api/src/scripts/migrate.ts && node_modules/.bin/tsx apps/api/src/index.ts
     healthCheckPath: /v1/healthz
     envVars:
