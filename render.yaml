@@ -119,13 +119,21 @@ services:
       # Render logs that the binary's built-in defaults get blocked/limited
       # specifically from Render's IPs (not broken generally — this project's
       # own local dev traffic hits them fine): ethereum-rpc.publicnode.com
-      # returned a real 403, mainnet.base.org a real 429. These two swap to
-      # different providers than the ones already failing; not yet confirmed
-      # against real Render traffic (that happens on this deploy).
+      # returned a real 403, mainnet.base.org a real 429.
+      #
+      # First attempt (cloudflare-eth.com + base-rpc.publicnode.com) was
+      # real-tested and only partly worked: base-rpc.publicnode.com also
+      # 403'd — publicnode.com blocks Render broadly, not just one chain's
+      # subdomain — and cloudflare-eth.com stopped 403ing but returned a
+      # malformed response ("eth_blockNumber missing result"), still not a
+      # working call. Second attempt: dRPC, unrelated infra to both
+      # Cloudflare and publicnode.com. Also not yet confirmed — if this
+      # doesn't hold up either, the honest fix is a real Alchemy/Infura free
+      # key, which needs your own signup, not another blind provider swap.
       - key: ETH_RPC_URL
-        value: https://cloudflare-eth.com
+        value: https://eth.drpc.org
       - key: BASE_RPC_URL
-        value: https://base-rpc.publicnode.com
+        value: https://base.drpc.org
 
   # ── Signer-set / frontend-hash / oracle-staleness detectors ────────────────
   - type: web
