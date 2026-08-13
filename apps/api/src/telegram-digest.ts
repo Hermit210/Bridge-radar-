@@ -63,10 +63,27 @@ export async function runWeeklyDigestSend(db: RadarDb, botToken: string): Promis
 /** Real weekly schedule: Sunday 20:00 UTC (`0 20 * * 0`, node-cron's real
  * five-field cron syntax — https://www.npmjs.com/package/node-cron). No-op
  * (with a clear log line) if TELEGRAM_BOT_TOKEN isn't configured, matching
- * the existing alerter's honest dry-run behavior rather than crashing. */
+ * the existing alerter's honest dry-run behavior rather than crashing.
+ *
+ * Also a no-op when WEEKLY_DIGEST_EXTERNAL_CRON is set (Render deploy only)
+ * — node-cron is a purely in-process, in-memory timer with no catch-up: it
+ * only fires while this exact process is running, and Render's free tier
+ * both spins down on inactivity and reserves the right to restart a free
+ * service at any time. A scheduled GitHub Actions workflow now calls
+ * POST /internal/weekly-digest instead, which doesn't depend on this
+ * process being alive at the exact scheduled moment. Both mechanisms
+ * calling runWeeklyDigestSend in the same week would double-send to every
+ * subscriber, so exactly one is ever active per deploy target. */
 export function scheduleWeeklyDigest(db: RadarDb, botToken: string | undefined): void {
   if (!botToken) {
     console.log("[telegram-digest] TELEGRAM_BOT_TOKEN not set — weekly digest scheduling disabled");
+    return;
+  }
+  if (process.env.WEEKLY_DIGEST_EXTERNAL_CRON === "true") {
+    console.log(
+      "[telegram-digest] in-process schedule disabled — WEEKLY_DIGEST_EXTERNAL_CRON is set, " +
+        "a scheduled GitHub Actions workflow calling POST /internal/weekly-digest handles this instead",
+    );
     return;
   }
   cron.schedule(

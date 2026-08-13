@@ -1,5 +1,6 @@
 import "./load-env.js"; // must run before any process.env read below
 
+import crypto from "node:crypto";
 import { serve } from "@hono/node-server";
 import { createNodeWebSocket } from "@hono/node-ws";
 import { Connection } from "@solana/web3.js";
@@ -19,7 +20,7 @@ import {
 } from "./wallet-activity.js";
 import { fetchWalletHoldings } from "./wallet-holdings.js";
 import { computeWeeklyDigest } from "./weekly-digest.js";
-import { scheduleWeeklyDigest } from "./telegram-digest.js";
+import { runWeeklyDigestSend, scheduleWeeklyDigest } from "./telegram-digest.js";
 import { WIDGET_JS } from "./widget.js";
 import {
   extractHeliusApiKey,
@@ -701,6 +702,42 @@ app.post("/v1/streak", async (c) => {
 // exactly one implementation.
 app.get("/v1/weekly-digest", async (c) => {
   return c.json(await computeWeeklyDigest(db));
+});
+
+/** Real trigger for the actual weekly Telegram send (not the read-only
+ * summary above) -- called by a scheduled GitHub Actions workflow instead
+ * of relying on the in-process node-cron scheduler in telegram-digest.ts,
+ * which only fires while this process happens to be running (see
+ * scheduleWeeklyDigest's WEEKLY_DIGEST_EXTERNAL_CRON gate). Secret-gated:
+ * WEEKLY_DIGEST_TRIGGER_SECRET must be set, and the caller must present it
+ * as `Authorization: Bearer <secret>`, compared with a constant-time
+ * comparison (crypto.timingSafeEqual) rather than `===` -- this route is a
+ * real, live, unauthenticated-until-checked POST endpoint, worth doing
+ * properly even though the actual value at risk (an early/extra digest
+ * send) is low. Real send, using the exact same runWeeklyDigestSend the
+ * in-process scheduler and the manual send-weekly-digest.ts script call --
+ * one implementation, three ways to trigger it. */
+app.post("/internal/weekly-digest", async (c) => {
+  const configuredSecret = process.env.WEEKLY_DIGEST_TRIGGER_SECRET;
+  if (!configuredSecret) {
+    return c.json({ error: "not configured", detail: "WEEKLY_DIGEST_TRIGGER_SECRET is not set" }, 501);
+  }
+  const provided = c.req.header("Authorization")?.replace(/^Bearer\s+/i, "") ?? "";
+  const providedBuf = Buffer.from(provided);
+  const configuredBuf = Buffer.from(configuredSecret);
+  const authorized =
+    providedBuf.length === configuredBuf.length && crypto.timingSafeEqual(providedBuf, configuredBuf);
+  if (!authorized) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!botToken) {
+    return c.json({ error: "not configured", detail: "TELEGRAM_BOT_TOKEN is not set" }, 501);
+  }
+
+  const result = await runWeeklyDigestSend(db, botToken);
+  return c.json(result);
 });
 
 // Real, read-only subscription status for a wallet -- written only by the

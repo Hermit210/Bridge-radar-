@@ -71,6 +71,20 @@ services:
         sync: false
       - key: HELIUS_API_KEY
         sync: false
+      # Gates the in-process node-cron weekly-digest scheduler off (see
+      # apps/api/src/telegram-digest.ts) — a scheduled GitHub Actions
+      # workflow (.github/workflows/weekly-digest.yml) calls
+      # POST /internal/weekly-digest instead, which doesn't depend on this
+      # service being awake at the exact scheduled moment. Not a secret,
+      # safe as a literal value.
+      - key: WEEKLY_DIGEST_EXTERNAL_CRON
+        value: "true"
+      # Real random secret, set directly via the Render API (not through
+      # this file) — see apps/api/src/index.ts's POST /internal/weekly-digest.
+      # Declared here with sync:false so the requirement is documented and
+      # a fresh blueprint deploy still prompts for it.
+      - key: WEEKLY_DIGEST_TRIGGER_SECRET
+        sync: false
 
   # ── Solana indexer — mainnet logsSubscribe + poll reconcile + Finality Watch
   - type: web
