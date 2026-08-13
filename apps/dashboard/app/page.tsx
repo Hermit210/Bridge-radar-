@@ -6,6 +6,7 @@ import { ScoringBeamDiagram } from "@/components/scoring-beam-diagram";
 import { OrbitGlow } from "@/components/orbit-glow";
 import { BridgeMarquee } from "@/components/bridge-marquee";
 import { BridgeGlobe } from "@/components/bridge-globe";
+import { RecentActivityStrip } from "@/components/recent-activity-strip";
 
 const heroCtaClass =
   "cta-glow group inline-flex items-center justify-center gap-2 rounded-full bg-accent px-8 py-4 font-display text-sm font-semibold tracking-[-0.01em] text-bg transition-all duration-200 hover:scale-[1.03] hover:bg-accent-bright hover:shadow-glow-md active:scale-[0.98]";
@@ -83,6 +84,11 @@ export default async function LandingPage() {
       {/* Live bridge ticker */}
       <Reveal delayMs={80}>
         <BridgeMarquee />
+      </Reveal>
+
+      {/* Recent activity */}
+      <Reveal>
+        <RecentActivityStrip />
       </Reveal>
 
       {/* Why it matters */}

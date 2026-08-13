@@ -10,7 +10,7 @@ const kindColor: Record<string, string> = {
   oracle_stale: "text-red",
 };
 
-const kindBg: Record<string, string> = {
+export const kindBg: Record<string, string> = {
   lock: "bg-accent/10 text-accent",
   unlock: "bg-accent/10 text-accent",
   mint: "bg-green/10 text-green",
