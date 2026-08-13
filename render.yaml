@@ -52,7 +52,11 @@ services:
     # default in-place reporter swallowed, but this makes sure we actually
     # see it next time either way.
     buildCommand: pnpm install --frozen-lockfile --reporter=append-only && pnpm --filter @radar/api typecheck
-    startCommand: node_modules/.bin/tsx apps/api/src/scripts/migrate.ts && node_modules/.bin/tsx apps/api/src/index.ts
+    # tsx is a devDependency of apps/api specifically, not the root
+    # package.json — pnpm places its bin symlink at apps/api/node_modules/
+    # .bin/tsx, not a root-hoisted node_modules/.bin/tsx (confirmed locally:
+    # the former exists, the latter doesn't, no .npmrc hoisting override).
+    startCommand: apps/api/node_modules/.bin/tsx apps/api/src/scripts/migrate.ts && apps/api/node_modules/.bin/tsx apps/api/src/index.ts
     healthCheckPath: /v1/healthz
     envVars:
       - key: DATABASE_URL
