@@ -1,0 +1,35 @@
+name: Weekly digest
+
+# Calls the real bridge-radar-api's POST /internal/weekly-digest, secret-
+# gated (see apps/api/src/index.ts). Exists because the in-process node-cron
+# scheduler that used to be the only trigger (telegram-digest.ts) is a
+# purely in-memory timer with no catch-up — it only fires while that exact
+# process is alive, and Render's free tier both spins down on inactivity
+# and reserves the right to restart a free service at any time. GitHub
+# Actions' own scheduler doesn't depend on bridge-radar-api being awake at
+# the exact scheduled moment, which is the whole point.
+#
+# workflow_dispatch lets this be triggered manually from the Actions tab —
+# used to verify the real end-to-end send before relying on the schedule.
+
+on:
+  schedule:
+    - cron: "0 20 * * 0" # Sunday 20:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call POST /internal/weekly-digest
+        run: |
+          set -e
+          STATUS=$(curl -s -o response.json -w "%{http_code}" -X POST \
+            -H "Authorization: Bearer ${{ secrets.WEEKLY_DIGEST_TRIGGER_SECRET }}" \
+            https://bridge-radar-api-uyzz.onrender.com/internal/weekly-digest)
+          echo "HTTP status: $STATUS"
+          cat response.json
+          if [ "$STATUS" -ne 200 ]; then
+            echo "Weekly digest trigger failed with status $STATUS"
+            exit 1
+          fi
