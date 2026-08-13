@@ -42,7 +42,16 @@ services:
     # tried to relink that exact path and hit EROFS, since /usr/bin is
     # read-only on this image). Enabling corepack here was always redundant;
     # it just failed loudly instead of being a harmless no-op.
-    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @radar/api typecheck
+    #
+    # `--reporter=append-only` forces pnpm to print plain, non-overwriting
+    # lines — the previous failure produced zero output between "Running
+    # build command" and "Command failed", in the raw dashboard log too, not
+    # just the API. That silence plus a real ~72s runtime points at an
+    # abrupt kill (most likely an OOM'd node-gyp compile of better-sqlite3's
+    # native addon — see .node-version) rather than a printed error pnpm's
+    # default in-place reporter swallowed, but this makes sure we actually
+    # see it next time either way.
+    buildCommand: pnpm install --frozen-lockfile --reporter=append-only && pnpm --filter @radar/api typecheck
     startCommand: node_modules/.bin/tsx apps/api/src/scripts/migrate.ts && node_modules/.bin/tsx apps/api/src/index.ts
     healthCheckPath: /v1/healthz
     envVars:
