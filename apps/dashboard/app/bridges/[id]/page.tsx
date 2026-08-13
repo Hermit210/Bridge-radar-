@@ -67,7 +67,9 @@ export default function BridgePage({
   const [history, setHistory] = useState<HealthScore[]>([]);
   const [events, setEvents] = useState<BridgeEvent[]>([]);
   const [registryEntry, setRegistryEntry] = useState<RegistryEntry | null>(null);
-  const [count24h, setCount24h] = useState<{ count: number; capped: boolean } | null>(null);
+  const [count24h, setCount24h] = useState<{ count: number; capped: boolean; finalityAnomalous: number } | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const spotlightRef = useRef<HTMLElement>(null);
 
@@ -116,7 +118,17 @@ export default function BridgePage({
           setRegistryEntry(
             [...registryData.implemented, ...registryData.planned].find((r) => r.id === id) ?? null,
           );
-          setCount24h({ count: count24hData.events.length, capped: count24hData.events.length >= 1000 });
+          // Real cross-reference, computed from the same 24h event batch
+          // already fetched above (no extra request) — every event already
+          // carries a real finality_anomaly_at_time flag (see /developers),
+          // true only if a real Finality Watch observation within 5s of
+          // that event's own timestamp was itself flagged anomalous.
+          // Purely descriptive; never a claim about that specific transfer.
+          setCount24h({
+            count: count24hData.events.length,
+            capped: count24hData.events.length >= 1000,
+            finalityAnomalous: count24hData.events.filter((e) => e.finality_anomaly_at_time === true).length,
+          });
           setLoading(false);
         }
       } catch (error) {
@@ -171,6 +183,12 @@ export default function BridgePage({
       key: "events24h",
       label: "Events (24h)",
       value: count24h ? `${count24h.count}${count24h.capped ? "+" : ""}` : "…",
+    },
+    {
+      key: "finality24h",
+      label: "Finality-anomalous (24h)",
+      value: count24h ? `${count24h.finalityAnomalous} of ${count24h.count}${count24h.capped ? "+" : ""}` : "…",
+      tone: count24h && count24h.finalityAnomalous > 0 ? "yellow" : undefined,
     },
     {
       key: "adapter",
