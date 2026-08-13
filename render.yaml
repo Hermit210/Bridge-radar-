@@ -1,0 +1,175 @@
+# Bridge Radar — Render Blueprint.
+#
+# Deploys the always-on backend to Render's free tier: the Node API gateway,
+# the 6 always-on Rust services, and a managed Postgres database. Does NOT
+# deploy apps/dashboard (Next.js) or programs/radar-oracle (the Anchor
+# program — already live on Solana Devnet, never touched by this file) or
+# radar-attester (optional/Devnet-only, not part of the always-on set).
+#
+# Every Rust service binds $PORT (Render injects this automatically for web
+# services) via crates/radar-core/src/liveness.rs — a dependency-free 200 OK
+# responder that only activates when $PORT is set, so it's a no-op for local
+# dev / the existing systemd deploy. See README.md's Architecture section for
+# what each binary actually does.
+#
+# No secret values are written here — every real credential is declared with
+# `sync: false`, which Render prompts for once during blueprint creation and
+# stores in its own secret store, never in this file.
+
+databases:
+  - name: bridge-radar-db
+    plan: free
+    region: oregon
+    databaseName: radar
+    user: radar
+
+services:
+  # ── Node API gateway (Hono, REST + WebSocket) ──────────────────────────────
+  - type: web
+    name: bridge-radar-api
+    runtime: node
+    plan: free
+    region: oregon
+    # Runs via tsx rather than a tsc build + `node dist/index.js` — apps/api
+    # imports real runtime values (not just types) from @radar/shared, whose
+    # package.json points straight at raw TypeScript source. Plain `node`
+    # cannot execute that without a loader, and the tsc+node path has never
+    # actually been run end-to-end (see README's Deployment status section)
+    # — tsx is the one execution path already proven to work, in dev.
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @radar/api typecheck
+    startCommand: node_modules/.bin/tsx apps/api/src/scripts/migrate.ts && node_modules/.bin/tsx apps/api/src/index.ts
+    healthCheckPath: /v1/healthz
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bridge-radar-db
+          property: connectionString
+      - key: SOLANA_RPC_URL
+        sync: false
+      - key: API_CORS_ORIGIN
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: HELIUS_API_KEY
+        sync: false
+
+  # ── Solana indexer — mainnet logsSubscribe + poll reconcile + Finality Watch
+  - type: web
+    name: radar-indexer-solana
+    runtime: rust
+    plan: free
+    region: oregon
+    buildCommand: cargo build --release -p radar-indexer-solana
+    startCommand: ./target/release/radar-indexer-solana
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bridge-radar-db
+          property: connectionString
+      - key: RUST_LOG
+        value: radar=info,sqlx=warn
+      - key: SOLANA_RPC_URL
+        sync: false
+      - key: SOLANA_WS_URL
+        sync: false
+
+  # ── EVM indexer — eth_getLogs poller, 6 chains ─────────────────────────────
+  - type: web
+    name: radar-indexer-evm
+    runtime: rust
+    plan: free
+    region: oregon
+    buildCommand: cargo build --release -p radar-indexer-evm
+    startCommand: ./target/release/radar-indexer-evm
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bridge-radar-db
+          property: connectionString
+      - key: RUST_LOG
+        value: radar=info,sqlx=warn
+      # ETH_RPC_URL / ARBITRUM_RPC_URL / BASE_RPC_URL / OPTIMISM_RPC_URL /
+      # BNB_RPC_URL / POLYGON_RPC_URL are intentionally not declared here —
+      # each has a real, working public default baked into the binary (see
+      # .env.example). Add them from the Render dashboard only if you have
+      # your own Alchemy/QuickNode/etc. keys.
+
+  # ── Signer-set / frontend-hash / oracle-staleness detectors ────────────────
+  - type: web
+    name: radar-watchers
+    runtime: rust
+    plan: free
+    region: oregon
+    buildCommand: cargo build --release -p radar-watchers
+    startCommand: ./target/release/radar-watchers
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bridge-radar-db
+          property: connectionString
+      - key: RUST_LOG
+        value: radar=info,sqlx=warn
+
+  # ── Health Score writer — every 60s ─────────────────────────────────────────
+  - type: web
+    name: radar-scorer
+    runtime: rust
+    plan: free
+    region: oregon
+    buildCommand: cargo build --release -p radar-scorer
+    startCommand: ./target/release/radar-scorer
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bridge-radar-db
+          property: connectionString
+      - key: RUST_LOG
+        value: radar=info,sqlx=warn
+
+  # ── DeFiLlama reference-data sync — 9 categories, independent schedules ────
+  - type: web
+    name: radar-defillama
+    runtime: rust
+    plan: free
+    region: oregon
+    buildCommand: cargo build --release -p radar-defillama
+    startCommand: ./target/release/radar-defillama
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bridge-radar-db
+          property: connectionString
+      - key: RUST_LOG
+        value: radar=info,sqlx=warn
+      - key: DEFILLAMA_API_KEY
+        sync: false
+
+  # ── Telegram + Discord + webhook alerter, plus the inbound Telegram bot ────
+  - type: web
+    name: radar-alerter
+    runtime: rust
+    plan: free
+    region: oregon
+    buildCommand: cargo build --release -p radar-alerter
+    startCommand: ./target/release/radar-alerter
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bridge-radar-db
+          property: connectionString
+      - key: RUST_LOG
+        value: radar=info,sqlx=warn
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: DISCORD_WEBHOOK_URL
+        sync: false
+      - key: ALERT_WEBHOOK_URL
+        sync: false

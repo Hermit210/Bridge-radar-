@@ -17,6 +17,7 @@ pub mod defillama;
 pub mod event;
 pub mod finality;
 pub mod health;
+pub mod liveness;
 pub mod pricing;
 pub mod storage;
 

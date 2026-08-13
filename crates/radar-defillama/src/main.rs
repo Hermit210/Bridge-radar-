@@ -35,6 +35,7 @@ async fn main() -> anyhow::Result<()> {
                 .unwrap_or_else(|_| EnvFilter::new("radar=info,radar_defillama=info")),
         )
         .init();
+    radar_core::liveness::spawn_if_configured();
 
     let db_url =
         std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://./data/radar.db".to_string());

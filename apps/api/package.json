@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "send-weekly-digest": "tsx src/scripts/send-weekly-digest.ts",
+    "migrate": "tsx src/scripts/migrate.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
