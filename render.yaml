@@ -109,11 +109,23 @@ services:
           property: connectionString
       - key: RUST_LOG
         value: radar=info,sqlx=warn
-      # ETH_RPC_URL / ARBITRUM_RPC_URL / BASE_RPC_URL / OPTIMISM_RPC_URL /
-      # BNB_RPC_URL / POLYGON_RPC_URL are intentionally not declared here —
-      # each has a real, working public default baked into the binary (see
-      # .env.example). Add them from the Render dashboard only if you have
-      # your own Alchemy/QuickNode/etc. keys.
+      # ARBITRUM_RPC_URL / OPTIMISM_RPC_URL / BNB_RPC_URL / POLYGON_RPC_URL
+      # are intentionally not declared here — confirmed via real Render logs
+      # to work fine from Render's IPs with the binary's built-in defaults.
+      # Add them from the dashboard only if you have your own Alchemy/
+      # QuickNode/etc. keys.
+      #
+      # ETH_RPC_URL / BASE_RPC_URL ARE overridden here — confirmed via real
+      # Render logs that the binary's built-in defaults get blocked/limited
+      # specifically from Render's IPs (not broken generally — this project's
+      # own local dev traffic hits them fine): ethereum-rpc.publicnode.com
+      # returned a real 403, mainnet.base.org a real 429. These two swap to
+      # different providers than the ones already failing; not yet confirmed
+      # against real Render traffic (that happens on this deploy).
+      - key: ETH_RPC_URL
+        value: https://cloudflare-eth.com
+      - key: BASE_RPC_URL
+        value: https://base-rpc.publicnode.com
 
   # ── Signer-set / frontend-hash / oracle-staleness detectors ────────────────
   - type: web
