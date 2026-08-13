@@ -41,12 +41,6 @@ function scoreBandColor(score: number) {
   return bandColor[bandOf(score)];
 }
 
-/** A real, verified transaction cited in BRIDGE_DISCOVERY.md — used only to
- * demonstrate the bridge-health features against real data when the
- * connected wallet has no bridge transaction history of its own. Real
- * on-chain data from a real wallet, just not the person using this page. */
-const EXAMPLE_WALLET_ADDRESS = "9DSkvHgHVYJxZYvVKW4L36ibhpT1UD6geqJdz6VUhpdL";
-
 function formatDays(days: number): string {
   if (days < 1) return "less than a day";
   const rounded = Math.round(days);
@@ -558,13 +552,6 @@ export default function MyActivityPage() {
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [timelineLoadingMore, setTimelineLoadingMore] = useState(false);
   const [timelineError, setTimelineError] = useState<string | null>(null);
-  /** When true, the bridge-activity scan (and the bridge-health features
-   * built on it) run against EXAMPLE_WALLET_ADDRESS — a real, cited
-   * transaction — instead of the connected wallet. Lets these features be
-   * demonstrated with real data even when the connected wallet has no
-   * bridge transaction history of its own. Never affects holdings or the
-   * full timeline, which stay tied to the actually-connected wallet. */
-  const [previewMode, setPreviewMode] = useState(false);
   /** Real read-only support for the Report Card's Share button: a
    * `?wallet=` link (see reportCardShareUrl below) resolves here on any
    * visitor's load, so a shared link genuinely shows that wallet's real
@@ -580,7 +567,7 @@ export default function MyActivityPage() {
     const w = new URLSearchParams(window.location.search).get("wallet");
     if (w) setSharedWallet(w);
   }, []);
-  const activityAddress = previewMode ? EXAMPLE_WALLET_ADDRESS : (publicKey?.toBase58() ?? sharedWallet);
+  const activityAddress = publicKey?.toBase58() ?? sharedWallet;
 
   useEffect(() => {
     if (!publicKey) {
@@ -607,8 +594,6 @@ export default function MyActivityPage() {
   // page loads — the server decides same-day/consecutive-day/gap from its
   // own clock (see recordStreakActivity's doc comment); this effect just
   // fires the real request and displays whatever real state comes back.
-  // Never runs for previewMode — the streak tracks real visits by the real
-  // connected wallet, not the demo.
   useEffect(() => {
     if (!publicKey) {
       setStreak(null);
@@ -916,7 +901,7 @@ export default function MyActivityPage() {
         </>
       )}
 
-      {!connected && !previewMode && !sharedWallet ? (
+      {!connected && !sharedWallet ? (
         <div className="grid overflow-hidden rounded-3xl border border-border-subtle shadow-card sm:grid-cols-2">
           <div className="relative flex flex-col justify-center gap-4 overflow-hidden bg-surface-0/80 p-8 sm:p-10">
             <div aria-hidden className="absolute inset-0 opacity-50">
@@ -949,13 +934,6 @@ export default function MyActivityPage() {
           <div className="flex flex-col items-center justify-center gap-4 bg-surface/60 p-8 text-center sm:p-10">
             <p className="text-sm text-muted">Connect your wallet to get started.</p>
             <WalletConnectButton />
-            <button
-              type="button"
-              onClick={() => setPreviewMode(true)}
-              className="text-xs text-muted-dark underline transition-colors hover:text-text"
-            >
-              Or view an example with a real bridge transaction →
-            </button>
           </div>
         </div>
       ) : loading ? (
@@ -971,23 +949,7 @@ export default function MyActivityPage() {
         </div>
       ) : !scan ? null : (
         <div className="space-y-6">
-          {previewMode && (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/30 bg-accent-glow/40 px-4 py-3 text-xs text-accent-bright">
-              <span>
-                Example wallet — for demonstration. This is real, on-chain data from a real wallet and a
-                real bridge transaction (cited in BRIDGE_DISCOVERY.md), not the wallet connected above.
-              </span>
-              <button
-                type="button"
-                onClick={() => setPreviewMode(false)}
-                className="shrink-0 underline transition-colors hover:text-text"
-              >
-                Exit example
-              </button>
-            </div>
-          )}
-
-          {!previewMode && sharedWallet && (
+          {sharedWallet && (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/30 bg-accent-glow/40 px-4 py-3 text-xs text-accent-bright">
               <span>
                 Shared read-only view of {sharedWallet.slice(0, 4)}…{sharedWallet.slice(-4)}'s real bridge activity
@@ -1108,15 +1070,6 @@ export default function MyActivityPage() {
                   {loadingMore ? "Scanning…" : "Scan further back →"}
                 </button>
               )}
-              {!previewMode && (
-                <button
-                  type="button"
-                  onClick={() => setPreviewMode(true)}
-                  className="block text-xs text-muted-dark underline transition-colors hover:text-text"
-                >
-                  View a real example transaction instead →
-                </button>
-              )}
             </div>
           ) : (
             <div className="space-y-4">
@@ -1227,7 +1180,7 @@ export default function MyActivityPage() {
         <Reveal>
           <ReportCard
             activityAddress={activityAddress}
-            isOwnWallet={!!publicKey && !previewMode && activityAddress === publicKey.toBase58()}
+            isOwnWallet={!!publicKey && activityAddress === publicKey.toBase58()}
             uniqueBridgeCount={summaryStats.uniqueBridgeCount}
             monitoredBridgeCount={digest?.monitoredBridgeCount ?? null}
             streak={streak}
