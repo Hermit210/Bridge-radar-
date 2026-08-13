@@ -28,7 +28,7 @@ import {
   WALLET_TIMELINE_DEFAULT_LIMIT,
 } from "./wallet-timeline.js";
 
-const port = Number(process.env.API_PORT ?? 3001);
+const port = Number(process.env.PORT ?? process.env.API_PORT ?? 3001);
 const host = process.env.API_HOST ?? "0.0.0.0";
 // Hono's cors({ origin }) only does exact-string (or exact-string-in-array)
 // matching — it never splits a comma-separated value itself. Passing the
