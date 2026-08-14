@@ -88,61 +88,83 @@ export default function BridgePage({
     params.then((p) => setId(p.id));
   }, [params]);
 
+  // Fast tier (10s): current health score + the real-time event log — the
+  // "is it healthy right now" concern. Was 5s; radar-scorer only writes a
+  // new score every 60s server-side, so 10s loses zero real freshness.
   useEffect(() => {
     if (!id) return;
-
     let cancelled = false;
-
-    const fetchData = async () => {
-      try {
-        const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-        const [bridgeData, historyData, eventsData, registryData, count24hData] = await Promise.all([
-          getBridge(id).catch(() => null),
-          getBridgeHistory(id, since).catch(() => ({ bridge_id: id, since, history: [] })),
-          listEvents({ bridge: id, limit: 50 }).catch(() => ({ events: [] })),
-          listRegistry().catch(() => ({ summary: { total: 0, implemented: 0, planned: 0 }, implemented: [], planned: [] })),
-          listEvents({ bridge: id, since: SINCE_24H(), limit: 1000 }).catch(() => ({ events: [] })),
-        ]);
-
-        if (!cancelled) {
-          // getBridge() returns bridge/health/defillama as sibling fields —
-          // merge them into one BridgeWithHealth here rather than dropping
-          // health/defillama on the floor (see the comment on getBridge()).
-          setDetail(
-            bridgeData
-              ? { ...bridgeData.bridge, health: bridgeData.health, defillama: bridgeData.defillama }
-              : null,
-          );
-          setHistory(historyData.history);
-          setEvents(eventsData.events);
-          setRegistryEntry(
-            [...registryData.implemented, ...registryData.planned].find((r) => r.id === id) ?? null,
-          );
-          // Real cross-reference, computed from the same 24h event batch
-          // already fetched above (no extra request) — every event already
-          // carries a real finality_anomaly_at_time flag (see /developers),
-          // true only if a real Finality Watch observation within 5s of
-          // that event's own timestamp was itself flagged anomalous.
-          // Purely descriptive; never a claim about that specific transfer.
-          setCount24h({
-            count: count24hData.events.length,
-            capped: count24hData.events.length >= 1000,
-            finalityAnomalous: count24hData.events.filter((e) => e.finality_anomaly_at_time === true).length,
-          });
-          setLoading(false);
-        }
-      } catch (error) {
-        console.error("Error fetching bridge data:", error);
-        if (!cancelled) setLoading(false);
-      }
+    const fetchFast = async () => {
+      const [bridgeData, eventsData] = await Promise.all([
+        getBridge(id).catch(() => null),
+        listEvents({ bridge: id, limit: 50 }).catch(() => ({ events: [] })),
+      ]);
+      if (cancelled) return;
+      // getBridge() returns bridge/health/defillama as sibling fields —
+      // merge them into one BridgeWithHealth here rather than dropping
+      // health/defillama on the floor (see the comment on getBridge()).
+      setDetail(
+        bridgeData ? { ...bridgeData.bridge, health: bridgeData.health, defillama: bridgeData.defillama } : null,
+      );
+      setEvents(eventsData.events);
+      setLoading(false);
     };
-
-    fetchData();
-    const interval = setInterval(fetchData, 5000);
-
+    fetchFast();
+    const interval = setInterval(fetchFast, 10_000);
     return () => {
       cancelled = true;
       clearInterval(interval);
+    };
+  }, [id]);
+
+  // Slow tier (30s): 24h-scoped chart + stats. This used to refetch a full
+  // 24h window (up to 1000 real events) every 5s along with everything
+  // else -- one real point lands on the score-history chart every 60s
+  // server-side, so nothing here needs to be fresher than 30s.
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    const fetchSlow = async () => {
+      const since = SINCE_24H();
+      const [historyData, count24hData] = await Promise.all([
+        getBridgeHistory(id, since).catch(() => ({ bridge_id: id, since, history: [] })),
+        listEvents({ bridge: id, since, limit: 1000 }).catch(() => ({ events: [] })),
+      ]);
+      if (cancelled) return;
+      setHistory(historyData.history);
+      // Real cross-reference, computed from the same 24h event batch
+      // already fetched above (no extra request) — every event already
+      // carries a real finality_anomaly_at_time flag (see /developers),
+      // true only if a real Finality Watch observation within 5s of
+      // that event's own timestamp was itself flagged anomalous.
+      // Purely descriptive; never a claim about that specific transfer.
+      setCount24h({
+        count: count24hData.events.length,
+        capped: count24hData.events.length >= 1000,
+        finalityAnomalous: count24hData.events.filter((e) => e.finality_anomaly_at_time === true).length,
+      });
+    };
+    fetchSlow();
+    const interval = setInterval(fetchSlow, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [id]);
+
+  // Registry metadata (chains supported, homepage) is near-static -- fetch
+  // once on mount, never poll it.
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    listRegistry()
+      .then((registryData) => {
+        if (cancelled) return;
+        setRegistryEntry([...registryData.implemented, ...registryData.planned].find((r) => r.id === id) ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
     };
   }, [id]);
 
