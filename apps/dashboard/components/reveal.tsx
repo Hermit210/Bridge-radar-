@@ -27,6 +27,13 @@ export function Reveal({
       return;
     }
 
+    // threshold is a fraction of the TARGET's own height, not the
+    // viewport's -- for content taller than roughly viewport-height / 0.15
+    // (e.g. a long API reference section), that fraction can never be
+    // reached even with the viewport fully filled by the element, so it
+    // would never reveal. threshold: 0 fires on any intersection at all,
+    // independent of the target's height; rootMargin still keeps it from
+    // firing the instant a single pixel peeks in from the very bottom edge.
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -34,7 +41,7 @@ export function Reveal({
           observer.disconnect();
         }
       },
-      { threshold: 0.15, rootMargin: "0px 0px -40px 0px" },
+      { threshold: 0, rootMargin: "0px 0px -40px 0px" },
     );
     observer.observe(el);
     return () => observer.disconnect();
