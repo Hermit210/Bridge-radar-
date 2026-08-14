@@ -258,7 +258,7 @@ function BridgeSlot({
         )}
       </Row>
 
-      <Row label="Chains supported">
+      <Row label="Chains supported" stack>
         {registryEntry ? registryEntry.supportedChains.join(", ") : <span className="text-muted-dark">unknown</span>}
       </Row>
 
@@ -283,16 +283,29 @@ function BridgeSlot({
 function Row({
   label,
   winning,
+  stack,
   children,
 }: {
   label: string;
   winning?: boolean;
+  /** Stack label above value on narrow screens instead of squeezing both
+   * onto one row -- for values that can run long (e.g. a comma-separated
+   * chain list), side-by-side leaves each side too little room to wrap. */
+  stack?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between text-sm border-t border-border/30 pt-2.5">
+    <div
+      className={`flex text-sm border-t border-border/30 pt-2.5 gap-2 ${
+        stack ? "flex-col sm:flex-row sm:items-center sm:justify-between" : "items-center justify-between"
+      }`}
+    >
       <span className="text-muted">{label}</span>
-      <span className={`inline-flex items-center gap-1.5 font-medium ${winning ? "text-green" : "text-text-secondary"}`}>
+      <span
+        className={`inline-flex items-center gap-1.5 font-medium ${stack ? "sm:justify-end sm:text-right" : ""} ${
+          winning ? "text-green" : "text-text-secondary"
+        }`}
+      >
         {winning && <span className="text-[10px]">▲</span>}
         {children}
       </span>
