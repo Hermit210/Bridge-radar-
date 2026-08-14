@@ -10,6 +10,7 @@ html {
 html, body {
   background: #0a0a09;
   color: #f2ede1;
+  overflow-x: hidden;
   font-feature-settings: "ss01", "cv11", "liga", "calt";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

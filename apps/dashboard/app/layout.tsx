@@ -6,6 +6,7 @@ import { WalletProviders } from "@/components/wallet-providers";
 import { WalletConnectButton } from "@/components/wallet-connect-button";
 import { TelegramIcon, DiscordIcon } from "@/components/social-icons";
 import { NavLinks } from "@/components/nav-links";
+import { MobileNav } from "@/components/mobile-nav";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -50,17 +51,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen font-sans antialiased">
         <WalletProviders>
           <header className="sticky top-3 z-50 px-3 sm:top-4 sm:px-4">
-            <div className="mx-auto grid max-w-7xl grid-cols-[auto_1fr_auto] items-center gap-4 rounded-full border border-border-subtle bg-surface-0/85 px-5 py-3 shadow-card backdrop-blur-xl sm:gap-6 sm:px-7">
+            <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 rounded-full border border-border-subtle bg-surface-0/85 px-5 py-3 shadow-card backdrop-blur-xl sm:gap-6 sm:px-7">
               <Link href="/" className="flex shrink-0 items-center gap-2.5 whitespace-nowrap text-[15px] font-display font-semibold tracking-[-0.01em] text-text">
                 <span className="status-dot status-dot-green"></span>
                 Bridge Radar
               </Link>
-              <nav className="flex items-center justify-center gap-5 overflow-x-auto whitespace-nowrap text-[13px] font-medium text-text-secondary sm:gap-7">
+              <nav className="hidden flex-1 items-center justify-center gap-5 whitespace-nowrap text-[13px] font-medium text-text-secondary lg:flex xl:gap-7">
                 <NavLinks />
               </nav>
-              <div className="flex shrink-0 items-center justify-end gap-3 whitespace-nowrap">
+              <div className="hidden shrink-0 items-center justify-end gap-3 whitespace-nowrap lg:flex">
                 <WalletConnectButton />
               </div>
+              <MobileNav />
             </div>
           </header>
           <main className="mx-auto max-w-7xl px-6 py-10">{children}</main>

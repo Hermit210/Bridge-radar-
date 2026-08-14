@@ -24,7 +24,7 @@ function isActive(pathname: string, href: string): boolean {
   return false;
 }
 
-export function NavLinks() {
+export function NavLinks({ onNavigate, className }: { onNavigate?: () => void; className?: string }) {
   const pathname = usePathname();
 
   return (
@@ -35,10 +35,12 @@ export function NavLinks() {
           <Link
             key={href}
             href={href}
+            onClick={onNavigate}
             className={
-              active
+              (active
                 ? "font-bold text-white"
-                : "text-text-secondary transition-colors duration-150 hover:text-text"
+                : "text-text-secondary transition-colors duration-150 hover:text-text") +
+              (className ? ` ${className}` : "")
             }
           >
             {label}

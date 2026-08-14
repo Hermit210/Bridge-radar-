@@ -36,14 +36,14 @@ function ArrowIcon() {
 export default async function LandingPage() {
   return (
     <HomepageLiveDataProvider>
-    <div className="mx-auto max-w-5xl space-y-28 px-6 py-16 sm:space-y-36 sm:py-24">
+    <div className="mx-auto max-w-5xl space-y-20 py-16 sm:space-y-28 sm:py-24 lg:space-y-36">
       {/* Hero */}
       <section className="relative py-6 text-center">
         <div className="hero-grid pointer-events-none absolute inset-0 animate-grid-fade" />
         <OrbitGlow />
 
         <div className="stagger-children relative z-10 space-y-8">
-          <h1 className="font-display text-6xl font-bold leading-[0.98] tracking-[-0.045em] sm:text-7xl md:text-8xl">
+          <h1 className="font-display text-4xl font-bold leading-[1.05] tracking-[-0.03em] sm:text-6xl sm:leading-[0.98] sm:tracking-[-0.045em] md:text-7xl lg:text-8xl">
             Is this bridge
             <br />
             <span className="font-serif italic font-normal text-gradient">safe</span> right now?

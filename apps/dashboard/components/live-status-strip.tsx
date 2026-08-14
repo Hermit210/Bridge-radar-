@@ -77,11 +77,11 @@ export function LiveStatusStrip() {
         <span className="status-dot status-dot-green"></span>
         {snap ? `Live · updated ${ageSec}s ago` : "Connecting…"}
       </div>
-      <div className="flex overflow-x-auto divide-x divide-border-subtle rounded-3xl border border-border-subtle bg-surface-0/70 shadow-card backdrop-blur-sm">
+      <div className="grid grid-cols-2 divide-x divide-y divide-border-subtle rounded-3xl border border-border-subtle bg-surface-0/70 shadow-card backdrop-blur-sm sm:flex sm:divide-y-0 sm:overflow-x-auto">
         {segments.map((s) => (
           <div
             key={s.label}
-            className="group relative min-w-[128px] flex-1 px-6 py-6 text-center transition-colors hover:bg-surface-2/40 sm:px-8"
+            className="group relative px-4 py-5 text-center transition-colors hover:bg-surface-2/40 sm:min-w-[128px] sm:flex-1 sm:py-6 sm:px-8"
           >
             <span
               aria-hidden

@@ -9,7 +9,7 @@ export function OrbitGlow() {
       aria-hidden
       className="pointer-events-none absolute left-1/2 top-[40%] z-0 -translate-x-1/2 -translate-y-1/2 opacity-95"
     >
-      <div className="relative h-[440px] w-[440px] sm:h-[600px] sm:w-[600px]">
+      <div className="relative h-[300px] w-[300px] sm:h-[440px] sm:w-[440px] md:h-[600px] md:w-[600px]">
         <div className="absolute left-1/2 top-1/2 h-44 w-44 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent/45 blur-[80px] animate-glow-pulse" />
         <div className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent-bright/70 blur-2xl" />
 
