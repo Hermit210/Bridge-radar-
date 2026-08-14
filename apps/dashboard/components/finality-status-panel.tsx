@@ -35,22 +35,35 @@ const STATUS_META: Record<Status, { label: string; dotClass: string; textClass: 
   normal: { label: "Normal — consistent with TowerBFT's known finality range", dotClass: "status-dot-green", textClass: "text-green" },
 };
 
-export function FinalityStatusPanel({ compact = false }: { compact?: boolean }) {
-  const [health, setHealth] = useState<FinalityHealth | null>(null);
-  const [errored, setErrored] = useState(false);
+interface Props {
+  compact?: boolean;
+  /** Pass real health/errored data down when a parent page already polls
+   * getFinalityHealth() itself (e.g. as part of its own shared poll) — this
+   * skips the panel's own fetch entirely rather than duplicating the same
+   * request from two independent timers. Omit both for standalone usage
+   * (e.g. the homepage), where the panel keeps polling on its own. */
+  health?: FinalityHealth | null;
+  errored?: boolean;
+}
+
+export function FinalityStatusPanel({ compact = false, health: healthProp, errored: erroredProp }: Props) {
+  const standalone = healthProp === undefined;
+  const [healthState, setHealthState] = useState<FinalityHealth | null>(null);
+  const [erroredState, setErroredState] = useState(false);
 
   useEffect(() => {
+    if (!standalone) return;
     let cancelled = false;
     const poll = () => {
       getFinalityHealth()
         .then((h) => {
           if (!cancelled) {
-            setHealth(h);
-            setErrored(false);
+            setHealthState(h);
+            setErroredState(false);
           }
         })
         .catch(() => {
-          if (!cancelled) setErrored(true);
+          if (!cancelled) setErroredState(true);
         });
     };
     poll();
@@ -59,8 +72,10 @@ export function FinalityStatusPanel({ compact = false }: { compact?: boolean }) 
       cancelled = true;
       clearInterval(interval);
     };
-  }, []);
+  }, [standalone]);
 
+  const health = standalone ? healthState : (healthProp ?? null);
+  const errored = standalone ? erroredState : (erroredProp ?? false);
   const status = statusOf(health);
   const meta = STATUS_META[status];
 

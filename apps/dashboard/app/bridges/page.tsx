@@ -8,7 +8,7 @@ import { HealthCard, type HeartbeatInfo } from "@/components/health-card";
 import { HeartbeatDot } from "@/components/heartbeat-dot";
 import { StatBar, type StatBarSegment } from "@/components/stat-bar";
 import { FinalityStatusPanel } from "@/components/finality-status-panel";
-import { listBridges, listEvents } from "@/lib/api";
+import { getFinalityHealth, listBridges, listEvents, type FinalityHealth } from "@/lib/api";
 import { bandFor, formatUsd, type BridgeWithHealth, type BridgeEvent, type HealthBand } from "@radar/shared";
 
 // Window for "recent" activity used only to pick a faster heartbeat pulse
@@ -55,25 +55,38 @@ export default function Home() {
   const [bridges, setBridges] = useState<BridgeWithHealth[]>([]);
   const [events, setEvents] = useState<BridgeEvent[]>([]);
   const [dayEvents, setDayEvents] = useState<BridgeEvent[]>([]);
+  const [finalityHealth, setFinalityHealth] = useState<FinalityHealth | null>(null);
+  const [finalityErrored, setFinalityErrored] = useState(false);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [bandFilter, setBandFilter] = useState<HealthBand | "all">("all");
   const [view, setView] = useState<"cards" | "list">("cards");
   const [gridRef] = useAutoAnimate<HTMLDivElement>({ duration: 250 });
 
+  // 10s, not 5s: radar-scorer only writes a new score every 60s server-side.
+  // Also folds in getFinalityHealth() -- FinalityStatusPanel used to poll
+  // that independently every 10s from its own timer; passing the result
+  // down as props (see below) means one shared poll instead of two.
   useEffect(() => {
     let cancelled = false;
 
     const fetchData = async () => {
       try {
-        const [bridgesResult, eventsResult] = await Promise.all([
+        const [bridgesResult, eventsResult, finalityResult] = await Promise.all([
           listBridges().catch(() => ({ bridges: [] })),
           listEvents({ limit: 50 }).catch(() => ({ events: [] })),
+          getFinalityHealth().catch(() => null),
         ]);
 
         if (!cancelled) {
           setBridges(bridgesResult.bridges);
           setEvents(eventsResult.events);
+          if (finalityResult) {
+            setFinalityHealth(finalityResult);
+            setFinalityErrored(false);
+          } else {
+            setFinalityErrored(true);
+          }
           setLoading(false);
         }
       } catch (error) {
@@ -82,7 +95,7 @@ export default function Home() {
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 5000);
+    const interval = setInterval(fetchData, 10_000);
 
     return () => {
       cancelled = true;
@@ -223,7 +236,7 @@ export default function Home() {
 
       <StatBar segments={segments} />
 
-      <FinalityStatusPanel compact />
+      <FinalityStatusPanel compact health={finalityHealth} errored={finalityErrored} />
 
       <div className="flex flex-wrap items-center gap-3">
         <input
