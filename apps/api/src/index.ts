@@ -572,25 +572,38 @@ app.get("/v1/events", async (c) => {
   const since = c.req.query("since");
   const limit = c.req.query("limit") ? Number(c.req.query("limit")) : undefined;
 
-  // The real, dominant cost this cache exists for: one DB query per
-  // returned event via finalityAnomalousNear below -- a limit=1000 request
-  // returning, say, 200 real events is ~201 real queries in a single
-  // request. Concurrent callers with the same filters landing in the same
-  // cache-TTL window now share one real round-trip instead of each paying
-  // that cost independently.
+  // Caching collapses concurrent-duplicate requests; this batching collapses
+  // the real per-request cost regardless of concurrency -- see the real
+  // finding that motivated it: a limit=1000 request returning ~200 real
+  // events used to run ~201 real queries (1 base + 1 finalityAnomalousNear
+  // per event). Now it's the base query plus exactly 1 more, no matter how
+  // many events come back.
   const key = JSON.stringify({ bridge, type, chain, sinceBucket: bucketSince(since), limit });
   const withFinality = await cached(`events:${key}`, async () => {
     const events = await db.listEvents({ bridgeId: bridge, kind: type, chain, since, limit });
+    if (events.length === 0) return events.map((e) => ({ ...e, finality_anomaly_at_time: false }));
+
     // Real per-event cross-reference against Finality Watch (see
     // crates/radar-core/src/finality.rs) -- purely descriptive, not an
     // advisory/predictive claim about any specific event, same rule as every
-    // other risk-flag feature in this API.
-    return Promise.all(
-      events.map(async (event) => ({
-        ...event,
-        finality_anomaly_at_time: await db.finalityAnomalousNear(event.event_time, FINALITY_ANOMALY_WINDOW_SECONDS),
-      })),
+    // other risk-flag feature in this API. One real range query covering
+    // every event in this batch, expanded by the correlation window on both
+    // ends, instead of one query per event -- mathematically identical
+    // results to the old per-event query, not an approximation: the range
+    // is constructed to include every anomaly that could possibly be within
+    // the window of any event in the batch.
+    const eventTimesMs = events.map((e) => new Date(e.event_time).getTime());
+    const windowMs = FINALITY_ANOMALY_WINDOW_SECONDS * 1000;
+    const rangeStart = new Date(Math.min(...eventTimesMs) - windowMs).toISOString();
+    const rangeEnd = new Date(Math.max(...eventTimesMs) + windowMs).toISOString();
+    const anomalousTimesMs = (await db.finalityAnomalousTimestampsBetween(rangeStart, rangeEnd)).map((t) =>
+      new Date(t).getTime(),
     );
+
+    return events.map((event, i) => ({
+      ...event,
+      finality_anomaly_at_time: anomalousTimesMs.some((t) => Math.abs(t - eventTimesMs[i]!) <= windowMs),
+    }));
   });
   return c.json({ events: withFinality });
 });
