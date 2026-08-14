@@ -345,10 +345,10 @@ function Component({
     v < 0.3 ? "health-bar-green" : v < 0.7 ? "health-bar-yellow" : "health-bar-red";
 
   return (
-    <li className="flex items-center justify-between">
+    <li className="flex items-center justify-between gap-3">
       <span className="text-text-secondary">{label}</span>
-      <span className="flex items-center gap-3">
-        <span className="h-1.5 w-36 overflow-hidden rounded-full bg-surface-2">
+      <span className="flex shrink-0 items-center gap-2 sm:gap-3">
+        <span className="h-1.5 w-16 overflow-hidden rounded-full bg-surface-2 sm:w-36">
           <span
             className={`block h-full health-bar-fill ${barColor}`}
             style={{ width: `${Math.min(100, v * 100)}%` }}
