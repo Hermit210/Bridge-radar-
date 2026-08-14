@@ -129,15 +129,18 @@ export interface RadarDb {
   /** Real observations with confirmedAt >= sinceIso, oldest first -- the
    * real rolling-baseline window for GET /v1/network/finality. */
   finalityObservationsSince(sinceIso: string): Promise<FinalityObservationRow[]>;
-  /** True if any real observation with finalizedAt within
-   * [atIso - windowSeconds, atIso + windowSeconds] was itself flagged
-   * anomalous (its own frozen isAnomalous). The real cross-reference
+  /** Every real anomalous observation's finalizedAt timestamp with
+   * finalizedAt in [startIso, endIso] -- the batched real cross-reference
    * primitive behind "was this bridge event processed during anomalous
-   * finality behavior" -- note this compares wall-clock proximity between
-   * the bridge event's own ingestion time and a finality observation's
-   * finalized time, a real but approximate correlation, not a claim that
-   * this specific transaction's own finalization was measured. */
-  finalityAnomalousNear(atIso: string, windowSeconds: number): Promise<boolean>;
+   * finality behavior" for a whole batch of events at once (see
+   * GET /v1/events, which calls this once per request instead of once per
+   * event). Caller does the per-event window check in-memory. Same
+   * underlying comparison as before (wall-clock proximity between a bridge
+   * event's own event_time and a finality observation's finalized time --
+   * a real but approximate correlation, not a claim that this specific
+   * transaction's own finalization was measured), just computed once for
+   * the whole batch instead of once per event. */
+  finalityAnomalousTimestampsBetween(startIso: string, endIso: string): Promise<string[]>;
   /** Real count of bridge events at or after sinceIso whose event_time
    * falls within windowSeconds of a real observation flagged anomalous. */
   countAnomalousBridgeEventsSince(sinceIso: string, windowSeconds: number): Promise<number>;
@@ -662,16 +665,14 @@ class SqliteRadarDb implements RadarDb {
     return rows.map(rowToFinalityObservation);
   }
 
-  async finalityAnomalousNear(atIso: string, windowSeconds: number): Promise<boolean> {
-    const row = this.db
+  async finalityAnomalousTimestampsBetween(startIso: string, endIso: string): Promise<string[]> {
+    const rows = this.db
       .prepare(
-        `SELECT 1 FROM finality_observations
-           WHERE is_anomalous = 1
-             AND ABS(julianday(finalized_at) - julianday(?)) * 86400.0 <= ?
-           LIMIT 1`,
+        `SELECT finalized_at FROM finality_observations
+           WHERE is_anomalous = 1 AND finalized_at >= ? AND finalized_at <= ?`,
       )
-      .get(atIso, windowSeconds) as unknown;
-    return row !== undefined;
+      .all(startIso, endIso) as { finalized_at: string }[];
+    return rows.map((r) => r.finalized_at);
   }
 
   async countAnomalousBridgeEventsSince(sinceIso: string, windowSeconds: number): Promise<number> {
@@ -1025,15 +1026,13 @@ class PostgresRadarDb implements RadarDb {
     return rows.map(rowToFinalityObservation);
   }
 
-  async finalityAnomalousNear(atIso: string, windowSeconds: number): Promise<boolean> {
-    const { rows } = await this.pool.query(
-      `SELECT 1 FROM finality_observations
-         WHERE is_anomalous = TRUE
-           AND ABS(EXTRACT(EPOCH FROM (finalized_at - $1::timestamptz))) <= $2
-         LIMIT 1`,
-      [atIso, windowSeconds],
+  async finalityAnomalousTimestampsBetween(startIso: string, endIso: string): Promise<string[]> {
+    const { rows } = await this.pool.query<{ finalized_at: string }>(
+      `SELECT finalized_at FROM finality_observations
+         WHERE is_anomalous = TRUE AND finalized_at >= $1 AND finalized_at <= $2`,
+      [startIso, endIso],
     );
-    return rows.length > 0;
+    return rows.map((r) => r.finalized_at);
   }
 
   async countAnomalousBridgeEventsSince(sinceIso: string, windowSeconds: number): Promise<number> {
