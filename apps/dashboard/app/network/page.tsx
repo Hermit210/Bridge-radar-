@@ -4,10 +4,15 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Reveal } from "@/components/reveal";
 import { FinalityStatusPanel } from "@/components/finality-status-panel";
-import { getFinalityHistory, type FinalityObservation } from "@/lib/api";
+import { getFinalityHealth, getFinalityHistory, type FinalityHealth, type FinalityObservation } from "@/lib/api";
 import { FinalityChart } from "./finality-chart";
 
-const POLL_MS = 10_000;
+// 15s, not 10s: this was 2 independent polls (this page's own chart data +
+// FinalityStatusPanel's own getFinalityHealth, each every 10s) -- merged
+// into 1 shared effect below, with a modest slowdown. Deliberately the
+// smallest cut of the pages touched for this: this is the one page whose
+// whole purpose is watching Finality Watch closely.
+const POLL_MS = 15_000;
 const WINDOWS = [
   { label: "1h", ms: 60 * 60 * 1000 },
   { label: "6h", ms: 6 * 60 * 60 * 1000 },
@@ -29,6 +34,8 @@ export default function NetworkPage() {
   const [observations, setObservations] = useState<FinalityObservation[]>([]);
   const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [finalityHealth, setFinalityHealth] = useState<FinalityHealth | null>(null);
+  const [finalityErrored, setFinalityErrored] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -40,17 +47,23 @@ export default function NetworkPage() {
       // already computes `truncated` for exactly this case (keeping the most
       // recent points, dropping the oldest); this used to be fetched and
       // silently discarded rather than shown.
-      getFinalityHistory({ since: new Date(Date.now() - windowMs).toISOString(), limit: 2000 })
-        .then((h) => {
-          if (!cancelled) {
-            setObservations(h.history);
-            setTruncated(h.truncated);
-            setLoading(false);
-          }
-        })
-        .catch(() => {
-          if (!cancelled) setLoading(false);
-        });
+      Promise.all([
+        getFinalityHistory({ since: new Date(Date.now() - windowMs).toISOString(), limit: 2000 }).catch(() => null),
+        getFinalityHealth().catch(() => null),
+      ]).then(([h, health]) => {
+        if (cancelled) return;
+        if (h) {
+          setObservations(h.history);
+          setTruncated(h.truncated);
+        }
+        if (health) {
+          setFinalityHealth(health);
+          setFinalityErrored(false);
+        } else {
+          setFinalityErrored(true);
+        }
+        setLoading(false);
+      });
     };
     poll();
     const interval = setInterval(poll, POLL_MS);
@@ -77,7 +90,7 @@ export default function NetworkPage() {
       </div>
 
       <Reveal>
-        <FinalityStatusPanel />
+        <FinalityStatusPanel health={finalityHealth} errored={finalityErrored} />
       </Reveal>
 
       <Reveal>
