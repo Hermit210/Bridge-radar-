@@ -550,24 +550,48 @@ app.get("/v1/wallet-timeline/:address", async (c) => {
 // FINALITY_ANOMALY_WINDOW_SECONDS doc comment below /v1/network/finality.
 const FINALITY_ANOMALY_WINDOW_SECONDS = 5;
 
+// Rounds `since` down to the current RESPONSE_CACHE_TTL_MS bucket so that
+// two callers requesting "since = N hours ago", computed a few seconds
+// apart at their own call time, land on the identical cache key instead of
+// each producing a literal timestamp that never matches another caller's.
+// Honest, deliberate tradeoff: a cached response's real window can be up to
+// RESPONSE_CACHE_TTL_MS *wider* than literally requested -- never
+// narrower, never missing real events, just possibly a few extra ones
+// right at the boundary. Immaterial for windows measured in hours.
+function bucketSince(since: string | undefined): string {
+  if (!since) return "none";
+  const t = new Date(since).getTime();
+  if (Number.isNaN(t)) return since; // malformed input -- never crash, just skip bucketing
+  return String(Math.floor(t / RESPONSE_CACHE_TTL_MS) * RESPONSE_CACHE_TTL_MS);
+}
+
 app.get("/v1/events", async (c) => {
-  const events = await db.listEvents({
-    bridgeId: c.req.query("bridge"),
-    kind: c.req.query("type") as BridgeEventKind | undefined,
-    chain: c.req.query("chain"),
-    since: c.req.query("since"),
-    limit: c.req.query("limit") ? Number(c.req.query("limit")) : undefined,
+  const bridge = c.req.query("bridge");
+  const type = c.req.query("type") as BridgeEventKind | undefined;
+  const chain = c.req.query("chain");
+  const since = c.req.query("since");
+  const limit = c.req.query("limit") ? Number(c.req.query("limit")) : undefined;
+
+  // The real, dominant cost this cache exists for: one DB query per
+  // returned event via finalityAnomalousNear below -- a limit=1000 request
+  // returning, say, 200 real events is ~201 real queries in a single
+  // request. Concurrent callers with the same filters landing in the same
+  // cache-TTL window now share one real round-trip instead of each paying
+  // that cost independently.
+  const key = JSON.stringify({ bridge, type, chain, sinceBucket: bucketSince(since), limit });
+  const withFinality = await cached(`events:${key}`, async () => {
+    const events = await db.listEvents({ bridgeId: bridge, kind: type, chain, since, limit });
+    // Real per-event cross-reference against Finality Watch (see
+    // crates/radar-core/src/finality.rs) -- purely descriptive, not an
+    // advisory/predictive claim about any specific event, same rule as every
+    // other risk-flag feature in this API.
+    return Promise.all(
+      events.map(async (event) => ({
+        ...event,
+        finality_anomaly_at_time: await db.finalityAnomalousNear(event.event_time, FINALITY_ANOMALY_WINDOW_SECONDS),
+      })),
+    );
   });
-  // Real per-event cross-reference against Finality Watch (see
-  // crates/radar-core/src/finality.rs) -- purely descriptive, not an
-  // advisory/predictive claim about any specific event, same rule as every
-  // other risk-flag feature in this API.
-  const withFinality = await Promise.all(
-    events.map(async (event) => ({
-      ...event,
-      finality_anomaly_at_time: await db.finalityAnomalousNear(event.event_time, FINALITY_ANOMALY_WINDOW_SECONDS),
-    })),
-  );
   return c.json({ events: withFinality });
 });
 
