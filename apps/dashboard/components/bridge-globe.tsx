@@ -7,6 +7,7 @@ import type { GlobeMethods } from "react-globe.gl";
 import { bandFor, type BridgeWithHealth } from "@radar/shared";
 import { type RegistryEntry } from "@/lib/api";
 import { useHomepageLiveData } from "./homepage-live-data";
+import { GlobeErrorBoundary } from "./globe-error-boundary";
 
 // react-globe.gl wraps three.js/WebGL and has no meaningful server-rendered
 // output — load it client-only so it never blocks or bloats pages that
@@ -195,47 +196,64 @@ export function BridgeGlobe() {
         }}
       >
         {ready && (
-          <Globe
-            ref={globeRef}
-            onGlobeReady={handleGlobeReady}
-            width={size.width}
-            height={size.height}
-            backgroundColor="rgba(0,0,0,0)"
-            globeImageUrl="/globe/earth-night.jpg"
-            showAtmosphere
-            atmosphereColor="#e0a530"
-            atmosphereAltitude={0.18}
-            pointsData={points}
-            pointLat="lat"
-            pointLng="lng"
-            pointColor={() => "#e0a530"}
-            pointAltitude={0.012}
-            pointRadius={0.35}
-            pointLabel={(p: object) => {
-              const pt = p as ChainPoint;
-              return `<div style="font:600 12px system-ui;color:#f2ede1;background:#1a1815;border:1px solid #3a352c;border-radius:8px;padding:6px 10px">${pt.label}<br/><span style="color:#948a78;font-weight:400">${pt.bridgeCount} monitored bridge${pt.bridgeCount === 1 ? "" : "s"}</span></div>`;
-            }}
-            arcsData={arcs}
-            arcStartLat="startLat"
-            arcStartLng="startLng"
-            arcEndLat="endLat"
-            arcEndLng="endLng"
-            arcColor={(a: object) => (a as Arc).color}
-            arcAltitude={0.28}
-            arcStroke={0.55}
-            arcDashLength={0.4}
-            arcDashGap={0.2}
-            arcDashAnimateTime={(a: object) => (a as Arc).animateTime}
-            arcLabel={(a: object) => {
-              const arc = a as Arc;
-              const scoreText = arc.score !== undefined ? `${arc.score}/100 (${arc.band})` : "no score yet";
-              return `<div style="font:600 12px system-ui;color:#f2ede1;background:#1a1815;border:1px solid #3a352c;border-radius:8px;padding:6px 10px">${arc.bridgeName}<br/><span style="color:#948a78;font-weight:400">Solana ↔ ${arc.otherChain} · ${scoreText}</span></div>`;
-            }}
-            onArcClick={(a: object) => router.push(`/bridges/${(a as Arc).bridgeId}`)}
-            onPointClick={() => router.push("/bridges")}
-            enablePointerInteraction
-            animateIn={false}
-          />
+          <GlobeErrorBoundary
+            fallback={
+              <div className="flex flex-col items-center gap-2 px-6 text-center">
+                <p className="text-sm font-medium text-text-secondary">
+                  3D globe view isn&apos;t supported in this browser.
+                </p>
+                <p className="text-xs text-muted-dark">
+                  {arcs.length} live bridge route{arcs.length === 1 ? "" : "s"} —{" "}
+                  <a href="/bridges" className="underline hover:text-accent">
+                    view them on the dashboard
+                  </a>
+                  .
+                </p>
+              </div>
+            }
+          >
+            <Globe
+              ref={globeRef}
+              onGlobeReady={handleGlobeReady}
+              width={size.width}
+              height={size.height}
+              backgroundColor="rgba(0,0,0,0)"
+              globeImageUrl="/globe/earth-night.jpg"
+              showAtmosphere
+              atmosphereColor="#e0a530"
+              atmosphereAltitude={0.18}
+              pointsData={points}
+              pointLat="lat"
+              pointLng="lng"
+              pointColor={() => "#e0a530"}
+              pointAltitude={0.012}
+              pointRadius={0.35}
+              pointLabel={(p: object) => {
+                const pt = p as ChainPoint;
+                return `<div style="font:600 12px system-ui;color:#f2ede1;background:#1a1815;border:1px solid #3a352c;border-radius:8px;padding:6px 10px">${pt.label}<br/><span style="color:#948a78;font-weight:400">${pt.bridgeCount} monitored bridge${pt.bridgeCount === 1 ? "" : "s"}</span></div>`;
+              }}
+              arcsData={arcs}
+              arcStartLat="startLat"
+              arcStartLng="startLng"
+              arcEndLat="endLat"
+              arcEndLng="endLng"
+              arcColor={(a: object) => (a as Arc).color}
+              arcAltitude={0.28}
+              arcStroke={0.55}
+              arcDashLength={0.4}
+              arcDashGap={0.2}
+              arcDashAnimateTime={(a: object) => (a as Arc).animateTime}
+              arcLabel={(a: object) => {
+                const arc = a as Arc;
+                const scoreText = arc.score !== undefined ? `${arc.score}/100 (${arc.band})` : "no score yet";
+                return `<div style="font:600 12px system-ui;color:#f2ede1;background:#1a1815;border:1px solid #3a352c;border-radius:8px;padding:6px 10px">${arc.bridgeName}<br/><span style="color:#948a78;font-weight:400">Solana ↔ ${arc.otherChain} · ${scoreText}</span></div>`;
+              }}
+              onArcClick={(a: object) => router.push(`/bridges/${(a as Arc).bridgeId}`)}
+              onPointClick={() => router.push("/bridges")}
+              enablePointerInteraction
+              animateIn={false}
+            />
+          </GlobeErrorBoundary>
         )}
       </div>
     </div>
