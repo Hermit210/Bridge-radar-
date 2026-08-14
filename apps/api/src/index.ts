@@ -153,6 +153,34 @@ app.get("/v1/healthz", async (c) =>
   c.json({ ok: true, events: await db.countEvents(), now: new Date().toISOString() }),
 );
 
+// Real, minimal in-memory response cache for the hottest GET routes.
+// Added 2026-08-14 after diagnosing real Render restarts with real
+// evidence (logs + CPU/memory/DB-connection metrics): near-duplicate
+// requests were arriving milliseconds apart -- multiple concurrent
+// browser tabs/visitors independently polling the same data -- driving
+// response times to 15-25s on a free-tier Postgres with zero connection
+// pooling. This doesn't cache resolved values on a timer (which would
+// still let two requests arriving before the first completes both hit
+// Postgres) -- it caches the in-flight *promise*, so every concurrent
+// caller within the TTL window shares the exact same real DB round-trip.
+// A failed compute is evicted immediately rather than cached, so a
+// transient DB error doesn't get replayed to every caller for the full TTL.
+const RESPONSE_CACHE_TTL_MS = 3000;
+const responseCache = new Map<string, { expiresAt: number; promise: Promise<unknown> }>();
+
+function cached<T>(key: string, compute: () => Promise<T>): Promise<T> {
+  const hit = responseCache.get(key);
+  if (hit && hit.expiresAt > Date.now()) {
+    return hit.promise as Promise<T>;
+  }
+  const promise = compute().catch((err) => {
+    responseCache.delete(key);
+    throw err;
+  });
+  responseCache.set(key, { expiresAt: Date.now() + RESPONSE_CACHE_TTL_MS, promise });
+  return promise;
+}
+
 // Surface the v0-naive scoring algorithm + weights on every health-bearing
 // response so consumers (and grant reviewers reading the JSON) can see exactly
 // how the score is computed today.
@@ -165,32 +193,35 @@ const SCORING_META = {
 
 // Bridge registry endpoint - returns all bridges with metadata (identity +
 // detection status only; no TVL — see BRIDGE_REGISTRY doc comment).
-app.get("/v1/registry", (c) => {
-  const implemented = getImplementedBridges();
-  const planned = getPlannedBridges();
-  return c.json({
-    summary: {
-      total: BRIDGE_REGISTRY.length,
-      implemented: implemented.length,
-      planned: planned.length,
-    },
-    implemented: implemented.map((b) => ({
-      id: b.id,
-      name: b.name,
-      homepage: b.homepage,
-      supportedChains: b.supportedChains,
-      hasSolana: b.hasSolana,
-      status: b.status,
-    })),
-    planned: planned.map((b) => ({
-      id: b.id,
-      name: b.name,
-      homepage: b.homepage,
-      supportedChains: b.supportedChains,
-      hasSolana: b.hasSolana,
-      status: b.status,
-    })),
+app.get("/v1/registry", async (c) => {
+  const body = await cached("registry", async () => {
+    const implemented = getImplementedBridges();
+    const planned = getPlannedBridges();
+    return {
+      summary: {
+        total: BRIDGE_REGISTRY.length,
+        implemented: implemented.length,
+        planned: planned.length,
+      },
+      implemented: implemented.map((b) => ({
+        id: b.id,
+        name: b.name,
+        homepage: b.homepage,
+        supportedChains: b.supportedChains,
+        hasSolana: b.hasSolana,
+        status: b.status,
+      })),
+      planned: planned.map((b) => ({
+        id: b.id,
+        name: b.name,
+        homepage: b.homepage,
+        supportedChains: b.supportedChains,
+        hasSolana: b.hasSolana,
+        status: b.status,
+      })),
+    };
   });
+  return c.json(body);
 });
 
 // Real protocol TVL for a bridge, from the DeFiLlama-backed cache (see
@@ -216,17 +247,23 @@ async function protocolTvlFor(bridgeId: string) {
 }
 
 app.get("/v1/bridges", async (c) => {
-  const [bridges, allScores] = await Promise.all([db.listBridges(), db.latestScores()]);
-  const scores = new Map(allScores.map((s) => [s.bridge_id, s]));
+  // Real cost that makes this the most important route to cache: 2 queries
+  // (listBridges + latestScores) plus one more real DB query per bridge via
+  // protocolTvlFor -- ~18 queries for a single request with 16 real bridges.
+  const body = await cached("bridges", async () => {
+    const [bridges, allScores] = await Promise.all([db.listBridges(), db.latestScores()]);
+    const scores = new Map(allScores.map((s) => [s.bridge_id, s]));
 
-  const out: BridgeWithHealth[] = await Promise.all(
-    bridges.map(async (b) => ({
-      ...b,
-      health: scores.get(b.id),
-      defillama: await protocolTvlFor(b.id),
-    })),
-  );
-  return c.json({ scoring: SCORING_META, bridges: out });
+    const out: BridgeWithHealth[] = await Promise.all(
+      bridges.map(async (b) => ({
+        ...b,
+        health: scores.get(b.id),
+        defillama: await protocolTvlFor(b.id),
+      })),
+    );
+    return { scoring: SCORING_META, bridges: out };
+  });
+  return c.json(body);
 });
 
 app.get("/v1/bridges/:id", async (c) => {
@@ -555,42 +592,45 @@ function medianElapsedMs(observations: { elapsedMs: number }[]): number | null {
 }
 
 app.get("/v1/network/finality", async (c) => {
-  const sinceIso = new Date(Date.now() - FINALITY_BASELINE_WINDOW_MS).toISOString();
-  const [latest, window, anomalousBridgeEventsLastHour] = await Promise.all([
-    db.latestFinalityObservation(),
-    db.finalityObservationsSince(sinceIso),
-    db.countAnomalousBridgeEventsSince(sinceIso, FINALITY_ANOMALY_WINDOW_SECONDS),
-  ]);
+  const body = await cached("network-finality", async () => {
+    const sinceIso = new Date(Date.now() - FINALITY_BASELINE_WINDOW_MS).toISOString();
+    const [latest, window, anomalousBridgeEventsLastHour] = await Promise.all([
+      db.latestFinalityObservation(),
+      db.finalityObservationsSince(sinceIso),
+      db.countAnomalousBridgeEventsSince(sinceIso, FINALITY_ANOMALY_WINDOW_SECONDS),
+    ]);
 
-  const sampleCount = window.length;
-  const rollingBaselineMs = sampleCount >= FINALITY_MIN_BASELINE_SAMPLES ? medianElapsedMs(window) : null;
-  const isAnomalous =
-    latest !== null &&
-    rollingBaselineMs !== null &&
-    rollingBaselineMs > 0 &&
-    latest.elapsedMs > rollingBaselineMs * FINALITY_ANOMALY_MULTIPLIER;
+    const sampleCount = window.length;
+    const rollingBaselineMs = sampleCount >= FINALITY_MIN_BASELINE_SAMPLES ? medianElapsedMs(window) : null;
+    const isAnomalous =
+      latest !== null &&
+      rollingBaselineMs !== null &&
+      rollingBaselineMs > 0 &&
+      latest.elapsedMs > rollingBaselineMs * FINALITY_ANOMALY_MULTIPLIER;
 
-  return c.json({
-    latest: latest
-      ? {
-          slot: latest.slot,
-          confirmedAt: latest.confirmedAt,
-          finalizedAt: latest.finalizedAt,
-          elapsedMs: latest.elapsedMs,
-        }
-      : null,
-    rollingBaselineMs,
-    sampleCount,
-    windowStart: sinceIso,
-    isAnomalous,
-    anomalousBridgeEventsLastHour,
-    note:
-      latest === null
-        ? "no real observations yet -- the indexer's finality tracker hasn't recorded any confirmed->finalized transitions since it last started"
-        : sampleCount < FINALITY_MIN_BASELINE_SAMPLES
-          ? `only ${sampleCount} real observation(s) in the trailing hour -- below the ${FINALITY_MIN_BASELINE_SAMPLES} needed to trust a baseline, so isAnomalous is always false until there are enough`
-          : "rollingBaselineMs and isAnomalous are computed from real observed data only",
+    return {
+      latest: latest
+        ? {
+            slot: latest.slot,
+            confirmedAt: latest.confirmedAt,
+            finalizedAt: latest.finalizedAt,
+            elapsedMs: latest.elapsedMs,
+          }
+        : null,
+      rollingBaselineMs,
+      sampleCount,
+      windowStart: sinceIso,
+      isAnomalous,
+      anomalousBridgeEventsLastHour,
+      note:
+        latest === null
+          ? "no real observations yet -- the indexer's finality tracker hasn't recorded any confirmed->finalized transitions since it last started"
+          : sampleCount < FINALITY_MIN_BASELINE_SAMPLES
+            ? `only ${sampleCount} real observation(s) in the trailing hour -- below the ${FINALITY_MIN_BASELINE_SAMPLES} needed to trust a baseline, so isAnomalous is always false until there are enough`
+            : "rollingBaselineMs and isAnomalous are computed from real observed data only",
+    };
   });
+  return c.json(body);
 });
 
 const FINALITY_HISTORY_DEFAULT_WINDOW_MS = 60 * 60 * 1000; // 1h
