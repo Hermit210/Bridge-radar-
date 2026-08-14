@@ -87,7 +87,7 @@ export function FinalityStatusPanel({ compact = false, health: healthProp, error
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-dark">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-dark">
             <span className={`status-dot ${meta.dotClass}`}></span>
             Network finality status
             {compact && (
