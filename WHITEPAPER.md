@@ -225,7 +225,7 @@ A lending protocol could refuse to accept wrapped USDC as collateral when the is
 | 1     | 2–4   | Solana + EVM indexers, normalized event store, parity detector for Wormhole + Allbridge | $1,200 |
 | 2     | 5–6   | Outflow + signer-set + frontend + oracle detectors; Health Score v1          | $1,000 |
 | 3     | 7–8   | Public dashboard (Next.js + shadcn), REST + WS API                           | $1,000 |
-| 4     | 9–10  | On-chain oracle program (Anchor), devnet + mainnet deploy, audit-light review| $1,000 |
+| 4     | 9–10  | On-chain oracle program (Anchor), devnet deploy , audit-light review| $1,000 |
 | 5     | 11    | Telegram/Discord/webhook alerting, docs, public launch                       | $300   |
 | 6     | 12    | Stretch: add LayerZero, deBridge, Mayan; community handoff doc               | $200   |
 
