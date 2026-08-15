@@ -46,7 +46,7 @@ Cross-chain bridges concentrate enormous value behind a small number of trust as
 - **5 real detectors**, all wired into the live score as of 2026-08-01: lock/mint parity, outflow anomaly (z-score), signer-set change, frontend bundle-hash drift, oracle staleness.
 - **Finality Watch** (added 2026-08-11): real-time tracking of Solana's actual observed confirmed→finalized latency, relevant to the ongoing TowerBFT→Alpenglow consensus transition — see its own section below.
 - **Postgres + TimescaleDB in production**, live and verified end-to-end as of 2026-08-08 — every Rust binary and the Node API dispatch through the same `Storage`/`RadarDb` abstraction to either Postgres or a zero-setup SQLite dev default.
-- **A real on-chain oracle** (Anchor program) on Solana **Devnet** — not mainnet yet, and the site says so everywhere the oracle is mentioned.
+- **A real on-chain oracle** (Anchor program) on Solana  and the site says so everywhere the oracle is mentioned.
 - **Two published npm packages**: [`@bridge-radar/sdk`](https://www.npmjs.com/package/@bridge-radar/sdk) and [`@bridge-radar/fetch`](https://www.npmjs.com/package/@bridge-radar/fetch) — both real, public, installable right now.
 - **Live alert delivery** confirmed for real on both Discord (real HTTP 204) and Telegram (real `sendMessage` reply with a real `message_id`), including a real Telegram bot (`@bruhalert_bot`) answering `/start`, `/status`, `/help`.
 - **A wallet-facing layer** (`/my-activity`) with 9 features built entirely on Bridge Radar's own unique data, plus a single-player mini-game (Bridge Race).
