@@ -1,4 +1,8 @@
-# Bridge Radar
+<p align="center">
+  <img src=".github/assets/bridge-radar-icon.png" width="96" alt="Bridge Radar icon" />
+</p>
+
+<h1 align="center">Bridge Radar</h1>
 
 **Real-time bridge-health intelligence layer for Solana.** Open source, public good, no token, no equity, no premine.
 
