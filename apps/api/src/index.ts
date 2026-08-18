@@ -149,9 +149,13 @@ app.get("/", (c) =>
   }),
 );
 
-app.get("/v1/healthz", async (c) =>
-  c.json({ ok: true, events: await db.countEvents(), now: new Date().toISOString() }),
-);
+// Liveness probe only -- confirms the process is up, nothing else. Render
+// hits this every ~5s with a hard 5s timeout; it used to also run
+// db.countEvents() (an uncached SELECT COUNT(*) full-table scan), which on
+// a cold connection pool competing with 6 other services against free-tier
+// Postgres (no pooling) regularly took 6-27s and got the instance killed
+// for a health-check timeout, restarting into the exact same contention.
+app.get("/v1/healthz", (c) => c.json({ ok: true, now: new Date().toISOString() }));
 
 // Real, minimal in-memory response cache for the hottest GET routes.
 // Added 2026-08-14 after diagnosing real Render restarts with real
